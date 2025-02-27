@@ -1,0 +1,42 @@
+{% block head %}
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Gipsy - Inicio de Sesión</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='CSS/login.css') }}"/>
+    <link rel="icon" type="image/jpg" href="{{ url_for('static', filename='IMG/Gipsy_isotipo_color.png') }}">
+    <!-- PyScript -->
+    <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css"/>
+    <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="logo">
+            <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"/>
+        </div>
+        <div class="form">
+            <h2>Inicie Sesión</h2>
+            <form id="loginForm" onsubmit="event.preventDefault(); submitLogin();">
+                <input type="text" name="User" placeholder="Usuario" required>
+                <br>
+                <div class="password-container">
+                    <input type="password" name="Password" placeholder="Contraseña" required>
+                </div>
+                <br>
+                <input type="submit" value="Ingresar">
+                <br>
+            </form>
+        </div>
+    </div>
+    <script>
+        function submitLogin() {
+            const user = document.querySelector('input[name="User"]').value;
+            const password = document.querySelector('input[name="Password"]').value;
+            if ((user === 'usuario' && password === '123') || (user === 'Gipsy' && password === 'BIgipsy2025*')) {
+                window.location.href = '{{ url_for("mainapp.homeCashier") }}';
+            } else {
+                alert('Credenciales incorrectas, por favor intente de nuevo.');
+            }
+        }
+    </script>
+{% endblock %}

@@ -1,0 +1,21 @@
+/* Anchos de las columnas para Conceptos */
+
+.styled-table th:nth-child(1), 
+.styled-table td:nth-child(1) {
+    width: 10%; /* Espacio para ID */
+}
+
+.styled-table th:nth-child(2), 
+.styled-table td:nth-child(2) {
+    width: 50%; /* Espacio para el Nombre/Descripción */
+}
+
+.styled-table th:nth-child(3), 
+.styled-table td:nth-child(3) {
+    width: 30%; /* Espacio para Movimiento */
+}
+
+.styled-table th:nth-child(4), 
+.styled-table td:nth-child(4) {
+    width: 10%; /* Espacio para Editar */
+}
