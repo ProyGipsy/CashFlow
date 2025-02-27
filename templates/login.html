@@ -1,15 +1,13 @@
-{% block head %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Gipsy - Inicio de Sesión</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='CSS/login.css') }}"/>
     <link rel="icon" type="image/jpg" href="{{ url_for('static', filename='IMG/Gipsy_isotipo_color.png') }}">
-    <!-- PyScript -->
-    <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css"/>
-    <script defer src="https://pyscript.net/latest/pyscript.js"></script>
-{% endblock %}
-
-{% block content %}
+</head>
+<body>
     <div class="card">
         <div class="logo">
             <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"/>
@@ -39,4 +37,5 @@
             }
         }
     </script>
-{% endblock %}
+</body>
+</html>
