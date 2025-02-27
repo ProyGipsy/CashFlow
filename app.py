@@ -9,7 +9,7 @@ app = Flask(__name__)
 @app.route('/')
 def index():
    print('Request for login page received')
-   return render_template('index.html')
+   return render_template('login.html')
 
 @app.route('/favicon.ico')
 def favicon():
