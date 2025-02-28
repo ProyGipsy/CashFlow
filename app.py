@@ -1,6 +1,9 @@
 import os
 
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for)
+from .db import get_beneficiaries
+from .db import get_last_beneficiary_id
+
 
 app = Flask(__name__)
 
