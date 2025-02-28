@@ -1,7 +1,9 @@
 import os
 
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify)
-
+from db import get_beneficiaries, get_stores, get_concepts, get_creditConcepts, get_debitConcepts, get_operations
+from db import get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id
+from db import set_beneficiaries, set_concepts, set_stores, set_operations
 
 app = Flask(__name__)
 
