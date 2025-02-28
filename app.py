@@ -15,9 +15,5 @@ def homeCashier():
     return render_template('homeCashier.html', page='homeCashier', active_page='homeCashier')
    
 
-@mainapp.route('/logout')
-def logout():
-    return render_template('index.html')
-
 if __name__ == '__main__':
    app.run()
