@@ -13,38 +13,38 @@
     <!-- MENU CASHIER -->
     <div class="sidebar" id="sidebar">
         <div class="logo">
-            <a href="{{ url_for('mainapp.homeCashier') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
+            <a href="{{ url_for('homeCashier') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
         </div>
         <div class="containerSideBar">
             <ul>
                 <li>
                     <div class="optionContainer {% if active_page == 'homeCashier' %}active{% endif %}">
                         {% if active_page == 'homeCashier' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('mainapp.homeCashier') }}" class="optionLink">Inicio</a>
+                        <a href="{{ url_for('homeCashier') }}" class="optionLink">Inicio</a>
                     </div>
                 </li>                             
                 <li>
                     <div class="optionContainer {% if active_page == 'operations' %}active{% endif %}">
                         {% if active_page == 'operations' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('mainapp.operations') }}" class="optionLink">Operaciones</a>
+                        <a href="{{ url_for('operations') }}" class="optionLink">Operaciones</a>
                     </div>
                 </li>
                 <li>
                     <div class="optionContainer {% if active_page == 'beneficiaries' %}active{% endif %}">
                         {% if active_page == 'beneficiaries' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('mainapp.beneficiaries') }}" class="optionLink">Beneficiarios</a>
+                        <a href="{{ url_for('beneficiaries') }}" class="optionLink">Beneficiarios</a>
                     </div>
                 </li>
                 <li>
                     <div class="optionContainer {% if active_page == 'stores' %}active{% endif %}">
                         {% if active_page == 'stores' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('mainapp.stores') }}" class="optionLink">Compañías</a>
+                        <a href="{{ url_for('stores') }}" class="optionLink">Compañías</a>
                     </div>
                 </li>
                 <li>
                     <div class="optionContainer {% if active_page == 'concepts' %}active{% endif %}">
                         {% if active_page == 'concepts' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('mainapp.concepts') }}" class="optionLink">Conceptos</a>
+                        <a href="{{ url_for('concepts') }}" class="optionLink">Conceptos</a>
                     </div>
                 </li>
             </ul>
@@ -52,7 +52,7 @@
                 <li>
                     <div class="optionContainer {% if active_page == 'login' %}active{% endif %}">
                         {% if active_page == 'login' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('mainapp.logout') }}" class="optionLink">Cerrar Sesión</a>
+                        <a href="{{ url_for('logout') }}" class="optionLink">Cerrar Sesión</a>
                     </div>
                 </li>
             </ul>
@@ -66,7 +66,7 @@
                 <img src="{{ url_for('static', filename='IMG/menu_icon.png') }}" alt="Menu Icon">
             </div>
             <div class="logoMobile">
-                <a href="{{ url_for('mainapp.homeCashier') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
+                <a href="{{ url_for('homeCashier') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
             </div>
             <div class="space2"></div>
         </header>
