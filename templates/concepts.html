@@ -1,0 +1,264 @@
+{% extends 'base.html' %}
+
+{% block title %}Gipsy - Conceptos{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/tableInterface.css') }}"/>
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/concepts.css') }}"/>
+{% endblock %}
+
+{% block content %}
+
+<div class="content">
+    <div class="title-container">
+        <a class="back" href="{{ url_for('homeCashier') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <div class="title-center">
+            <h2>Conceptos</h2>
+        </div>
+    </div>
+
+    <br>
+    <form action="{{ url_for('concepts') }}" method="POST">
+        <div class="searchBar">
+            <div class="searchInputContainer">
+                <input type="text" placeholder="Buscar" name="search" oninput="filterTable(this.value)">
+                <button type="submit">
+                    <img src="{{ url_for('static', filename='IMG/lupa.png') }}" alt="Buscar">
+                </button>
+            </div>
+        </div>
+    </form>
+    <br>
+
+    <!-- Lista de Conceptos. Hay que conectar con la BD -->     
+    <table class="styled-table" id="rules-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Descripción</th>
+                <th>Movimiento</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for concept in concepts %}
+            <tr>
+                <td>{{ concept[0] }}</td>
+                <td>{{ concept[1] }}</td>
+                <td>{{ concept[2] }}</td>
+                <td>{{ concept[3] }}</td>
+                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>  
+    
+    <button class="add-button" onclick="addRow()">+</button>
+
+    <!--Formularios ocultos para escritura-->
+    <form id="addForm" action="{{ url_for('concepts') }}" method="POST" style="display:none;">
+        <input type="hidden" name="action" value="add">
+        <input type="hidden" name="id" id="addId">
+        <input type="hidden" name="name" id="addName">
+        <input type="hidden" name="desc" id="addDesc">
+        <input type="hidden" name="motion" id="addMotion">
+    </form>
+    
+    <form id="editForm" action="{{ url_for('concepts') }}" method="POST" style="display:none;">
+        <input type="hidden" name="action" value="edit">
+        <input type="hidden" name="id" id="editId">
+        <input type="hidden" name="name" id="editName">
+        <input type="hidden" name="desc" id="editDesc">
+        <input type="hidden" name="motion" id="editMotion">
+    </form>
+
+    <br><br>
+    <div class="button-container">
+        <button type="button" class="undo-button" onclick="undoChanges()">Deshacer cambios</button>
+        <button type="button" class="save-button" onclick="saveChanges()">Guardar cambios</button>
+    </div>
+
+    <div id="loadingModal" class="loading-modal">
+        <div class="loading-content">
+            <p>Guardando cambios...</p>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let isChanged = false;
+    let nextId = {{ last_id + 1 }}; // Toma el último ID de la BD
+
+    function toggleSidebar() {
+        var sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('active');
+    }
+
+    function toggleBackground() {
+        var sidebar = document.getElementById('backgroundOpacity');
+        sidebar.classList.toggle('active');
+    }
+
+    function closeSidebar() {
+        var sidebar = document.getElementById('sidebar');
+        if (sidebar.classList.contains('active')) {
+            sidebar.classList.remove('active');
+        }
+        if (backgroundOpacity.classList.contains('active')) {
+            backgroundOpacity.classList.remove('active');
+        }
+    }
+
+    function filterTable(searchTerm) {
+        const table = document.getElementById('rules-table');
+        const rows = table.getElementsByTagName('tr');
+        
+        for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].getElementsByTagName('td');
+            let rowContainsSearchTerm = false;
+            
+            for (let j = 0; j < cells.length; j++) {
+                const cellText = cells[j].textContent.toLowerCase();
+                if (cellText.includes(searchTerm.toLowerCase())) {
+                    rowContainsSearchTerm = true;
+                    break;
+                }
+            }
+            
+            if (rowContainsSearchTerm) {
+                rows[i].style.display = '';
+            } else {
+                rows[i].style.display = 'none';
+            }
+        }
+    }
+
+    function editRow(btn) {
+        const row = btn.closest('tr');
+        const cells = row.getElementsByTagName('td');
+        
+        if (row.querySelector('input') || row.querySelector('select')) {
+            Array.from(cells).forEach((cell) => {
+                const input = cell.querySelector('input');
+                const select = cell.querySelector('select');
+                if (input) {
+                    cell.textContent = input.value;
+                } else if (select) {
+                    cell.textContent = select.options[select.selectedIndex].text;
+                }
+            });
+        } else {
+            cells[1].innerHTML = `<input type="text" class="input-field" value="${cells[1].textContent}"/>`;
+            cells[2].innerHTML = `<input type="text" class="input-field" value="${cells[2].textContent}"/>`;
+            cells[3].innerHTML = `
+                <select class="input-field">
+                    <option value="Ingreso" ${cells[2].textContent === 'Ingreso' ? 'selected' : ''}>Ingreso</option>
+                    <option value="Egreso" ${cells[2].textContent === 'Egreso' ? 'selected' : ''}>Egreso</option>
+                </select>`;
+        }
+        isChanged = true;
+    }
+
+    function addRow() {
+        const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
+        const newRow = table.insertRow();
+        newRow.innerHTML = `
+            <td>${nextId}</td> <!-- Mostrar el próximo ID -->
+            <td><input type="text" class="input-field" placeholder="Nombre" id="newName" /></td>
+            <td><input type="text" class="input-field" placeholder="Descripción" /></td>
+            <td>
+                <select class="input-field">
+                    <option value="Ingreso">Ingreso</option>
+                    <option value="Egreso">Egreso</option>
+                </select>
+            </td>
+            <td><span class="edit-icon" onclick="submitNewConcept()"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
+        `;
+        nextId++;
+        isChanged = true;
+    }
+
+    function submitNewConcept(){
+        const name = document.getElementById('newName').value;
+        const desc = document.querySelector('[placeholder="Descripción"]').value;
+        const typeMotion = document.querySelector('select.input-field').value; // Obtener el texto del select
+        
+        if (name && desc && typeMotion) {
+            // Asigna el ID directamente
+            document.getElementById('addId').value = nextId - 1; // Usa el ID que se mostró
+            document.getElementById('addName').value = name;
+            document.getElementById('addDesc').value = desc;
+            document.getElementById('addMotion').value = typeMotion; // Enviar el type_motion al servidor
+            document.getElementById('addForm').submit();
+        } else {
+            alert("Por favor, completa todos los campos antes de agregar.");
+        }
+    }
+
+    function saveChanges() {
+        document.getElementById('loadingModal').style.display = 'flex';
+        const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
+        const concepts = [];
+        
+        for (let row of table.rows) {
+            const id = row.cells[0].textContent.trim(); // Obtener el ID directamente del texto
+            const nameInput = row.cells[1].querySelector('input');
+            const descInput = row.cells[2].querySelector('input');
+            const typeMotionInput = row.cells[3].querySelector('select');
+    
+            const name = nameInput ? nameInput.value.trim() : row.cells[1].textContent.trim();
+            const desc = descInput ? descInput.value.trim() : row.cells[2].textContent.trim();
+            const typeMotion = typeMotionInput ? typeMotionInput.value : row.cells[3].textContent.trim();
+    
+            console.log(name);
+            console.log(desc);
+            console.log(typeMotion);
+            
+            if (id && name && desc && typeMotion) {
+                concepts.push({ id, name, desc, motion: typeMotion }); // Enviar el type_motion al servidor
+            }
+        }
+        
+        // Enviar los datos al servidor
+        if (concepts.length > 0) {
+    
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "{{ url_for('concepts') }}", true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+        
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    window.location.reload();
+                } else {
+                    alert("Hubo un error al guardar los cambios.");
+                }
+            };
+        
+            xhr.send(JSON.stringify(concepts));
+            isChanged = false;
+        } else {
+            alert("No se realizaron cambios.");
+        }
+    }
+
+    function undoChanges() {
+        if (isChanged) {
+            if (confirm("¿Estás seguro de que quieres deshacer los cambios?")) {
+                isChanged = false;
+                window.location.reload();
+            }
+        }
+    }
+
+    window.onbeforeunload = function() {
+        if (isChanged) {
+            return "Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?";
+        }
+    };
+</script>
+{% endblock %}
