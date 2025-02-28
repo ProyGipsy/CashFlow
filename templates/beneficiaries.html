@@ -43,13 +43,13 @@
             <tr>
                 <td>{{ beneficiary[0] }}</td>
                 <td data-original-name="{{ beneficiary[1] }}">{{ beneficiary[1] }}</td>
-                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
+                <td><span class="edit-icon"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
             </tr>
             {% endfor %}
         </tbody>               
     </table>  
 
-    <button class="add-button" onclick="addRow()">+</button>
+    <button class="add-button">+</button>
 
     <!--Formularios ocultos para escritura-->
     <form id="addForm" action="{{ url_for('beneficiaries') }}" method="POST" style="display:none;">
@@ -66,8 +66,8 @@
 
     <br><br>
     <div class="button-container">
-        <button type="button" class="undo-button" onclick="undoChanges()">Deshacer cambios</button>
-        <button type="button" class="save-button" onclick="saveChanges()">Guardar cambios</button>
+        <button type="button" class="undo-button">Deshacer cambios</button>
+        <button type="button" class="save-button">Guardar cambios</button>
     </div>
 
     <div id="loadingModal" class="loading-modal">
