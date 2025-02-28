@@ -43,13 +43,13 @@
             <tr>
                 <td>{{ beneficiary[0] }}</td>
                 <td data-original-name="{{ beneficiary[1] }}">{{ beneficiary[1] }}</td>
-                <td><span class="edit-icon"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
+                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
             </tr>
             {% endfor %}
         </tbody>               
     </table>  
 
-    <button class="add-button">+</button>
+    <button class="add-button" onclick="addRow()">+</button>
 
     <!--Formularios ocultos para escritura-->
     <form id="addForm" action="{{ url_for('beneficiaries') }}" method="POST" style="display:none;">
@@ -66,8 +66,8 @@
 
     <br><br>
     <div class="button-container">
-        <button type="button" class="undo-button">Deshacer cambios</button>
-        <button type="button" class="save-button">Guardar cambios</button>
+        <button type="button" class="undo-button" onclick="undoChanges()">Deshacer cambios</button>
+        <button type="button" class="save-button" onclick="saveChanges()">Guardar cambios</button>
     </div>
 
     <div id="loadingModal" class="loading-modal">
@@ -82,5 +82,150 @@
 
 {% block extra_js %}
 <script>
+    let isChanged = false;
+    let nextId = {{ last_id + 1 }}; // Toma el último ID de la BD
+
+    function toggleSidebar() {
+        var sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('active');
+    }
+
+    function toggleBackground() {
+        var sidebar = document.getElementById('backgroundOpacity');
+        sidebar.classList.toggle('active');
+    }
+
+    function closeSidebar() {
+        var sidebar = document.getElementById('sidebar');
+        if (sidebar.classList.contains('active')) {
+            sidebar.classList.remove('active');
+        }
+        if (backgroundOpacity.classList.contains('active')) {
+            backgroundOpacity.classList.remove('active');
+        }
+    }
+
+    function filterTable(searchTerm) {
+        const table = document.getElementById('rules-table');
+        const rows = table.getElementsByTagName('tr');
+        
+        for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].getElementsByTagName('td');
+            let rowContainsSearchTerm = false;
+            
+            for (let j = 0; j < cells.length; j++) {
+                const cellText = cells[j].textContent.toLowerCase();
+                if (cellText.includes(searchTerm.toLowerCase())) {
+                    rowContainsSearchTerm = true;
+                    break;
+                }
+            }
+            
+            if (rowContainsSearchTerm) {
+                rows[i].style.display = '';
+            } else {
+                rows[i].style.display = 'none';
+            }
+        }
+    }
+
+    function editRow(btn) {
+        const row = btn.closest('tr');
+        const cells = row.getElementsByTagName('td');
+        
+        if (row.querySelector('input')) {
+            Array.from(cells).forEach((cell) => {
+                const input = cell.querySelector('input');
+                if (input) {
+                    cell.textContent = input.value;
+                }
+            });
+        } else {
+            cells[1].innerHTML = `<input type="text" class="input-field" value="${cells[1].textContent}"/>`;
+        }
+        isChanged = true;
+    }
+
+    function addRow() {
+        const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
+        const newRow = table.insertRow();
+        newRow.innerHTML = `
+            <td>${nextId}</td> <!-- Mostrar el próximo ID -->
+            <td><input type="text" class="input-field" placeholder="Nombre del Beneficiario" id="newName" /></td>
+            <td><span class="edit-icon" onclick="submitNewBeneficiary()"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Agregar"></span></td>
+        `;
+        nextId++;
+        isChanged = true;
+    }
+    
+    function submitNewBeneficiary() {
+        const name = document.getElementById('newName').value;
+        if (name) {
+            // Asigna el ID directamente
+            document.getElementById('addId').value = nextId - 1; // Usa el ID que se mostró
+            document.getElementById('addName').value = name;
+            document.getElementById('addForm').submit();
+        } else {
+            alert("Por favor, completa el campo de nombre antes de agregar.");
+        }
+    }
+
+    function undoChanges() {
+        if (isChanged) {
+            if (confirm("¿Estás seguro de que quieres deshacer los cambios?")) {
+                isChanged = false;
+                window.location.reload();
+            }
+        }
+    }
+
+    function saveChanges() {
+        document.getElementById('loadingModal').style.display = 'flex';
+        const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
+        const beneficiaries = [];
+        
+        
+        for (let row of table.rows) {
+            const id = row.cells[0].textContent.trim(); // Obtener el ID directamente del texto
+            const nameInput = row.cells[1].querySelector('input');
+            
+            if (nameInput) {
+                const name = nameInput.value.trim();
+                beneficiaries.push({ id, name });
+            } else {
+                const name = row.cells[1].textContent.trim(); // Obtener el nombre directamente del texto
+                if (id && name) {
+                    beneficiaries.push({ id, name });
+                }
+            }
+        }
+        
+        // Enviar los datos al servidor
+        if (beneficiaries.length > 0) {
+    
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "{{ url_for('beneficiaries') }}", true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+        
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    window.location.reload();
+                } else {
+                    alert("Hubo un error al guardar los cambios.");
+                }
+            };
+        
+            xhr.send(JSON.stringify(beneficiaries));
+            isChanged = false;
+        } else {
+            alert("No se realizaron cambios.");
+        }
+    }
+
+    window.onbeforeunload = function() {
+        if (isChanged) {
+            return "Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?";
+        }
+    };
 </script>
 {% endblock %}
