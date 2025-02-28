@@ -3,10 +3,10 @@ import pymssql
 
 def get_db_connection():
     conn = pymssql.connect(
-        server = os.getenv('AZURE_SQL_SERVER'),
-        database = os.getenv('AZURE_SQL_DATABASE'),
-        user = os.getenv('AZURE_SQL_USER'),
-        password = os.getenv('AZURE_SQL_PASSWORD')
+        server = os.environ.get('AZURE_SQL_SERVER'),
+        database = os.environ.get('AZURE_SQL_DATABASE'),
+        user = os.environ.get('AZURE_SQL_USER'),
+        password = os.environ.get('AZURE_SQL_PASSWORD')
     )
     return conn
 
