@@ -79,10 +79,6 @@ def concepts():
         set_concepts(data)
         return jsonify(success=True)
     return render_template('concepts.html', page='concepts', active_page='concepts', concepts=concepts, last_id=last_id)
-
-@app.route('/logout')
-def logout():
-    return render_template('login.html', page='login', active_page='login')
    
 
 if __name__ == '__main__':
