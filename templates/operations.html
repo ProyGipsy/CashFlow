@@ -54,12 +54,20 @@
                 <td>{{ operation[3] }}</td>
                 <td>{{ operation[4] }}</td>
                 <td>{{ operation[5] }}</td>
-                <td>{{ operation[6] if operation[6] else '' }}</td>
-                <td>{{ operation[7] if operation[7] else '' }}</td>
+                <td>
+                    {% if operation[6] != '0,00' %}
+                        {{ operation[6] }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if operation[7] != '0,00' %}
+                        {{ operation[7] }}
+                    {% endif %}
+                </td>
                 <td>{{ operation[8] }}</td>
             </tr>
             {% endfor %}
-        </tbody>        
+        </tbody> 
     </table>
 
     <br>
