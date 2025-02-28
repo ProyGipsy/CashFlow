@@ -3,10 +3,10 @@ import pymssql
 
 def get_db_connection():
     server = os.environ.get('DB_SERVER')
-    database = os.environ.get('DB_NAME')
     user = os.environ.get('DB_USER')
     password = os.environ.get('DB_PASSWORD')
-    conn = pymssql.connect(server, database, user, password)
+    database = os.environ.get('DB_NAME')
+    conn = pymssql.connect(server, user, password, database)
     return conn
 
 
