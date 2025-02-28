@@ -10,14 +10,14 @@
 
 <div class="content">
     <div class="title-container">
-        <a class="back" href="{{ url_for('mainapp.homeCashier') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <a class="back" href="{{ url_for('homeCashier') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
         <div class="title-center">
             <h2>Compañía</h2>
         </div>
     </div>
 
     <br>
-    <form action="{{ url_for('mainapp.stores') }}" method="POST">
+    <form action="{{ url_for('stores') }}" method="POST">
         <div class="searchBar">
             <div class="searchInputContainer">
                 <input type="text" placeholder="Buscar" name="search" oninput="filterTable(this.value)">
@@ -52,13 +52,13 @@
     <button class="add-button" onclick="addRow()">+</button>
 
     <!--Formularios ocultos para escritura-->
-    <form id="addForm" action="{{ url_for('mainapp.stores') }}" method="POST" style="display:none;">
+    <form id="addForm" action="{{ url_for('stores') }}" method="POST" style="display:none;">
         <input type="hidden" name="action" value="add">
         <input type="hidden" name="id" id="addId">
         <input type="hidden" name="name" id="addName">
     </form>
     
-    <form id="editForm" action="{{ url_for('mainapp.stores') }}" method="POST" style="display:none;">
+    <form id="editForm" action="{{ url_for('stores') }}" method="POST" style="display:none;">
         <input type="hidden" name="action" value="edit">
         <input type="hidden" name="id" id="editId">
         <input type="hidden" name="name" id="editName">
@@ -194,7 +194,7 @@
         if (stores.length > 0) {
     
             const xhr = new XMLHttpRequest();
-            xhr.open("POST", "{{ url_for('mainapp.stores') }}", true);
+            xhr.open("POST", "{{ url_for('stores') }}", true);
             xhr.setRequestHeader("Content-Type", "application/json");
         
             xhr.onload = function() {
