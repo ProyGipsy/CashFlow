@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block title %}Gipsy - Operaciones{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/operations.css') }}"/>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="title-container">
+        <a class="back" href="{{ url_for('homeCashier') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <div class="title-center">
+            <h2>Operaciones</h2>
+        </div>
+    </div>
+
+    <br>
+    <form action="{{ url_for('operations') }}" method="POST">
+        <div class="searchBar">
+            <div class="searchInputContainer">
+                <input type="text" placeholder="Buscar" name="search" oninput="filterTable(this.value)">
+                <button type="submit">
+                    <img src="{{ url_for('static', filename='IMG/lupa.png') }}" alt="Buscar">
+                </button>
+            </div>
+        </div>
+    </form>
+    <br> 
+
+    <button class="add-operation" onclick="openModal()">Agregar operación</button>
+    <br>
+
+    <table class="styled-table" id="rules-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Compañía</th>
+                <th>Concepto</th>
+                <th>Beneficiario</th>
+                <th>Observación</th>
+                <th>Crédito</th>
+                <th>Débito</th>
+                <th>Saldo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for operation in operations | reverse %}
+            <tr>
+                <td>{{ operation[0] }}</td>
+                <td>{{ operation[1] }}</td>
+                <td>{{ operation[2] }}</td>
+                <td>{{ operation[3] }}</td>
+                <td>{{ operation[4] }}</td>
+                <td>{{ operation[5] }}</td>
+                <td>{{ operation[6] if operation[6] else '' }}</td>
+                <td>{{ operation[7] if operation[7] else '' }}</td>
+                <td>{{ operation[8] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>        
+    </table>
+
+    <br>
+</div>
+
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2>Nueva Operación</h2>
+        <form id="operationForm" action="{{ url_for('operations') }}" method="POST">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Movimiento</th>
+                        <th>Concepto</th>
+                        <th>Compañía</th>
+                        <th>Beneficiario</th>
+                        <th>Observación</th>
+                        <th>Monto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><input type="date" id="date_operation" name="date_operation" class="input-field"></td>
+                        <td>
+                            <select id="motionType" class="input-field" onchange="filterConcepts()">
+                                <option value="1">Ingreso</option>
+                                <option value="2">Egreso</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select id="concept" name="concept" class="input-field"> 
+                                <option value="">Concepto</option> 
+                                <!-- Los conceptos cargarán según el Movimiento seleccionado -->
+                            </select>
+                        </td>
+                        <td>
+                            <select id="store" name="store" class="input-field"> 
+                                <option value="">Compañía</option> 
+                                {% for store in stores | sort(attribute=1)  %}
+                                <option value="{{ store[0] }}">{{ store[1] }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td>
+                            <select id="beneficiary" name="beneficiary" class="input-field"> 
+                                <option value="">Beneficiario</option> 
+                                {% for beneficiary in beneficiaries | sort(attribute=1)  %}
+                                <option value="{{ beneficiary[0] }}">{{ beneficiary[1] }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input id="observation" name="observation" type="text" class="input-field" placeholder="Observación" /></td>
+                        <td><input type="number" id="amount" name="amount" step="0.01" class="input-field"></td> 
+                    </tr>
+                </tbody>
+            </table>
+            <button class="save-button" type="submit" onclick="saveChanges()">Agregar Operación</button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+
+    function filterTable(searchTerm) {
+        const table = document.getElementById('rules-table');
+        const rows = table.getElementsByTagName('tr');
+        
+        for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].getElementsByTagName('td');
+            let rowContainsSearchTerm = false;
+            
+            for (let j = 0; j < cells.length; j++) {
+                const cellText = cells[j].textContent.toLowerCase();
+                if (cellText.includes(searchTerm.toLowerCase())) {
+                    rowContainsSearchTerm = true;
+                    break;
+                }
+            }
+            
+            if (rowContainsSearchTerm) {
+                rows[i].style.display = '';
+            } else {
+                rows[i].style.display = 'none';
+            }
+        }
+    }
+
+    function openModal() {
+        document.getElementById("modal").style.display = "block";
+    }
+
+    function closeModal() {
+        document.getElementById("modal").style.display = "none";
+    }
+
+    // Datos de conceptos (ingresos y egresos) pasados desde el backend
+    const creditConcepts = [
+        {% for concept in creditConcepts %}
+        { id: "{{ concept[0] }}", name: "{{ concept[1] }}" },
+        {% endfor %}
+    ];
+
+    const debitConcepts = [
+        {% for concept in debitConcepts %}
+        { id: "{{ concept[0] }}", name: "{{ concept[1] }}" },
+        {% endfor %}
+    ];
+
+    function filterConcepts() {
+        const motionType = document.getElementById("motionType").value;
+        const conceptSelect = document.getElementById("concept");
+
+        conceptSelect.innerHTML = '<option value="">Concepto</option>';
+
+        const conceptsToShow = motionType === "1" ? creditConcepts : debitConcepts;
+
+        conceptsToShow.forEach(concept => {
+            const option = document.createElement("option");
+            option.value = concept.id;
+            option.textContent = concept.name;
+            conceptSelect.appendChild(option);
+        });
+    }
+
+    // Inicializar el filtro al cargar la página
+    document.addEventListener("DOMContentLoaded", function() {
+        filterConcepts(); // Aplicar el filtro inicial
+    });
+
+    function saveChanges() {
+        const formData = new FormData(document.getElementById('operationForm'));
+        saveButton.disabled = true;
+    
+        fetch("{{ url_for('operations') }}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Error al guardar la operación');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            saveButton.disabled = false;
+        });
+    }
+
+</script>
+{% endblock %}
