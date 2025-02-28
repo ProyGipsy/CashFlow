@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>{% block title %}Gipsy{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='CSS/menuCashier.css') }}"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='CSS/homeCashier.css') }}"/>
+    <link rel="icon" type="image/jpg" href="{{ url_for('static', filename='IMG/Gipsy_isotipo_color.png') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- MENU CASHIER -->
+    <div class="sidebar" id="sidebar">
+        <div class="logo">
+            <a href="{{ url_for('mainapp.homeCashier') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
+        </div>
+        <div class="containerSideBar">
+            <ul>
+                <li>
+                    <div class="optionContainer {% if active_page == 'homeCashier' %}active{% endif %}">
+                        {% if active_page == 'homeCashier' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('mainapp.homeCashier') }}" class="optionLink">Inicio</a>
+                    </div>
+                </li>                             
+                <li>
+                    <div class="optionContainer {% if active_page == 'operations' %}active{% endif %}">
+                        {% if active_page == 'operations' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('mainapp.operations') }}" class="optionLink">Operaciones</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="optionContainer {% if active_page == 'beneficiaries' %}active{% endif %}">
+                        {% if active_page == 'beneficiaries' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('mainapp.beneficiaries') }}" class="optionLink">Beneficiarios</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="optionContainer {% if active_page == 'stores' %}active{% endif %}">
+                        {% if active_page == 'stores' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('mainapp.stores') }}" class="optionLink">Compañías</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="optionContainer {% if active_page == 'concepts' %}active{% endif %}">
+                        {% if active_page == 'concepts' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('mainapp.concepts') }}" class="optionLink">Conceptos</a>
+                    </div>
+                </li>
+            </ul>
+            <ul class="bottomMenu">
+                <li>
+                    <div class="optionContainer {% if active_page == 'login' %}active{% endif %}">
+                        {% if active_page == 'login' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('mainapp.logout') }}" class="optionLink">Cerrar Sesión</a>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="backgroundOpacity" id="backgroundOpacity" onclick="closeSidebar()"></div>
+    
+    <div class="main-content">
+        <header>
+            <div class="menu-icon" onclick="toggleSidebar(); toggleBackground()">
+                <img src="{{ url_for('static', filename='IMG/menu_icon.png') }}" alt="Menu Icon">
+            </div>
+            <div class="logoMobile">
+                <a href="{{ url_for('mainapp.homeCashier') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
+            </div>
+            <div class="space2"></div>
+        </header>
+        
+        <!-- Contenido principal -->
+        {% block content %}{% endblock %}
+    </div>
+    
+    <script>
+        function toggleSidebar() {
+            var sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('active');
+        }
+
+        function toggleBackground() {
+            var sidebar = document.getElementById('backgroundOpacity');
+            sidebar.classList.toggle('active');
+        }
+
+        function closeSidebar() {
+            var sidebar = document.getElementById('sidebar');
+            if (sidebar.classList.contains('active')) {
+                sidebar.classList.remove('active');
+            }
+            if (backgroundOpacity.classList.contains('active')) {
+                backgroundOpacity.classList.remove('active');
+            }
+        }
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
