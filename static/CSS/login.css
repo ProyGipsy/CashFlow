@@ -62,9 +62,11 @@ body{
     text-decoration: none;
 }
 
+/*
 .password-container input[type="password"]{
     padding-right: 40px;
 }
+*/
 
 .form .remember-container{
     display: flex;
