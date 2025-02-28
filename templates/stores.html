@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+
+{% block title %}Gipsy - Compañías{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/tableInterface.css') }}"/>
+{% endblock %}
+
+{% block content %}
+
+<div class="content">
+    <div class="title-container">
+        <a class="back" href="{{ url_for('mainapp.homeCashier') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <div class="title-center">
+            <h2>Compañía</h2>
+        </div>
+    </div>
+
+    <br>
+    <form action="{{ url_for('mainapp.stores') }}" method="POST">
+        <div class="searchBar">
+            <div class="searchInputContainer">
+                <input type="text" placeholder="Buscar" name="search" oninput="filterTable(this.value)">
+                <button type="submit">
+                    <img src="{{ url_for('static', filename='IMG/lupa.png') }}" alt="Buscar">
+                </button>
+            </div>
+        </div>
+    </form>
+    <br>  
+
+    <!-- Lista de Compañías. Hay que conectar con la BD -->     
+    <table class="styled-table" id="rules-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre de la Compañía</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for store in stores %}
+            <tr>
+                <td>{{ store[0] }}</td>
+                <td>{{ store[1] }}</td>
+                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>  
+    
+    <button class="add-button" onclick="addRow()">+</button>
+
+    <!--Formularios ocultos para escritura-->
+    <form id="addForm" action="{{ url_for('mainapp.stores') }}" method="POST" style="display:none;">
+        <input type="hidden" name="action" value="add">
+        <input type="hidden" name="id" id="addId">
+        <input type="hidden" name="name" id="addName">
+    </form>
+    
+    <form id="editForm" action="{{ url_for('mainapp.stores') }}" method="POST" style="display:none;">
+        <input type="hidden" name="action" value="edit">
+        <input type="hidden" name="id" id="editId">
+        <input type="hidden" name="name" id="editName">
+    </form>
+
+    <br><br>
+    <div class="button-container">
+        <button type="button" class="undo-button" onclick="undoChanges()">Deshacer cambios</button>
+        <button type="button" class="save-button" onclick="saveChanges()">Guardar cambios</button>
+    </div>
+
+    <div id="loadingModal" class="loading-modal">
+        <div class="loading-content">
+            <p>Guardando cambios...</p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let isChanged = false;
+    let nextId = {{ last_id + 1 }}; // Toma el último ID de la BD
+
+    function toggleSidebar() {
+        var sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('active');
+    }
+
+    function toggleBackground() {
+        var sidebar = document.getElementById('backgroundOpacity');
+        sidebar.classList.toggle('active');
+    }
+
+    function closeSidebar() {
+        var sidebar = document.getElementById('sidebar');
+        if (sidebar.classList.contains('active')) {
+            sidebar.classList.remove('active');
+        }
+        if (backgroundOpacity.classList.contains('active')) {
+            backgroundOpacity.classList.remove('active');
+        }
+    }
+
+    function filterTable(searchTerm) {
+        const table = document.getElementById('rules-table');
+        const rows = table.getElementsByTagName('tr');
+        
+        for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].getElementsByTagName('td');
+            let rowContainsSearchTerm = false;
+            
+            for (let j = 0; j < cells.length; j++) {
+                const cellText = cells[j].textContent.toLowerCase();
+                if (cellText.includes(searchTerm.toLowerCase())) {
+                    rowContainsSearchTerm = true;
+                    break;
+                }
+            }
+            
+            if (rowContainsSearchTerm) {
+                rows[i].style.display = '';
+            } else {
+                rows[i].style.display = 'none';
+            }
+        }
+    }
+
+    function editRow(btn) {
+        const row = btn.closest('tr');
+        const cells = row.getElementsByTagName('td');
+        
+        if (row.querySelector('input')) {
+            Array.from(cells).forEach((cell) => {
+                const input = cell.querySelector('input');
+                if (input) {
+                    cell.textContent = input.value;
+                }
+            });
+        } else {
+            cells[1].innerHTML = `<input type="text" class="input-field" value="${cells[1].textContent}"/>`;
+        }
+        isChanged = true;
+    }
+
+    function addRow() {
+        const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
+        const newRow = table.insertRow();
+        newRow.innerHTML = `
+            <td>${nextId}</td> <!-- Mostrar el próximo ID -->
+            <td><input type="text" class="input-field" placeholder="Nombre" /></td>
+            <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
+        `;
+        nextId++;
+        isChanged = true;
+    }
+
+    function submitNewStore() {
+        const name = document.getElementById('newName').value;
+        if (name) {
+            // Asigna el ID directamente
+            document.getElementById('addId').value = nextId - 1; // Usa el ID que se mostró
+            document.getElementById('addName').value = name;
+            document.getElementById('addForm').submit();
+        } else {
+            alert("Por favor, completa el campo de nombre antes de agregar.");
+        }
+    }
+
+    function saveChanges() {
+        document.getElementById('loadingModal').style.display = 'flex';
+        const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
+        const stores = [];
+        
+        
+        for (let row of table.rows) {
+            const id = row.cells[0].textContent.trim(); // Obtener el ID directamente del texto
+            const nameInput = row.cells[1].querySelector('input');
+            
+            if (nameInput) {
+                const name = nameInput.value.trim();
+                stores.push({ id, name });
+            } else {
+                const name = row.cells[1].textContent.trim(); // Obtener el nombre directamente del texto
+                if (id && name) {
+                    stores.push({ id, name });
+                }
+            }
+        }
+        
+        // Enviar los datos al servidor
+        if (stores.length > 0) {
+    
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "{{ url_for('mainapp.stores') }}", true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+        
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    window.location.reload();
+                } else {
+                    alert("Hubo un error al guardar los cambios.");
+                }
+            };
+        
+            xhr.send(JSON.stringify(stores));
+            isChanged = false;
+        } else {
+            alert("No se realizaron cambios.");
+        }
+    }
+
+    function undoChanges() {
+        if (isChanged) {
+            if (confirm("¿Estás seguro de que quieres deshacer los cambios?")) {
+                isChanged = false;
+                window.location.reload();
+            }
+        }
+    }
+
+    window.onbeforeunload = function() {
+        if (isChanged) {
+            return "Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?";
+        }
+    };
+</script>
+{% endblock %}
