@@ -117,14 +117,21 @@ def get_operations():
     conn.close()
 
     # Calcular el saldo acumulado
-    saldo = 0
+    balance = 0
     operations_with_balance = []
     for operation in operations:
-        credito = operation[6]
-        debito = operation[7]
-        saldo += credito - debito
+        credit = operation[6]
+        debit = operation[7]
+        balance += credit - debit
+
+        formattedCredit = "{:,.2f}".format(credit).replace(".", "X").replace(",", ".").replace("X", ",")
+        formattedDebit = "{:,.2f}".format(debit).replace(".", "X").replace(",", ".").replace("X", ",")
+        formattedBalance = "{:,.2f}".format(balance).replace(".", "X").replace(",", ".").replace("X", ",")
+        
         operation_list = list(operation)
-        operation_list.append(saldo)
+        operation_list[6] = formattedCredit
+        operation_list[7] = formattedDebit
+        operation_list.append(formattedBalance)
         operations_with_balance.append(tuple(operation_list))
 
     return operations_with_balance
