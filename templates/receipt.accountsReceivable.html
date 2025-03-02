@@ -1,0 +1,120 @@
+{% extends "receipt.sellerBase.html" %}
+
+{% block title %}Gipsy - Cuentas por Cobrar{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/accountsReceivable.css') }}"/>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="title-container">
+        <a class="back" href="{{ url_for('homeSeller') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <div class="title-center">
+            <h2>Cuentas por Cobrar</h2>
+        </div>
+    </div>
+
+    <br>
+    <form action="{{ url_for('accountsReceivable') }}" method="POST">
+        <div class="searchBar">
+            <div class="searchInputContainer">
+                <input type="text" placeholder="Buscar" name="search" oninput="filterTable(this.value)">
+                <button type="submit">
+                    <img src="{{ url_for('static', filename='IMG/lupa.png') }}" alt="Buscar">
+                </button>
+            </div>
+        </div>
+    </form>
+    <br> 
+
+    <!-- Lista de Empresas. Hay que conectar con la BD -->
+    <div class="company-container">
+        <button class="company-name">Empresa 1</button>
+        <div class="company-customers">
+            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
+            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
+            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
+        </div>
+        <button class="company-name">Empresa 2</button>
+        <div class="company-customers">
+            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
+            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
+        </div>
+        <button class="company-name">Empresa 3</button>
+        <div class="company-customers">
+            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
+            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
+            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
+        </div>
+        <button class="company-name">Empresa 4</button>
+        <div class="company-customers">
+            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
+            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
+        </div>
+    </div>
+</div>
+
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2>Facturas del Cliente</h2>
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>N° de Documento</th>
+                    <th>Monto Original</th>
+                    <th>Monto Abonado</th>
+                    <th>Monto IVA Retenido</th>
+                    <th>Monto Restante</th>
+                    <th>Registrar</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>001</td>
+                    <td>$1000.00</td>
+                    <td>$200.00</td>
+                    <td>$50.00</td>
+                    <td>$750.00</td>
+                    <td><input type="checkbox" /></td>
+                </tr>
+                <tr>
+                    <td>002</td>
+                    <td>$2000.00</td>
+                    <td>$500.00</td>
+                    <td>$100.00</td>
+                    <td>$1400.00</td>
+                    <td><input type="checkbox" /></td>
+                </tr>
+            </tbody>
+        </table>
+        <button class="save-button" onclick="registerCollections()">Registrar Cobranza</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll('.company-name').forEach(button => {
+        button.addEventListener('click', () => {
+            const answer = button.nextElementSibling;
+             answer.style.display = answer.style.display === 'block' ? 'none' : 'block';
+         });
+     });
+
+    /*Listado de Facturas*/
+
+    function openModal() {
+       document.getElementById("modal").style.display = "block";
+    }
+        
+    function closeModal() {
+        document.getElementById("modal").style.display = "none";
+    }
+        
+    function registerCollections() {
+        window.location.href = "{{ url_for('accountsForm') }}";
+    };
+</script>
+{% endblock %}

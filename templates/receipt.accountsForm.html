@@ -1,0 +1,162 @@
+{% extends "receipt.sellerBase.html" %}
+
+{% block title %}Gipsy - Formulario de Cobranza{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/accountsForm.css') }}"/>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="title-container">
+        <a class="back" href="{{ url_for('accountsReceivable') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <div class="title-center">
+            <h2>Formulario de Cobranza</h2>
+        </div>
+    </div> 
+
+    <div class="client-info">
+        <p><strong>Empresa:</strong> NombreEmpresa</p>
+        <p><strong>Cliente:</strong> NombreCliente</p>
+    </div>
+
+    <br>
+    <table class="styled-table"> 
+        <tr> 
+            <th>Nro. Cuenta</th>
+            <th>Total Deuda (T/D)</th>
+            <th>Fecha Emisión</th>
+            <th>Fecha Vencimiento</th>
+        </tr> 
+        <tr> 
+            <td><input type="number" name="nro_cuenta" class="input-field"></td>  
+            <td><input type="number" name="td" class="input-field"></td> 
+            <td><input type="date" name="f_emision" class="input-field"></td> 
+            <td><input type="date" name="f_vencimiento" class="input-field"></td> 
+        </tr> 
+    </table>
+
+    <table class="styled-table">
+        <tr> 
+            <th>N/Dcm</th>
+            <th>Monto</th>
+            <th>Crédito</th>
+        </tr> 
+        <tr> 
+            <td><input type="number" name="ndcm" class="input-field"></td> 
+            <td><input type="number" name="monto" step="0.01" class="input-field"></td> 
+            <td><input type="number" name="credito" step="0.01" class="input-field"></td> 
+        </tr> 
+    </table>
+
+    <br> 
+    <div id="formas-de-pago"> 
+        <h3>Formas de Pagos</h3> 
+        <table class="styled-table" id="pago-table">
+            <tr>
+                <th>Forma de Pago</th>
+                <th>Fecha de Pago</th>
+                <th>Monto</th>
+                <th>Descuento</th>
+                <th>Referencia</th>
+                <th>Abono Realizado en</th>
+                <th></th>
+            </tr>
+            <tr class="pago-row">
+                <td>
+                    <select name="forma_pago" class="input-field"> 
+                        <option value="">EFECTIVO Bs</option> 
+                        <option value="">DOLAR EFECTIVO</option>
+                        <option value="">AMERICANA</option>
+                        <option value="">BANESCO CREDITO</option>
+                        <option value="">BANESCO DEBITO</option>
+                        <option value="">BANESCO ELECTRON</option>
+                        <option value="">DOLAR OFERTA</option>
+                        <option value="">DOLAR ZELLE</option>
+                        <option value="">EURO EFECTIVO</option>
+                        <option value="">FLEXIPOS CREDITO</option>
+                    </select>
+                </td>
+                <td><input type="date" name="fecha_pago" class="input-field"></td>
+                <td><input type="number" name="monto_pago" step="0.01" class="input-field"></td>
+                <td><input type="number" name="descuento" step="0.01" class="input-field"></td>
+                <td><input type="number" name="referencia" class="input-field"></td>
+                <td><select name="abono_realizado" class="input-field">
+                    <option value="">Cuenta Bancaria</option> 
+                </td>
+                <td><span class="delete-icon" onclick="deleteRow(this)"><img src="{{ url_for('static', filename='IMG/trash.png') }}" alt="Eliminar"></span></td>
+            </tr>
+        </table>
+        <button type="button" id="add-pago" class="add-button">+</button>
+    </div> 
+
+    <br><br>
+    <div class="inline-label">
+        <label for="saldo_nota">Saldo Nota:</label>
+        <input type="number" id="saldo_nota" name="saldo_nota" step="0.01" class="input-field small-input"> 
+
+        <label for="dias_transcurridos">Días Transcurridos:</label>
+        <input type="number" id="dias_transcurridos" name="dias_transcurridos" class="input-field small-input"> 
+    </div>   
+
+    <br><br>
+    <div class="file-upload-container">
+        <label for="comprobante_pago">Cargar Comprobante:</label>
+        <input type="file" id="comprobante_pago" name="comprobante_pago" class="input-field" accept="image/*,.pdf" onchange="updateFileName()">
+        <button type="button" class="upload-button" onclick="uploadFile()">Subir</button>
+        <p id="file-message" class="file-message"></p>
+    </div>
+
+    <br>
+    <div class="inline-label">
+        <label for="saldo_nota">Comisión a recibir:</label>
+        <input type="number" id="saldo_nota" name="saldo_nota" step="0.01" class="input-field small-input" value="100.00" readonly>
+    </div> 
+    
+    <br><br>
+    <div class="submit-container">
+        <input type="submit" value="Enviar">
+    </div>
+    
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('add-pago').addEventListener('click', function() { 
+        const pagoRow = document.querySelector('.pago-row'); 
+        const newPagoRow = pagoRow.cloneNode(true); 
+        const inputs = newPagoRow.querySelectorAll('input'); 
+        inputs.forEach(input => input.value = '');
+        const selects = newPagoRow.querySelectorAll('select');
+        selects.forEach(select => select.selectedIndex = 0);
+        document.getElementById('pago-table').appendChild(newPagoRow); 
+    });
+
+    function updateFileName() {
+        const fileInput = document.getElementById('comprobante_pago');
+        const fileMessage = document.getElementById('file-message');
+        
+        if (fileInput.files.length > 0) {
+            fileMessage.textContent = `Archivo seleccionado: ${fileInput.files[0].name}`;
+        } else {
+            fileMessage.textContent = '';
+        }
+    }
+    
+    function uploadFile() {
+        const fileInput = document.getElementById('comprobante_pago');
+        if (fileInput.files.length > 0) {
+            alert(`Subiendo archivo: ${fileInput.files[0].name}`);
+        } else {
+            alert('Por favor, selecciona un archivo antes de subir.');
+        }
+    }
+
+    function deleteRow(btn) {
+        const row = btn.parentNode.parentNode;
+        row.parentNode.removeChild(row);
+        isChanged = true;
+    };
+</script>
+{% endblock %}

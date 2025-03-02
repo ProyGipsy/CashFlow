@@ -4,40 +4,28 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>{% block title %}Gipsy{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='CSS/menuPurple.css') }}"/>
-    <link rel="stylesheet" href="{{ url_for('static', filename='CSS/homePurple.css') }}"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='CSS/menuBlue.css') }}"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='CSS/homeBlue.css') }}"/>
     <link rel="icon" type="image/jpg" href="{{ url_for('static', filename='IMG/Gipsy_isotipo_color.png') }}">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     <div class="sidebar" id="sidebar">
         <div class="logo">
-            <a href="{{ url_for('homeAdmin') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
+            <a href="{{ url_for('homeSeller') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
         </div>
         <div class="containerSideBar">
             <ul>
                 <li>
-                    <div class="optionContainer {% if active_page == 'homeAdmin' %}active{% endif %}">
-                        {% if active_page == 'homeAdmin' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('homeAdmin') }}" class="optionLink">Inicio</a>
+                    <div class="optionContainer {% if active_page == 'homeSeller' %}active{% endif %}">
+                        {% if active_page == 'homeSeller' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('homeSeller') }}" class="optionLink">Inicio</a>
                     </div>
                 </li>                             
                 <li>
-                    <div class="optionContainer {% if active_page == 'sellers' %}active{% endif %}">
-                        {% if active_page == 'sellers' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('sellers') }}" class="optionLink">Vendedores</a>
-                    </div>
-                </li>
-                <li>
-                    <div class="optionContainer {% if active_page == 'receipts' %}active{% endif %}">
-                        {% if active_page == 'receipts' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('receipts') }}" class="optionLink">Recibos de Cobranza</a>
-                    </div>
-                </li>
-                <li>
-                    <div class="optionContainer {% if active_page == 'businessRules' %}active{% endif %}">
-                        {% if active_page == 'businessRules' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('businessRules') }}" class="optionLink">Reglas del Negocio</a>
+                    <div class="optionContainer {% if active_page == 'accountsReceivable' %}active{% endif %}">
+                        {% if active_page == 'accountsReceivable' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('accountsReceivable') }}" class="optionLink">Cuentas por Cobrar</a>
                     </div>
                 </li>
             </ul>
@@ -59,7 +47,7 @@
                 <img src="{{ url_for('static', filename='IMG/menu_icon.png') }}" alt="Menu Icon">
             </div>
             <div class="logoMobile">
-                <a href="{{ url_for('homeAdmin') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
+                <a href="{{ url_for('homeSeller') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
             </div>
             <div class="space2"></div>
         </header>

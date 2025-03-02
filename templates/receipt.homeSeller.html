@@ -1,17 +1,18 @@
-{% extends "receipt.adminBase.html" %}
+{% extends "receipt.sellerBase.html" %}
 
-{% block title %}Gipsy - Caja{% endblock %}
+{% block title %}Gipsy - Vendedor{% endblock %}
 
 {% block content %}
     <div class="content">
         <div class="title-container">
             <div class="title-center">
-                <h2>Administración de Cobranza Gipsy</h2>
+                <h2>Registro de Cobranza Gipsy</h2>
             </div>
             <div class="title-center">
                 <h2>Bienvenido</h2>
             </div>
         </div>
-        <img src="{{ url_for('static', filename='IMG/admin_Wallpaper.jpg') }}" alt="Admin Wallpaper">
+        <img src="{{ url_for('static', filename='IMG/seller_Wallpaper.png') }}" alt="Seller Wallpaper">
+
     </div>
 {% endblock %}

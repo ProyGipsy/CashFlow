@@ -122,6 +122,18 @@ def receiptDetails():
 def businessRules():
     return render_template('receipt.businessRules.html', page='businessRules', active_page='businessRules')
 
+@app.route('/receiptSeller')
+def homeSeller():
+    return render_template('receipt.homeSeller.html', page='homeSeller', active_page='homeSeller')
+
+@app.route('/accountsReceivable')
+def accountsReceivable():
+    return render_template('receipt.accountsReceivable.html', page='accountsReceivable', active_page='accountsReceivable')
+
+@app.route('/accountsForm')
+def accountsForm():
+    return render_template('receipt.accountsForm.html', page='accountsForm', active_page='accountsReceivable')
+
 
 if __name__ == '__main__':
    app.run()
