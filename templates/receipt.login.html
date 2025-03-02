@@ -36,7 +36,7 @@
             const user = document.querySelector('input[name="User"]').value;
             const password = document.querySelector('input[name="Password"]').value;
             if (user === 'usuario' && password === '123') {
-                window.location.href = '{{ url_for("homeCashier") }}';
+                window.location.href = '{{ url_for("homeAdmin") }}';
             } else {
                 alert('Credenciales incorrectas, por favor intente de nuevo.');
             }

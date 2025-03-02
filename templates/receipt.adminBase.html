@@ -12,46 +12,40 @@
 <body>
     <div class="sidebar" id="sidebar">
         <div class="logo">
-            <a href="{{ url_for('homeCashier') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
+            <a href="{{ url_for('homeAdmin') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
         </div>
         <div class="containerSideBar">
             <ul>
                 <li>
-                    <div class="optionContainer {% if active_page == 'homeCashier' %}active{% endif %}">
-                        {% if active_page == 'homeCashier' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('homeCashier') }}" class="optionLink">Inicio</a>
+                    <div class="optionContainer {% if active_page == 'homeAdmin' %}active{% endif %}">
+                        {% if active_page == 'homeAdmin' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('homeAdmin') }}" class="optionLink">Inicio</a>
                     </div>
                 </li>                             
                 <li>
-                    <div class="optionContainer {% if active_page == 'operations' %}active{% endif %}">
-                        {% if active_page == 'operations' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('operations') }}" class="optionLink">Operaciones</a>
+                    <div class="optionContainer {% if active_page == 'sellers' %}active{% endif %}">
+                        {% if active_page == 'sellers' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('sellers') }}" class="optionLink">Vendedores</a>
                     </div>
                 </li>
                 <li>
-                    <div class="optionContainer {% if active_page == 'beneficiaries' %}active{% endif %}">
-                        {% if active_page == 'beneficiaries' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('beneficiaries') }}" class="optionLink">Beneficiarios</a>
+                    <div class="optionContainer {% if active_page == 'receipts' %}active{% endif %}">
+                        {% if active_page == 'receipts' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('receipts') }}" class="optionLink">Recibos de Cobranza</a>
                     </div>
                 </li>
                 <li>
-                    <div class="optionContainer {% if active_page == 'stores' %}active{% endif %}">
-                        {% if active_page == 'stores' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('stores') }}" class="optionLink">Compañías</a>
-                    </div>
-                </li>
-                <li>
-                    <div class="optionContainer {% if active_page == 'concepts' %}active{% endif %}">
-                        {% if active_page == 'concepts' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('concepts') }}" class="optionLink">Conceptos</a>
+                    <div class="optionContainer {% if active_page == 'businessRules' %}active{% endif %}">
+                        {% if active_page == 'businessRules' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('businessRules') }}" class="optionLink">Reglas del Negocio</a>
                     </div>
                 </li>
             </ul>
             <ul class="bottomMenu">
                 <li>
-                    <div class="optionContainer {% if active_page == 'loginCashflow' %}active{% endif %}">
-                        {% if active_page == 'loginCashflow' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('loginCashflow') }}" class="optionLink">Cerrar Sesión</a>
+                    <div class="optionContainer {% if active_page == 'loginReceipt' %}active{% endif %}">
+                        {% if active_page == 'loginReceipt' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('loginReceipt') }}" class="optionLink">Cerrar Sesión</a>
                     </div>
                 </li>
             </ul>
@@ -65,7 +59,7 @@
                 <img src="{{ url_for('static', filename='IMG/menu_icon.png') }}" alt="Menu Icon">
             </div>
             <div class="logoMobile">
-                <a href="{{ url_for('homeCashier') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
+                <a href="{{ url_for('homeAdmin') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
             </div>
             <div class="space2"></div>
         </header>

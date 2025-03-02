@@ -1,0 +1,175 @@
+{% extends "receipt.adminBase.html" %}
+
+{% block title %}Gipsy - Reglas del Negocio{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/businessRules.css') }}"/>
+{% endblock %}
+
+{% block content %}
+
+<div class="content">
+    <div class="title-container">
+        <a class="back" href="{{ url_for('homeAdmin') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <div class="title-center">
+            <h2>Reglas de Negocio</h2>
+        </div>
+    </div>
+
+    <table class="styled-table" id="rules-table">
+        <thead>
+            <tr>
+                <th>Nombre Condición</th>
+                <th>Condición Días</th>
+                <th>%</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>FACTURAS PREPAGADAS O DE CONTADO</td>
+                <td>0</td>
+                <td>6,00</td>
+                <td>
+                    <label class="switch">
+                        <input type="checkbox" checked onclick="toggleRow(this)">
+                        <span class="slider round"></span>
+                    </label>
+                </td>
+                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
+            </tr>
+            <tr>
+                <td>FACTURAS PAGADAS A SU VENCIMIENTO 21 DÍAS</td>
+                <td>21</td>
+                <td>5,00</td>
+                <td>
+                    <label class="switch">
+                        <input type="checkbox" checked onclick="toggleRow(this)">
+                        <span class="slider round"></span>
+                    </label>
+                </td>
+                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
+            </tr>
+            <tr>
+                <td>FACTURAS PAGADAS A 45 DÍAS DEL VENCIMIENTO</td>
+                <td>45</td>
+                <td>4,00</td>
+                <td>
+                    <label class="switch">
+                        <input type="checkbox" checked onclick="toggleRow(this)">
+                        <span class="slider round"></span>
+                    </label>
+                </td>
+                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
+            </tr>
+            <tr>
+                <td>FACTURA ES PAGADA A MÁS DE 45 DÍAS</td>
+                <td>46</td>
+                <td>0,00</td>
+                <td>
+                    <label class="switch">
+                        <input type="checkbox" checked onclick="toggleRow(this)">
+                        <span class="slider round"></span>
+                    </label>
+                </td>
+                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <button class="add-button" onclick="addRow()">+</button>
+
+    <br><br>
+    <div class="button-container">
+        <button type="button" class="undo-button" onclick="undoChanges()">Deshacer cambios</button>
+        <button type="button" class="save-button" onclick="saveChanges()">Guardar cambios</button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let isChanged = false;
+
+function addRow() {
+    const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
+    const newRow = table.insertRow();
+    newRow.innerHTML = `
+        <td><input type="text" class="input-field" placeholder="Nombre" /></td>
+        <td><input type="number" class="input-field" placeholder="Días" /></td>
+        <td><input type="number" step="0.01" class="input-field" placeholder="%" /></td>
+        <td>
+            <label class="switch">
+                <input type="checkbox" checked onclick="toggleRow(this)">
+                <span class="slider round"></span>
+            </label>
+        </td>
+        <td><span class="edit-icon onclick="editRow(this)""><img src="../../static/IMG/edit.png" alt="Editar"></span></td>
+        `;
+    isChanged = true;
+}
+
+function editRow(btn) {
+    const row = btn.parentNode.parentNode;
+    const inputs = row.getElementsByTagName('input');
+            
+    if (inputs.length === 0) {
+        const cells = row.getElementsByTagName('td');
+        for (let i = 0; i < cells.length - 2; i++) {
+            const cellText = cells[i].textContent;
+            const input = document.createElement('input');
+            input.type = (i === 1) ? 'number' : 'text';
+            input.className = 'input-field';
+            input.value = cellText;
+            cells[i].innerHTML = '';
+            cells[i].appendChild(input);
+        }
+    } else {
+        for (let i = 0; i < inputs.length; i++) {
+            const cell = inputs[i].parentNode;
+            const textNode = document.createTextNode(inputs[i].value);
+            cell.innerHTML = '';
+            cell.appendChild(textNode);
+        }
+    }
+    isChanged = true;
+}
+
+function toggleRow(checkbox) {
+    const row = checkbox.parentNode.parentNode.parentNode;
+    const cells = row.getElementsByTagName('td');
+        
+    if (checkbox.checked) {
+        for (let i = 0; i < cells.length; i++) {
+            cells[i].style.color = "";
+        }
+    } else {
+        for (let i = 0; i < cells.length; i++) {
+            cells[i].style.color = "#b7b4bb";
+        }
+    }
+}
+
+            
+function undoChanges() {
+    if (isChanged) {
+        if (confirm("¿Estás seguro de que quieres deshacer los cambios?")) {
+            isChanged = false;
+            window.location.reload();
+        }
+    }
+}
+
+function saveChanges() {
+    // Falta lógica para guardar los cambios
+    alert("Cambios guardados.");
+    isChanged = false;
+}
+
+window.onbeforeunload = function() {
+    if (isChanged) {
+        return "Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?";
+    }
+};
+</script>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "receipt.adminBase.html" %}
+
+{% block title %}Gipsy - Detalles Vendedor{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/sellerDetails.css') }}"/>
+{% endblock %}
+
+{% block content %}
+
+<div class="content">
+    <div class="title-container">
+        <a class="back" href="{{ url_for('sellers') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <div class="title-center">
+            <h2>Detalles del Vendedor</h2>
+        </div>
+    </div>
+
+    <br>
+    <p><strong>Empresa:</strong> NombreEmpresa</p>
+
+    <table class="styled-table"> 
+        <tr> 
+            <th>ID del Vendedor</th>
+            <th>Nombre del Vendedor</th>
+        </tr> 
+        <tr> 
+            <td>12345</td>  
+            <td>Juan Pérez</td>  
+        </tr> 
+    </table>
+
+    <table class="styled-table"> 
+        <tr> 
+            <th>Correo Electrónico</th>
+            <th>Nro de Teléfono</th>
+            <th>Comisión sobre Venta (%)</th>
+        </tr> 
+        <tr> 
+            <td>juan.perez@example.com</td> 
+            <td>4125551234</td>
+            <td>10</td>  
+        </tr> 
+    </table>
+
+</div>
+
+{% endblock %}

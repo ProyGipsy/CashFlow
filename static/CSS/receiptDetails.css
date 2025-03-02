@@ -1,0 +1,134 @@
+.main-content {
+    color: #421d83;
+    display: flex;
+    flex-direction: column;
+}
+
+.content {
+    padding: 0% 3% 3% 3%;
+}
+
+.title-container {
+    padding: 2%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.back {
+    margin-right: auto;
+}
+
+.title-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.title-container a.back img {
+    width: 24px;
+    height: auto;
+}
+
+.title-container h2 {
+    margin: 0;
+}
+
+.client-info {
+    color: #421d83;
+    font-size: 1em;
+    margin: 10px 0; 
+}
+
+.client-info p {
+    margin: 0;
+}
+
+.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.styled-table th, .styled-table td {
+    border: 1px solid #421d83;
+    padding: 10px;
+    text-align: left;
+}
+
+.styled-table th {
+    background-color: #d0b8ff;
+    color: #421d83;
+    align-items: center;
+}
+
+.inline-label, .file-upload-container {
+    display: inline-block;
+    margin-right: 10px;
+    vertical-align: middle;
+    justify-content: center;
+    font-weight: bold;
+    color: #421d83;
+    font-size: 1em;
+}
+
+#saldo_nota, #dias_transcurridos{
+    font-weight: normal;
+}
+
+.inline-label + .small-input {
+    margin-left: 5px;
+}
+
+.small-input {
+    width: 100px;
+    display: inline-block;
+    margin-right: 20px;
+}
+
+.upload-button {
+    margin-left: 10px;
+    background-color: #d0b8ff;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    color: #421d83;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.deny-button, .validate-button {
+    background-color: #421d83;
+    color: #ffffff;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 1em;
+    margin: 0 10px;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.3s ease;
+}
+
+.deny-button:hover, .validate-button:hover {
+    background-color: #8b56ed;
+}
+
+.button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.styled-table td input {
+    display: none;
+}
+
+.styled-table td {
+    color: #421d83;
+}
+
+.file-upload-container img {
+    max-width: 500px;
+    height: auto;
+}

@@ -98,6 +98,30 @@ def concepts():
 
 # RECIBO DE VENDEDORES - RUTAS
 
+@app.route('/receiptAdmin')
+def homeAdmin():
+    return render_template('receipt.homeAdmin.html', page='homeAdmin', active_page='homeAdmin')
+
+@app.route('/sellers')
+def sellers():
+    return render_template('receipt.sellers.html', page='sellers', active_page='sellers')
+
+@app.route('/sellerDetails')
+def sellerDetails():
+    return render_template('receipt.sellerDetails.html', page='sellerDetails', active_page='sellers')
+
+@app.route('/receipts')
+def receipts():
+    return render_template('receipt.receipts.html', page='receipts', active_page='receipts')
+
+@app.route('/receiptDetails')
+def receiptDetails():
+    return render_template('receipt.receiptDetails.html', page='receiptDetails', active_page='receipts')
+
+@app.route('/businessRules')
+def businessRules():
+    return render_template('receipt.businessRules.html', page='businessRules', active_page='businessRules')
+
 
 if __name__ == '__main__':
    app.run()

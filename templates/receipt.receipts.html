@@ -1,0 +1,83 @@
+{% extends "receipt.adminBase.html" %}
+
+{% block title %}Gipsy - Recibos de Cobranza{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/sellersList.css') }}"/>
+{% endblock %}
+
+{% block content %}
+
+<div class="content">
+    <div class="title-container">
+        <a class="back" href="{{ url_for('homeAdmin') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <div class="title-center">
+            <h2>Recibos de Cobranza por Validar</h2>
+        </div>
+    </div>
+
+    <br>
+    <form action="{{ url_for('receipts') }}" method="POST">
+        <div class="searchBar">
+            <div class="searchInputContainer">
+                <input type="text" placeholder="Buscar" name="search" oninput="filterTable(this.value)">
+                <button type="submit">
+                    <img src="{{ url_for('static', filename='IMG/lupa.png') }}" alt="Buscar">
+                </button>
+            </div>
+        </div>
+    </form>
+    <br> 
+
+    <!-- Lista de Empresas. Hay que conectar con la BD -->               
+    <div class="company-container">
+        <button class="company-name">Empresa 1</button>
+        <div class="company-sellers">
+            <p>Cliente <a href="{{ url_for('receiptDetails') }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
+            <p>Cliente <a href="{{ url_for('receiptDetails') }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
+            <p>Cliente <a href="{{ url_for('receiptDetails') }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
+        </div>
+        <button class="company-name">Empresa 2</button>
+        <div class="company-sellers">
+            <p>Cliente <a href="{{ url_for('receiptDetails') }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
+            <p>Cliente <a href="{{ url_for('receiptDetails') }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function filterTable(searchTerm) {
+        const table = document.getElementById('rules-table');
+        const rows = table.getElementsByTagName('tr');
+        
+        for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].getElementsByTagName('td');
+            let rowContainsSearchTerm = false;
+            
+            for (let j = 0; j < cells.length; j++) {
+                const cellText = cells[j].textContent.toLowerCase();
+                if (cellText.includes(searchTerm.toLowerCase())) {
+                    rowContainsSearchTerm = true;
+                    break;
+                }
+            }
+            
+            if (rowContainsSearchTerm) {
+                rows[i].style.display = '';
+            } else {
+                rows[i].style.display = 'none';
+            }
+        }
+    }
+
+    document.querySelectorAll('.company-name').forEach(button => {
+        button.addEventListener('click', () => {
+            const answer = button.nextElementSibling;
+            answer.style.display = answer.style.display === 'block' ? 'none' : 'block';
+        });
+    });   
+</script>
+{% endblock %}
