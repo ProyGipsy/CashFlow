@@ -1,9 +1,13 @@
 import os
 
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify)
-from db import get_beneficiaries, get_stores, get_concepts, get_creditConcepts, get_debitConcepts, get_operations
-from db import get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id
-from db import set_beneficiaries, set_concepts, set_stores, set_operations
+
+from cashflow_db import get_beneficiaries, get_stores, get_concepts, get_creditConcepts, get_debitConcepts, get_operations
+from cashflow_db import get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id
+from cashflow_db import set_beneficiaries, set_concepts, set_stores, set_operations
+
+from receipt_db import get_stores, get_store_by_id, get_sellers, get_seller_details
+
 
 app = Flask(__name__)
 
@@ -104,11 +108,20 @@ def homeAdmin():
 
 @app.route('/sellers')
 def sellers():
-    return render_template('receipt.sellers.html', page='sellers', active_page='sellers')
+    stores = get_stores()
+    sellers_by_store = {store[0]: get_sellers(store[0]) for store in stores}
+    return render_template('receipt.sellers.html', page='sellers', active_page='sellers', stores=stores, sellers_by_store=sellers_by_store)
 
-@app.route('/sellerDetails')
-def sellerDetails():
-    return render_template('receipt.sellerDetails.html', page='sellerDetails', active_page='sellers')
+@app.route('/sellerDetails/<int:seller_id>')
+def sellerDetails(seller_id):
+    # Obtener los detalles del vendedor
+    seller = get_seller_details(seller_id)
+    if seller:
+        # Obtener el nombre de la empresa (tienda) a la que pertenece el vendedor
+        store = get_store_by_id(seller[5])
+        return render_template('receipt.sellerDetails.html', page='sellerDetails', active_page='sellers', seller=seller, store=store)
+    else:
+        return "Vendedor no encontrado", 404
 
 @app.route('/receipts')
 def receipts():

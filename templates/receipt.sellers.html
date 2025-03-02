@@ -1,13 +1,9 @@
 {% extends "receipt.adminBase.html" %}
-
 {% block title %}Gipsy - Vendedores{% endblock %}
-
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='CSS/sellersList.css') }}"/>
 {% endblock %}
-
 {% block content %}
-
 <div class="content">
     <div class="title-container">
         <a class="back" href="{{ url_for('homeAdmin') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
@@ -15,69 +11,68 @@
             <h2>Vendedores</h2>
         </div>
     </div>
-
     <br>
-    <form action="{{ url_for('sellers') }}" method="POST">
+    <form action="{{ url_for('sellers') }}" method="GET">
         <div class="searchBar">
             <div class="searchInputContainer">
-                <input type="text" placeholder="Buscar" name="search" oninput="filterTable(this.value)">
+                <input id="searchInput" type="text" placeholder="Buscar" name="search" oninput="filterTable(this.value)">
                 <button type="submit">
                     <img src="{{ url_for('static', filename='IMG/lupa.png') }}" alt="Buscar">
                 </button>
             </div>
         </div>
-    </form>
-    <br> 
-
-    <!-- Lista de Empresas. Hay que conectar con la BD -->               
+    </form>    
+    <br>
     <div class="company-container">
-        <button class="company-name">Empresa 1</button>
-        <div class="company-sellers">
-            <p>Vendedor <a href="{{ url_for('sellerDetails') }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
-            <p>Vendedor <a href="{{ url_for('sellerDetails') }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
-            <p>Vendedor <a href="{{ url_for('sellerDetails') }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
+        {% for store in stores %}
+        <button class="company-name" onclick="toggleSellers('{{ store[0] }}')">{{ store[0] }} | {{ store[1] }}</button>
+        <div class="company-sellers" id="sellers-{{ store[0] }}" style="display: none;">
+            {% for seller in sellers_by_store[store[0]] %}
+            <p>{{ seller[1] }} <a href="{{ url_for('sellerDetails', seller_id=seller[0]) }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
+            {% endfor %}
         </div>
-        <button class="company-name">Empresa 2</button>
-        <div class="company-sellers">
-            <p>Vendedor <a href="{{ url_for('sellerDetails') }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
-            <p>Vendedor <a href="{{ url_for('sellerDetails') }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
-        </div>
+        {% endfor %}
     </div>
 </div>
-
 {% endblock %}
-
 {% block extra_js %}
 <script>
-    function filterTable(searchTerm) {
-        const table = document.getElementById('rules-table');
-        const rows = table.getElementsByTagName('tr');
-        
-        for (let i = 1; i < rows.length; i++) {
-            const cells = rows[i].getElementsByTagName('td');
-            let rowContainsSearchTerm = false;
-            
-            for (let j = 0; j < cells.length; j++) {
-                const cellText = cells[j].textContent.toLowerCase();
-                if (cellText.includes(searchTerm.toLowerCase())) {
-                    rowContainsSearchTerm = true;
-                    break;
-                }
-            }
-            
-            if (rowContainsSearchTerm) {
-                rows[i].style.display = '';
+function filterTable(searchTerm) {
+    const companyButtons = document.querySelectorAll('.company-name');
+    companyButtons.forEach(button => {
+        const storeName = button.textContent.toLowerCase();
+        const storeId = button.getAttribute('onclick').match(/'([^']+)'/)[1];
+        const sellersDiv = document.getElementById('sellers-' + storeId);
+        const sellers = sellersDiv.getElementsByTagName('p');
+
+        let storeMatches = storeName.includes(searchTerm.toLowerCase());
+        let sellerMatches = false;
+
+        // Mostrar u ocultar vendedores según el término de búsqueda
+        for (let seller of sellers) {
+            const sellerName = seller.textContent.toLowerCase();
+            if (sellerName.includes(searchTerm.toLowerCase())) {
+                sellerMatches = true;
+                seller.style.display = '';
             } else {
-                rows[i].style.display = 'none';
+                seller.style.display = 'none';
             }
         }
-    }
 
-    document.querySelectorAll('.company-name').forEach(button => {
-        button.addEventListener('click', () => {
-            const answer = button.nextElementSibling;
-            answer.style.display = answer.style.display === 'block' ? 'none' : 'block';
-        });
-    });   
+        // Mostrar u ocultar la tienda según si coincide con el término de búsqueda o tiene vendedores que coincidan
+        if (storeMatches || sellerMatches) {
+            button.style.display = '';
+            sellersDiv.style.display = 'block';
+        } else {
+            button.style.display = 'none';
+            sellersDiv.style.display = 'none'
+        }
+    });
+}   
+
+function toggleSellers(storeId) {
+    const sellersDiv = document.getElementById('sellers-' + storeId);
+    sellersDiv.style.display = sellersDiv.style.display === 'block' ? 'none' : 'block';
+}
 </script>
 {% endblock %}

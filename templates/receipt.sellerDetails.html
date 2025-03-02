@@ -17,7 +17,7 @@
     </div>
 
     <br>
-    <p><strong>Empresa:</strong> NombreEmpresa</p>
+    <p><strong>Empresa:</strong> {{ seller[5] }} | {{ store[0] }}</p>
 
     <table class="styled-table"> 
         <tr> 
@@ -25,8 +25,8 @@
             <th>Nombre del Vendedor</th>
         </tr> 
         <tr> 
-            <td>12345</td>  
-            <td>Juan Pérez</td>  
+            <td>{{ seller[0] }}</td>  
+            <td>{{ seller[1] }}</td>  
         </tr> 
     </table>
 
@@ -37,9 +37,9 @@
             <th>Comisión sobre Venta (%)</th>
         </tr> 
         <tr> 
-            <td>juan.perez@example.com</td> 
-            <td>4125551234</td>
-            <td>10</td>  
+            <td>{{ seller[2] }}</td> 
+            <td>{{ seller[3] }}</td>
+            <td>{{ seller[4] }}</td>  
         </tr> 
     </table>
 
