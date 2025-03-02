@@ -43,3 +43,19 @@ def get_seller_details(seller_id):
     seller = cursor.fetchone()
     conn.close()
     return seller
+
+def get_customers(store_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT ID, FirstName, LastName FROM Main.Customer WHERE StoreID = %s', (store_id,))
+    sellers = cursor.fetchall()
+    conn.close()
+    return sellers
+
+def get_tender():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT ID, Description FROM Main.Tender')
+    stores = cursor.fetchall()
+    conn.close()
+    return stores

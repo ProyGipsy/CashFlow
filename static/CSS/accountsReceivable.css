@@ -26,7 +26,7 @@
     justify-content: center;
 }
 
-.title-container a.back img {
+.title-container a.back img, .company-sellers p a img {
     width: 24px;
     height: auto;
 }
@@ -72,7 +72,7 @@
 }
 
 .searchBar button:hover {
-    background-color: #92cbf7;
+    background-color: #afdafb;
 }
 
 .searchBar button img {
@@ -84,7 +84,7 @@
 .searchBar input[type="text"]:focus,
 .searchBar button:focus {
     outline: none;
-    background-color: #f0f0f0;
+    background-color: #eef0ff;
 }
 
 .company-container {
@@ -92,6 +92,7 @@
     max-width: 1500px;
     margin: 0 auto;
     font-family: Arial, sans-serif;
+    font-size: 14px;
 }
 
 .company-name {
@@ -103,30 +104,46 @@
     text-align: left;
     cursor: pointer;
     outline: none;
-    font-size: 18px;
+    font-size: 15px;
     border-radius: 5px;
     border: 1px solid #324bab;
 }
 
-.company-customers {
+.company-sellers {
     padding: 10px;
     display: none;
 }
 
-.company-customers p {
+.company-sellers p {
     display: flex;
     justify-content: space-between;
     align-items: center;
     width: 100%;
 }
 
-.company-customers p a {
+.company-sellers p a {
     margin-left: auto;
     color: #324bab;
     text-align: right;
 }
 
+.add-seller {
+    background-color: #d0ebff;
+    color: #324bab;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+    margin-left: auto;
+    display: block;
+    width: fit-content;
+}
 
+.add-seller:hover {
+    background-color: #d0ebff;
+}
 
 @media (max-width: 650px) {
     body {
@@ -227,7 +244,7 @@
 
 .save-button {
     background-color: #324bab;
-    color: #ffffff;
+    color: #d0ebff;
     display: block;
     width: 20%;
     margin: 20px auto 0;

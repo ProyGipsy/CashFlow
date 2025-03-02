@@ -63,6 +63,10 @@
     align-items: center;
 }
 
+.heading-table td {
+    padding: 5px;
+}
+
 .input-field {
     margin: auto;
     width: 80%;
@@ -96,6 +100,10 @@
     width: 100px;
     display: inline-block;
     margin-right: 20px;
+}
+
+#saldo_nota, #dias_transcurridos{
+    font-weight: normal;
 }
 
 .input-field:focus {

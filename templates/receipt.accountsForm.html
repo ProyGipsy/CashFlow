@@ -21,7 +21,7 @@
     </div>
 
     <br>
-    <table class="styled-table"> 
+    <table class="styled-table heading-table"> 
         <tr> 
             <th>Nro. Cuenta</th>
             <th>Total Deuda (T/D)</th>
@@ -29,23 +29,23 @@
             <th>Fecha Vencimiento</th>
         </tr> 
         <tr> 
-            <td><input type="number" name="nro_cuenta" class="input-field"></td>  
-            <td><input type="number" name="td" class="input-field"></td> 
-            <td><input type="date" name="f_emision" class="input-field"></td> 
-            <td><input type="date" name="f_vencimiento" class="input-field"></td> 
+            <td><p>12345</p></td>  
+            <td><p>$1000.00</p></td> 
+            <td><p>2023-10-01</p></td> 
+            <td><p>2023-12-31</p></td> 
         </tr> 
     </table>
 
-    <table class="styled-table">
+    <table class="styled-table heading-table">
         <tr> 
             <th>N/Dcm</th>
             <th>Monto</th>
             <th>Crédito</th>
         </tr> 
         <tr> 
-            <td><input type="number" name="ndcm" class="input-field"></td> 
-            <td><input type="number" name="monto" step="0.01" class="input-field"></td> 
-            <td><input type="number" name="credito" step="0.01" class="input-field"></td> 
+            <td><p>001</p></td> 
+            <td><p>$500.00</p></td> 
+            <td><p>$200.00</p></td> 
         </tr> 
     </table>
 
@@ -65,16 +65,10 @@
             <tr class="pago-row">
                 <td>
                     <select name="forma_pago" class="input-field"> 
-                        <option value="">EFECTIVO Bs</option> 
-                        <option value="">DOLAR EFECTIVO</option>
-                        <option value="">AMERICANA</option>
-                        <option value="">BANESCO CREDITO</option>
-                        <option value="">BANESCO DEBITO</option>
-                        <option value="">BANESCO ELECTRON</option>
-                        <option value="">DOLAR OFERTA</option>
-                        <option value="">DOLAR ZELLE</option>
-                        <option value="">EURO EFECTIVO</option>
-                        <option value="">FLEXIPOS CREDITO</option>
+                        <option value="">Forma de Pago</option> 
+                        {% for t in tender | sort(attribute=1)  %}
+                        <option value="{{ t[0] }}">{{t[1] }}</option>
+                        {% endfor %}
                     </select>
                 </td>
                 <td><input type="date" name="fecha_pago" class="input-field"></td>
@@ -93,11 +87,11 @@
     <br><br>
     <div class="inline-label">
         <label for="saldo_nota">Saldo Nota:</label>
-        <input type="number" id="saldo_nota" name="saldo_nota" step="0.01" class="input-field small-input"> 
-
+        <span id="saldo_nota" class="small-input">0</span> 
+        
         <label for="dias_transcurridos">Días Transcurridos:</label>
-        <input type="number" id="dias_transcurridos" name="dias_transcurridos" class="input-field small-input"> 
-    </div>   
+        <span id="dias_transcurridos" class="small-input">5</span> 
+    </div>    
 
     <br><br>
     <div class="file-upload-container">
@@ -107,17 +101,16 @@
         <p id="file-message" class="file-message"></p>
     </div>
 
-    <br>
+    <br><br>
     <div class="inline-label">
-        <label for="saldo_nota">Comisión a recibir:</label>
-        <input type="number" id="saldo_nota" name="saldo_nota" step="0.01" class="input-field small-input" value="100.00" readonly>
-    </div> 
+        <label for="saldo_nota">Comisión a Recibir:</label>
+        <span id="saldo_nota" class="small-input">1234</span>  
+    </div>
     
     <br><br>
     <div class="submit-container">
         <input type="submit" value="Enviar">
     </div>
-    
 </div>
 {% endblock %}
 

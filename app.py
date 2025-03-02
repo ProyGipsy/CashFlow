@@ -6,8 +6,7 @@ from cashflow_db import get_beneficiaries, get_stores, get_concepts, get_creditC
 from cashflow_db import get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id
 from cashflow_db import set_beneficiaries, set_concepts, set_stores, set_operations
 
-from receipt_db import get_stores, get_store_by_id, get_sellers, get_seller_details
-
+from receipt_db import get_stores, get_store_by_id, get_sellers, get_seller_details, get_customers, get_tender
 
 app = Flask(__name__)
 
@@ -114,10 +113,8 @@ def sellers():
 
 @app.route('/sellerDetails/<int:seller_id>')
 def sellerDetails(seller_id):
-    # Obtener los detalles del vendedor
     seller = get_seller_details(seller_id)
     if seller:
-        # Obtener el nombre de la empresa (tienda) a la que pertenece el vendedor
         store = get_store_by_id(seller[5])
         return render_template('receipt.sellerDetails.html', page='sellerDetails', active_page='sellers', seller=seller, store=store)
     else:
@@ -125,7 +122,9 @@ def sellerDetails(seller_id):
 
 @app.route('/receipts')
 def receipts():
-    return render_template('receipt.receipts.html', page='receipts', active_page='receipts')
+    stores = get_stores()
+    customers_by_store = {store[0]: get_customers(store[0]) for store in stores}
+    return render_template('receipt.receipts.html', page='receipts', active_page='receipts', stores=stores, customers_by_store=customers_by_store)
 
 @app.route('/receiptDetails')
 def receiptDetails():
@@ -141,11 +140,14 @@ def homeSeller():
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
-    return render_template('receipt.accountsReceivable.html', page='accountsReceivable', active_page='accountsReceivable')
+    stores = get_stores()
+    customers_by_store = {store[0]: get_customers(store[0]) for store in stores}
+    return render_template('receipt.accountsReceivable.html', page='accountsReceivable', active_page='accountsReceivable', stores=stores, customers_by_store=customers_by_store)
 
 @app.route('/accountsForm')
 def accountsForm():
-    return render_template('receipt.accountsForm.html', page='accountsForm', active_page='accountsReceivable')
+    tender = get_tender()
+    return render_template('receipt.accountsForm.html', page='accountsForm', active_page='accountsReceivable', tender=tender)
 
 
 if __name__ == '__main__':

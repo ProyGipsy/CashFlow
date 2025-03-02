@@ -16,10 +16,10 @@
     </div>
 
     <br>
-    <form action="{{ url_for('accountsReceivable') }}" method="POST">
+    <form action="{{ url_for('accountsReceivable') }}" method="GET">
         <div class="searchBar">
             <div class="searchInputContainer">
-                <input type="text" placeholder="Buscar" name="search" oninput="filterTable(this.value)">
+                <input id="searchInput" type="text" placeholder="Buscar" name="search" oninput="filterTable(this.value)">
                 <button type="submit">
                     <img src="{{ url_for('static', filename='IMG/lupa.png') }}" alt="Buscar">
                 </button>
@@ -28,30 +28,17 @@
     </form>
     <br> 
 
-    <!-- Lista de Empresas. Hay que conectar con la BD -->
     <div class="company-container">
-        <button class="company-name">Empresa 1</button>
-        <div class="company-customers">
-            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
-            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
-            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
+        {% for store in stores %}
+        <button class="company-name" onclick="toggleSellers('{{ store[0] }}')">{{ store[0] }} | {{ store[1] }}</button>
+        <div class="company-sellers" id="sellers-{{ store[0] }}" style="display: none;">
+            {% for customer in customers_by_store[store[0]] %}
+            <p>{{ customer[0] }} | {{ customer[1] }}{{ customer[2] }}
+                <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a>
+            </p>
+            {% endfor %}
         </div>
-        <button class="company-name">Empresa 2</button>
-        <div class="company-customers">
-            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
-            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
-        </div>
-        <button class="company-name">Empresa 3</button>
-        <div class="company-customers">
-            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
-            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
-            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
-        </div>
-        <button class="company-name">Empresa 4</button>
-        <div class="company-customers">
-            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
-            <p>Cliente <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a></p>
-        </div>
+        {% endfor %}
     </div>
 </div>
 
@@ -96,6 +83,39 @@
 
 {% block extra_js %}
 <script>
+    function filterTable(searchTerm) {
+        const companyButtons = document.querySelectorAll('.company-name');
+        companyButtons.forEach(button => {
+            const storeName = button.textContent.toLowerCase();
+            const storeId = button.getAttribute('onclick').match(/'([^']+)'/)[1];
+            const sellersDiv = document.getElementById('sellers-' + storeId);
+            const sellers = sellersDiv.getElementsByTagName('p');
+
+            let storeMatches = storeName.includes(searchTerm.toLowerCase());
+            let sellerMatches = false;
+
+            // Mostrar u ocultar vendedores según el término de búsqueda
+            for (let seller of sellers) {
+                const sellerName = seller.textContent.toLowerCase();
+                if (sellerName.includes(searchTerm.toLowerCase())) {
+                    sellerMatches = true;
+                    seller.style.display = '';
+                } else {
+                    seller.style.display = 'none';
+                }
+            }
+
+            // Mostrar u ocultar la tienda según si coincide con el término de búsqueda o tiene vendedores que coincidan
+            if (storeMatches || sellerMatches) {
+                button.style.display = '';
+                sellersDiv.style.display = 'block';
+            } else {
+                button.style.display = 'none';
+                sellersDiv.style.display = 'none'
+            }
+        });
+    } 
+
     document.querySelectorAll('.company-name').forEach(button => {
         button.addEventListener('click', () => {
             const answer = button.nextElementSibling;
