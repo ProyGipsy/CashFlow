@@ -1,3 +1,15 @@
+.back {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+}
+
+.back img {
+    width: 30px;
+    height: auto;
+}
+
 body{
     background-size: cover;
     height: 100vh;

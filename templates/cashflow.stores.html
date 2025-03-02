@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
+{% extends "cashflow.base.html" %}
 
-{% block title %}Gipsy - Beneficiarios{% endblock %}
+{% block title %}Gipsy - Compañías{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='CSS/tableInterface.css') }}"/>
@@ -12,12 +12,12 @@
     <div class="title-container">
         <a class="back" href="{{ url_for('homeCashier') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
         <div class="title-center">
-            <h2>Beneficiarios</h2>
+            <h2>Compañía</h2>
         </div>
     </div>
 
     <br>
-    <form action="{{ url_for('beneficiaries') }}" method="POST">
+    <form action="{{ url_for('stores') }}" method="POST">
         <div class="searchBar">
             <div class="searchInputContainer">
                 <input type="text" placeholder="Buscar" name="search" oninput="filterTable(this.value)">
@@ -27,38 +27,38 @@
             </div>
         </div>
     </form>
-    <br>    
+    <br>  
 
-    <!-- Lista de Beneficiarios -->     
+    <!-- Lista de Compañías. Hay que conectar con la BD -->     
     <table class="styled-table" id="rules-table">
         <thead>
             <tr>
                 <th>ID</th>
-                <th>Nombre del Beneficiario</th>
+                <th>Nombre de la Compañía</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
-            {% for beneficiary in beneficiaries %}
+            {% for store in stores %}
             <tr>
-                <td>{{ beneficiary[0] }}</td>
-                <td data-original-name="{{ beneficiary[1] }}">{{ beneficiary[1] }}</td>
+                <td>{{ store[0] }}</td>
+                <td>{{ store[1] }}</td>
                 <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
             </tr>
             {% endfor %}
-        </tbody>               
+        </tbody>
     </table>  
-
+    
     <button class="add-button" onclick="addRow()">+</button>
 
     <!--Formularios ocultos para escritura-->
-    <form id="addForm" action="{{ url_for('beneficiaries') }}" method="POST" style="display:none;">
+    <form id="addForm" action="{{ url_for('stores') }}" method="POST" style="display:none;">
         <input type="hidden" name="action" value="add">
         <input type="hidden" name="id" id="addId">
         <input type="hidden" name="name" id="addName">
     </form>
     
-    <form id="editForm" action="{{ url_for('beneficiaries') }}" method="POST" style="display:none;">
+    <form id="editForm" action="{{ url_for('stores') }}" method="POST" style="display:none;">
         <input type="hidden" name="action" value="edit">
         <input type="hidden" name="id" id="editId">
         <input type="hidden" name="name" id="editName">
@@ -75,7 +75,6 @@
             <p>Guardando cambios...</p>
         </div>
     </div>
-
 </div>
 
 {% endblock %}
@@ -151,14 +150,14 @@
         const newRow = table.insertRow();
         newRow.innerHTML = `
             <td>${nextId}</td> <!-- Mostrar el próximo ID -->
-            <td><input type="text" class="input-field" placeholder="Nombre del Beneficiario" id="newName" /></td>
-            <td><span class="edit-icon" onclick="submitNewBeneficiary()"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Agregar"></span></td>
+            <td><input type="text" class="input-field" placeholder="Nombre" /></td>
+            <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
         `;
         nextId++;
         isChanged = true;
     }
-    
-    function submitNewBeneficiary() {
+
+    function submitNewStore() {
         const name = document.getElementById('newName').value;
         if (name) {
             // Asigna el ID directamente
@@ -170,19 +169,10 @@
         }
     }
 
-    function undoChanges() {
-        if (isChanged) {
-            if (confirm("¿Estás seguro de que quieres deshacer los cambios?")) {
-                isChanged = false;
-                window.location.reload();
-            }
-        }
-    }
-
     function saveChanges() {
         document.getElementById('loadingModal').style.display = 'flex';
         const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
-        const beneficiaries = [];
+        const stores = [];
         
         
         for (let row of table.rows) {
@@ -191,20 +181,20 @@
             
             if (nameInput) {
                 const name = nameInput.value.trim();
-                beneficiaries.push({ id, name });
+                stores.push({ id, name });
             } else {
                 const name = row.cells[1].textContent.trim(); // Obtener el nombre directamente del texto
                 if (id && name) {
-                    beneficiaries.push({ id, name });
+                    stores.push({ id, name });
                 }
             }
         }
         
         // Enviar los datos al servidor
-        if (beneficiaries.length > 0) {
+        if (stores.length > 0) {
     
             const xhr = new XMLHttpRequest();
-            xhr.open("POST", "{{ url_for('beneficiaries') }}", true);
+            xhr.open("POST", "{{ url_for('stores') }}", true);
             xhr.setRequestHeader("Content-Type", "application/json");
         
             xhr.onload = function() {
@@ -215,10 +205,19 @@
                 }
             };
         
-            xhr.send(JSON.stringify(beneficiaries));
+            xhr.send(JSON.stringify(stores));
             isChanged = false;
         } else {
             alert("No se realizaron cambios.");
+        }
+    }
+
+    function undoChanges() {
+        if (isChanged) {
+            if (confirm("¿Estás seguro de que quieres deshacer los cambios?")) {
+                isChanged = false;
+                window.location.reload();
+            }
         }
     }
 

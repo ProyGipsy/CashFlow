@@ -7,15 +7,27 @@ from db import set_beneficiaries, set_concepts, set_stores, set_operations
 
 app = Flask(__name__)
 
-
 @app.route('/')
 def index():
-   print('Request for login page received')
    return render_template('index.html')
+
+
+# INICIOS DE SESIÓN
+
+@app.route('/loginCashflow')
+def loginCashflow():
+   return render_template('cashflow.login.html')
+
+@app.route('/loginReceipt')
+def loginReceipt():
+   return render_template('receipt.login.html')
+
+
+# CASHFLOW - RUTAS
 
 @app.route('/cashier')
 def homeCashier():
-    return render_template('homeCashier.html', page='homeCashier', active_page='homeCashier')
+    return render_template('cashflow.homeCashier.html', page='homeCashier', active_page='homeCashier')
 
 @app.route('/operations', methods=['GET', 'POST'])
 def operations():
@@ -38,7 +50,7 @@ def operations():
         return redirect(url_for('operations'))
 
     return render_template(
-        'operations.html',
+        'cashflow.operations.html',
         page='operations',
         active_page='operations',
         operations=operations,
@@ -57,7 +69,7 @@ def beneficiaries():
         data = request.get_json()  # Obtener datos JSON
         set_beneficiaries(data)
         return jsonify(success=True)
-    return render_template('beneficiaries.html', page='beneficiaries', active_page='beneficiaries', beneficiaries=beneficiaries, last_id=last_id)
+    return render_template('cashflow.beneficiaries.html', page='beneficiaries', active_page='beneficiaries', beneficiaries=beneficiaries, last_id=last_id)
     
 @app.route('/stores', methods=['GET', 'POST'])
 def stores():
@@ -67,7 +79,7 @@ def stores():
         data = request.get_json()
         set_stores(data)
         return jsonify(success=True)
-    return render_template('stores.html', page='stores', active_page='stores', stores=stores, last_id=last_id)
+    return render_template('cashflow.stores.html', page='stores', active_page='stores', stores=stores, last_id=last_id)
 
 @app.route('/concepts', methods=['GET', 'POST'])
 def concepts():
@@ -81,8 +93,11 @@ def concepts():
             concept['motion'] = motion_id
         set_concepts(data)
         return jsonify(success=True)
-    return render_template('concepts.html', page='concepts', active_page='concepts', concepts=concepts, last_id=last_id)
+    return render_template('cashflow.concepts.html', page='concepts', active_page='concepts', concepts=concepts, last_id=last_id)
    
+
+# RECIBO DE VENDEDORES - RUTAS
+
 
 if __name__ == '__main__':
    app.run()
