@@ -39,7 +39,7 @@ def get_sellers(store_id):
 def get_seller_details(seller_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT ID, Name, EmailAddress, Telephone, PercentOfSale, StoreID FROM Main.SalesRep WHERE ID = %s', (seller_id,))
+    cursor.execute("SELECT ID, Name, EmailAddress, Telephone, CONCAT(FLOOR(PercentOfSale*100), '%'), StoreID FROM Main.SalesRep WHERE ID = %s", (seller_id,))
     seller = cursor.fetchone()
     conn.close()
     return seller
