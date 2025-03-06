@@ -32,7 +32,7 @@ def get_last_beneficiary_id():
 def get_stores():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT StoreID, StoreName FROM cashflow.store')
+    cursor.execute('SELECT StoreID, StoreName FROM cashflow.Store')
     stores = cursor.fetchall()
     conn.close()
     return stores
@@ -40,7 +40,7 @@ def get_stores():
 def get_last_store_id():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT MAX(StoreID) FROM cashflow.store")
+    cursor.execute("SELECT MAX(StoreID) FROM cashflow.Store")
     last_id = cursor.fetchone()[0] 
     conn.close()
     return last_id if last_id is not None else 0  # Retorna 0 si no hay registros
@@ -109,7 +109,7 @@ def get_operations():
             END AS Débito
         FROM 
             cashflow.Operation O 
-            JOIN cashflow.store S ON O.StoreID = S.StoreID 
+            JOIN cashflow.Store S ON O.StoreID = S.StoreID 
             JOIN cashflow.Concept C ON O.ConceptID = C.ConceptID 
             JOIN cashflow.Beneficiary B ON O.BeneficiaryID = B.BeneficiaryID 
     ''')
@@ -168,7 +168,7 @@ def set_stores(stores):
         id = store['id']
         name = store['name']
         cursor.execute(f"""
-            MERGE INTO cashflow.store AS target
+            MERGE INTO cashflow.Store AS target
             USING (VALUES (%s, %s)) AS source (StoreID, StoreName)
             ON target.StoreID = source.StoreID
             WHEN MATCHED THEN
