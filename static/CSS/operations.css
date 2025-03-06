@@ -126,7 +126,12 @@
 
 .styled-table th:nth-child(2), 
 .styled-table td:nth-child(2) {
-    width: 10%; /* Espacio para la fecha */
+    width: 10%;
+}
+
+.modal-table th:nth-child(7), 
+.modal-table td:nth-child(7) {
+    width: 15%;
 }
 
 .input-field {
@@ -157,7 +162,7 @@
     background-color: #d0b8ff;
 }
 
-.undo-button, .save-button {
+.undo-button, .save-button, .cancel-button {
     background-color: #421d83;
     color: #ffffff;
     border-radius: 5px;
@@ -172,6 +177,11 @@
 .undo-button:hover, .save-button:hover {
     background-color: #8b56ed;
 }
+
+.cancel-button:hover {
+    background-color: #b21554;
+}
+
 
 .button-container {
     display: flex;
@@ -257,4 +267,25 @@
     color: black;
     text-decoration: none;
     cursor: pointer;
+}
+
+.loading-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 20%;
+    top: 0;
+    width: 80%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+}
+
+.loading-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    text-align: center;
 }

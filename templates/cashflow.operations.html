@@ -78,7 +78,7 @@
         <span class="close" onclick="closeModal()">&times;</span>
         <h2>Nueva Operación</h2>
         <form id="operationForm" action="{{ url_for('operations') }}" method="POST">
-            <table class="styled-table">
+            <table class="styled-table modal-table">
                 <thead>
                     <tr>
                         <th>Fecha</th>
@@ -122,12 +122,29 @@
                             </select>
                         </td>
                         <td><input id="observation" name="observation" type="text" class="input-field" placeholder="Observación" /></td>
-                        <td><input type="number" id="amount" name="amount" step="0.01" class="input-field"></td> 
+                        <td><input type="number" id="amount" name="amount" step="0.01" class="input-field amount-field"></td>
                     </tr>
                 </tbody>
             </table>
-            <button class="save-button" type="submit" onclick="saveChanges()">Agregar Operación</button>
+            <button class="save-button" type="submit" onclick="openConfirmationModal()">Agregar Operación</button>
         </form>
+    </div>
+</div>
+
+<!-- Modal de confirmación -->
+<div id="confirmationModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeConfirmationModal()">&times;</span>
+        <h2>¿Está seguro de agregar esta operación?</h2>
+        <button class="save-button" onclick="saveChanges()">Aceptar</button>
+        <button class="cancel-button" onclick="closeConfirmationModal()">Cancelar</button>
+    </div>
+</div>
+
+<!-- Modal de "Guardando" -->
+<div id="loadingModal" class="loading-modal">
+    <div class="loading-content">
+        <p>Guardando...</p>
     </div>
 </div>
 
@@ -168,6 +185,16 @@
         document.getElementById("modal").style.display = "none";
     }
 
+    // Función para no permitir operaciones futuras
+    document.addEventListener("DOMContentLoaded", function() {
+        const today = new Date();
+        const day = String(today.getDate()).padStart(2, '0');
+        const month = String(today.getMonth() + 1).padStart(2, '0'); // Enero es 0
+        const year = today.getFullYear();
+        const maxDate = `${year}-${month}-${day}`;
+        document.getElementById("date_operation").setAttribute("max", maxDate);
+    });
+
     // Datos de conceptos (ingresos y egresos) pasados desde el backend
     const creditConcepts = [
         {% for concept in creditConcepts %}
@@ -203,6 +230,8 @@
     });
 
     function saveChanges() {
+        closeConfirmationModal();
+        document.getElementById('loadingModal').style.display = 'flex';
         const formData = new FormData(document.getElementById('operationForm'));
         saveButton.disabled = true;
     
@@ -223,6 +252,14 @@
         .finally(() => {
             saveButton.disabled = false;
         });
+    }
+
+    function openConfirmationModal() {
+        document.getElementById("confirmationModal").style.display = "block";
+    }
+
+    function closeConfirmationModal() {
+        document.getElementById("confirmationModal").style.display = "none";
     }
 
 </script>

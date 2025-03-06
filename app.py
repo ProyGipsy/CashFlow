@@ -17,9 +17,20 @@ def index():
 
 # INICIOS DE SESIÓN
 
-@app.route('/loginCashflow')
+@app.route('/loginCashflow', methods=['GET', 'POST'])
 def loginCashflow():
-   return render_template('cashflow.login.html')
+    if request.method == 'POST':
+        user = request.form.get('User')
+        password = request.form.get('Password')
+
+        if ((user == os.environ.get('CASHFLOW_USERTDV') and password == os.environ.get('CASHFLOW_PASSTDV')) or
+            (user == os.environ.get('CASHFLOW_USERGIPSY') and password == os.environ.get('CASHFLOW_PASSGIPSY'))):
+            return redirect(url_for('homeCashier'))
+        else:
+            return render_template('cashflow.login.html', error="Credenciales incorrectas, por favor intente de nuevo.")
+            
+    return render_template('cashflow.login.html')
+
 
 @app.route('/loginReceipt')
 def loginReceipt():
