@@ -12,7 +12,7 @@ def get_db_connection():
 
 # Obtención de Data en la Interfaz
 
-def get_stores():
+def get_receiptStores():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT ID, Name FROM Main.Store')
@@ -20,7 +20,7 @@ def get_stores():
     conn.close()
     return stores
 
-def get_store_by_id(store_id):
+def get_receiptStore_by_id(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT Name FROM Main.Store WHERE ID = %s', (store_id,))

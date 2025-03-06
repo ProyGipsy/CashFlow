@@ -29,7 +29,7 @@ def get_last_beneficiary_id():
     return last_id if last_id is not None else 0  # Retorna 0 si no hay registros
 
 
-def get_stores():
+def get_cashflowStores():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT StoreID, StoreName FROM cashflow.Store')

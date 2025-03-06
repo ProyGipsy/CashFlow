@@ -2,11 +2,11 @@ import os
 
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify)
 
-from cashflow_db import get_beneficiaries, get_stores, get_concepts, get_creditConcepts, get_debitConcepts, get_operations
+from cashflow_db import get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts, get_operations
 from cashflow_db import get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id
 from cashflow_db import set_beneficiaries, set_concepts, set_stores, set_operations
 
-from receipt_db import get_stores, get_store_by_id, get_sellers, get_seller_details, get_customers, get_tender
+from receipt_db import get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender
 
 app = Flask(__name__)
 
@@ -46,7 +46,7 @@ def homeCashier():
 @app.route('/operations', methods=['GET', 'POST'])
 def operations():
     operations = get_operations()
-    stores = get_stores()
+    stores = get_cashflowStores()
     concepts = get_concepts()
     creditConcepts = get_creditConcepts()
     debitConcepts = get_debitConcepts()
@@ -87,7 +87,7 @@ def beneficiaries():
     
 @app.route('/stores', methods=['GET', 'POST'])
 def stores():
-    stores = get_stores()
+    stores = get_cashflowStores()
     last_id = get_last_store_id()
     if request.method == 'POST':
         data = request.get_json()
@@ -118,7 +118,7 @@ def homeAdmin():
 
 @app.route('/sellers')
 def sellers():
-    stores = get_stores()
+    stores = get_receiptStores()
     sellers_by_store = {store[0]: get_sellers(store[0]) for store in stores}
     return render_template('receipt.sellers.html', page='sellers', active_page='sellers', stores=stores, sellers_by_store=sellers_by_store)
 
@@ -126,14 +126,14 @@ def sellers():
 def sellerDetails(seller_id):
     seller = get_seller_details(seller_id)
     if seller:
-        store = get_store_by_id(seller[5])
+        store = get_receiptStore_by_id(seller[5])
         return render_template('receipt.sellerDetails.html', page='sellerDetails', active_page='sellers', seller=seller, store=store)
     else:
         return "Vendedor no encontrado", 404
 
 @app.route('/receipts')
 def receipts():
-    stores = get_stores()
+    stores = get_receiptStores()
     customers_by_store = {store[0]: get_customers(store[0]) for store in stores}
     return render_template('receipt.receipts.html', page='receipts', active_page='receipts', stores=stores, customers_by_store=customers_by_store)
 
@@ -151,7 +151,7 @@ def homeSeller():
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
-    stores = get_stores()
+    stores = get_receiptStores()
     customers_by_store = {store[0]: get_customers(store[0]) for store in stores}
     return render_template('receipt.accountsReceivable.html', page='accountsReceivable', active_page='accountsReceivable', stores=stores, customers_by_store=customers_by_store)
 
