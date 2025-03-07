@@ -25,64 +25,55 @@
             </tr>
         </thead>
         <tbody>
-            <tr>
-                <td>FACTURAS PREPAGADAS O DE CONTADO</td>
-                <td>0</td>
-                <td>6,00</td>
+            {% for rule in rules %}
+            <tr data-id="{{rule[0]}}">
+                <td>{{rule[1]}}</td>
+                <td>{{rule[2]}}</td>
+                <td>{{rule[3]}}</td>
                 <td>
                     <label class="switch">
-                        <input type="checkbox" checked onclick="toggleRow(this)">
+                        <input type="checkbox" {% if rule[4] %}checked{% endif %} onclick="toggleRow(this)">
                         <span class="slider round"></span>
                     </label>
                 </td>
                 <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
             </tr>
-            <tr>
-                <td>FACTURAS PAGADAS A SU VENCIMIENTO 21 DÍAS</td>
-                <td>21</td>
-                <td>5,00</td>
-                <td>
-                    <label class="switch">
-                        <input type="checkbox" checked onclick="toggleRow(this)">
-                        <span class="slider round"></span>
-                    </label>
-                </td>
-                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
-            </tr>
-            <tr>
-                <td>FACTURAS PAGADAS A 45 DÍAS DEL VENCIMIENTO</td>
-                <td>45</td>
-                <td>4,00</td>
-                <td>
-                    <label class="switch">
-                        <input type="checkbox" checked onclick="toggleRow(this)">
-                        <span class="slider round"></span>
-                    </label>
-                </td>
-                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
-            </tr>
-            <tr>
-                <td>FACTURA ES PAGADA A MÁS DE 45 DÍAS</td>
-                <td>46</td>
-                <td>0,00</td>
-                <td>
-                    <label class="switch">
-                        <input type="checkbox" checked onclick="toggleRow(this)">
-                        <span class="slider round"></span>
-                    </label>
-                </td>
-                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
-            </tr>
+            {% endfor %}
         </tbody>
     </table>
 
     <button class="add-button" onclick="addRow()">+</button>
+
+    <!-- Formularios ocultos para escritura -->
+    <form id="addForm" action="{{ url_for('businessRules') }}" method="POST" style="display:none;">
+        <input type="hidden" name="action" value="add">
+        <input type="hidden" name="name" id="addName">
+        <input type="hidden" name="days" id="addDays">
+        <input type="hidden" name="percentage" id="addPercentage">
+        <input type="hidden" name="is_active" id="addIsActive" value="1"> <!-- Valor por defecto: activo -->
+    </form>
+
+    <form id="editForm" action="{{ url_for('businessRules') }}" method="POST" style="display:none;">
+        <input type="hidden" name="action" value="edit">
+        <input type="hidden" name="id" id="editId">
+        <input type="hidden" name="name" id="editName">
+        <input type="hidden" name="days" id="editDays">
+        <input type="hidden" name="percentage" id="editPercentage">
+        <input type="hidden" name="is_active" id="editIsActive"> <!-- Estado del toggle -->
+    </form>
 
     <br><br>
     <div class="button-container">
         <button type="button" class="undo-button" onclick="undoChanges()">Deshacer cambios</button>
         <button type="button" class="save-button" onclick="saveChanges()">Guardar cambios</button>
     </div>
+
+    <div id="loadingModal" class="loading-modal">
+        <div class="loading-content">
+            <p>Guardando cambios...</p>
+        </div>
+    </div>
+
 </div>
 
 {% endblock %}
@@ -95,42 +86,52 @@ function addRow() {
     const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
     const newRow = table.insertRow();
     newRow.innerHTML = `
-        <td><input type="text" class="input-field" placeholder="Nombre" /></td>
-        <td><input type="number" class="input-field" placeholder="Días" /></td>
-        <td><input type="number" step="0.01" class="input-field" placeholder="%" /></td>
+        <td><input type="text" class="input-field" placeholder="Nombre" id="newName" /></td>
+        <td><input type="number" class="input-field" placeholder="Días" id="newDays" /></td>
+        <td><input type="number" step="0.01" class="input-field" placeholder="%" id="newPercentage" /></td>
         <td>
             <label class="switch">
                 <input type="checkbox" checked onclick="toggleRow(this)">
                 <span class="slider round"></span>
             </label>
         </td>
-        <td><span class="edit-icon onclick="editRow(this)""><img src="../../static/IMG/edit.png" alt="Editar"></span></td>
-        `;
+        <td><span class="edit-icon" onclick="submitNewRule()"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Agregar"></span></td>
+    `;
     isChanged = true;
 }
 
-function editRow(btn) {
-    const row = btn.parentNode.parentNode;
-    const inputs = row.getElementsByTagName('input');
-            
-    if (inputs.length === 0) {
-        const cells = row.getElementsByTagName('td');
-        for (let i = 0; i < cells.length - 2; i++) {
-            const cellText = cells[i].textContent;
-            const input = document.createElement('input');
-            input.type = (i === 1) ? 'number' : 'text';
-            input.className = 'input-field';
-            input.value = cellText;
-            cells[i].innerHTML = '';
-            cells[i].appendChild(input);
-        }
+function submitNewRule() {
+    const name = document.getElementById('newName').value;
+    const days = document.getElementById('newDays').value;
+    const percentage = document.getElementById('newPercentage').value;
+    const isActive = 1; // Por defecto, la nueva regla está activa
+
+    if (name && days && percentage) {
+        document.getElementById('addName').value = name;
+        document.getElementById('addDays').value = days;
+        document.getElementById('addPercentage').value = percentage;
+        document.getElementById('addIsActive').value = isActive;
+        document.getElementById('addForm').submit();
     } else {
-        for (let i = 0; i < inputs.length; i++) {
-            const cell = inputs[i].parentNode;
-            const textNode = document.createTextNode(inputs[i].value);
-            cell.innerHTML = '';
-            cell.appendChild(textNode);
-        }
+        alert("Por favor, completa todos los campos antes de agregar.");
+    }
+}
+
+function editRow(btn) {
+    const row = btn.closest('tr');
+    const cells = row.getElementsByTagName('td');
+    
+    if (row.querySelector('input')) {
+        Array.from(cells).forEach((cell, index) => {
+            const input = cell.querySelector('input');
+            if (input) {
+                cell.textContent = input.value;
+            }
+        });
+    } else {
+        cells[0].innerHTML = `<input type="text" class="input-field" value="${cells[0].textContent}"/>`;
+        cells[1].innerHTML = `<input type="number" class="input-field" value="${cells[1].textContent}"/>`;
+        cells[2].innerHTML = `<input type="number" step="0.01" class="input-field" value="${cells[2].textContent}"/>`;
     }
     isChanged = true;
 }
@@ -148,8 +149,8 @@ function toggleRow(checkbox) {
             cells[i].style.color = "#b7b4bb";
         }
     }
+    isChanged = true;
 }
-
             
 function undoChanges() {
     if (isChanged) {
@@ -161,9 +162,51 @@ function undoChanges() {
 }
 
 function saveChanges() {
-    // Falta lógica para guardar los cambios
-    alert("Cambios guardados.");
-    isChanged = false;
+    document.getElementById('loadingModal').style.display = 'flex';
+    const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
+    const rules = [];
+    
+    for (let row of table.rows) {
+        const id = row.getAttribute('data-id');
+        const nameInput = row.cells[0].querySelector('input');
+        const daysInput = row.cells[1].querySelector('input');
+        const percentageInput = row.cells[2].querySelector('input');
+        const isActive = row.cells[3].querySelector('input[type="checkbox"]').checked ? 1 : 0; // Captura el estado del toggle
+        
+        if (nameInput && daysInput && percentageInput) {
+            const name = nameInput.value.trim();
+            const days = daysInput.value.trim();
+            const percentage = percentageInput.value.trim();
+            rules.push({ id, name, days, percentage, is_active: isActive });
+        } else {
+            const name = row.cells[0].textContent.trim();
+            const days = row.cells[1].textContent.trim();
+            const percentage = row.cells[2].textContent.trim();
+            if (id && name && days && percentage) {
+                rules.push({ id, name, days, percentage, is_active: isActive });
+            }
+        }
+    }
+    
+    // Enviar los datos al servidor
+    if (rules.length > 0) {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "{{ url_for('businessRules') }}", true);
+        xhr.setRequestHeader("Content-Type", "application/json");
+    
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                window.location.reload();
+            } else {
+                alert("Hubo un error al guardar los cambios.");
+            }
+        };
+    
+        xhr.send(JSON.stringify(rules));
+        isChanged = false;
+    } else {
+        alert("No se realizaron cambios.");
+    }
 }
 
 window.onbeforeunload = function() {

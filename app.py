@@ -6,7 +6,8 @@ from cashflow_db import get_beneficiaries, get_cashflowStores, get_concepts, get
 from cashflow_db import get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id
 from cashflow_db import set_beneficiaries, set_concepts, set_stores, set_operations
 
-from receipt_db import get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender
+from receipt_db import get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules
+from receipt_db import set_commissionsRules
 
 app = Flask(__name__)
 
@@ -151,9 +152,14 @@ def receipts():
 def receiptDetails():
     return render_template('receipt.receiptDetails.html', page='receiptDetails', active_page='receipts')
 
-@app.route('/businessRules')
+@app.route('/businessRules', methods=['GET', 'POST'])
 def businessRules():
-    return render_template('receipt.businessRules.html', page='businessRules', active_page='businessRules')
+    rules = get_commissionsRules()
+    if request.method == 'POST':
+        data = request.get_json()
+        set_commissionsRules(data)
+        return jsonify(success=True)
+    return render_template('receipt.businessRules.html', page='businessRules', active_page='businessRules', rules=rules)
 
 @app.route('/receiptSeller')
 def homeSeller():

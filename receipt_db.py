@@ -1,5 +1,6 @@
 import os
 import pymssql
+from datetime import datetime
 
 def get_db_connection():
     server = os.environ.get('DB_SERVER')
@@ -59,3 +60,43 @@ def get_tender():
     stores = cursor.fetchall()
     conn.close()
     return stores
+
+def get_commissionsRules():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT CommissionID, CommissionName, DaysSinceDue, CommissionRate, Active FROM CommissionReceipt.Commission')
+    rules = cursor.fetchall()
+    conn.close()
+    return rules
+
+
+# Escritura de datos en la BD a través de la Interfaz
+
+def set_commissionsRules(rules):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    for rule in rules:
+        id = rule.get('id')
+        name = rule['name']
+        days = rule['days']
+        percentage = rule['percentage']
+        is_active = rule['is_active']
+        
+        cursor.execute(f"""
+            MERGE INTO CommissionReceipt.Commission AS target
+            USING (VALUES (%s, %s, %s, %s, %s, %s)) AS source (CommissionID, CommissionName, CommissionRate, DaysSinceDue, Active, DateCreated)
+            ON target.CommissionID = source.CommissionID
+            WHEN MATCHED THEN
+                UPDATE SET 
+                    target.CommissionName = source.CommissionName,
+                    target.CommissionRate = source.CommissionRate,
+                    target.DaysSinceDue = source.DaysSinceDue,
+                    target.Active = source.Active
+            WHEN NOT MATCHED THEN
+                INSERT (CommissionName, CommissionRate, DaysSinceDue, Active, DateCreated)
+                VALUES (source.CommissionName, source.CommissionRate, source.DaysSinceDue, source.Active, GETDATE());
+        """, (id, name, percentage, days, is_active, None))
+    
+    conn.commit()
+    conn.close()
