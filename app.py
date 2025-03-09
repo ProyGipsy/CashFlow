@@ -42,6 +42,8 @@ def loginReceipt():
         if ((user == os.environ.get('CASHFLOW_USERTDV') and password == os.environ.get('CASHFLOW_PASSTDV')) or
             (user == os.environ.get('CASHFLOW_USERGIPSY') and password == os.environ.get('CASHFLOW_PASSGIPSY'))):
             return redirect(url_for('homeAdmin'))
+        elif (user == os.environ.get('RECEIPT_USERSELLER') and password == os.environ.get('RECEIPT_PASSSELLER')):
+            return redirect(url_for('homeSeller'))
         else:
             return render_template('receipt.login.html', error="Credenciales incorrectas, por favor intente de nuevo.")
 
