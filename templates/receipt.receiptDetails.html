@@ -8,218 +8,96 @@
 
 {% block content %}
 
-<div class="header">
-    {% if is_pdf %}
-    <!-- Membrete solo para PDF -->
-    <div class="logo-left">
-        <img src="{{ url_for('static', filename='IMG/Gipsy_isotipo_color.png') }}" alt="Logo Cobranza">
-    </div>
-    <div class="header-text">
-        <h1>Reporte de Cobranza Gipsy Corp</h1>
-        <p><strong>{{ storeName }}</strong></p>
-        <p><strong>{{ customerName }}</strong></p>
-    </div>
-    <div class="logo-right">
-        <img src="{{ url_for('static', filename='IMG/logo_store.png') }}" alt="Logo Store">
-    </div>
-    {% endif %}
-</div>
-
-
 <div class="content">
-    {% if not is_pdf %}
     <div class="title-container">
         <a class="back" href="{{ url_for('receipts') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
         <div class="title-center">
             <h2>Detalles de Cobranza</h2>
         </div>
     </div>
-    {% endif %}
 
-    <form id="pdfForm" action="{{ url_for('generate_pdf') }}" method="POST">
+    <div class="client-info">
+        <p><strong>Empresa:</strong> NombreEmpresa</p>
+        <p><strong>Cliente:</strong> NombreCliente</p>
+    </div>
 
-        {% if not is_pdf %}
-        <div class="client-info">
-            <p><strong>Empresa:</strong> NombreEmpresa</p>
-            <p><strong>Cliente:</strong> NombreCliente</p>
-        </div>
-        {% endif %}
-    
-        <!-- Envío de datos al servidor -->
-        <input type="hidden" name="storeName" value="NombreEmpresa">
-        <input type="hidden" name="customerName" value="NombreCliente">
-    
-        <br>
-        <table class="styled-table"> 
-            <tr> 
-                <th>Nro. Cuenta</th>
-                <th>Total Deuda (T/D)</th>
-                <th>Fecha Emisión</th>
-                <th>Fecha Vencimiento</th>
-                <th>N/Dcm</th>
+    <br>
+    <table class="styled-table"> 
+        <tr> 
+            <th>Nro. Cuenta</th>
+            <th>Total Deuda (T/D)</th>
+            <th>Fecha Emisión</th>
+            <th>Fecha Vencimiento</th>
+        </tr> 
+        <tr> 
+            <td>123456789</td>  
+            <td>5000</td> 
+            <td>2023-01-10</td> 
+            <td>2023-02-10</td> 
+        </tr> 
+    </table>
+
+    <table class="styled-table">
+        <tr> 
+            <th>N/Dcm</th>
+            <th>Monto</th>
+            <th>Crédito</th>
+        </tr> 
+        <tr> 
+            <td>NDCM001</td> 
+            <td>5000</td> 
+            <td>0</td> 
+        </tr> 
+    </table>
+
+    <br> 
+    <div id="formas-de-pago"> 
+        <h3>Formas de Pagos</h3> 
+        <table class="styled-table" id="pago-table">
+            <tr>
+                <th>Forma de Pago</th>
+                <th>Fecha de Pago</th>
                 <th>Monto</th>
-                <th>Crédito</th>
-            </tr> 
-            <tr> 
-                <td>123456789</td>  
-                <td>5000</td> 
-                <td>2023-01-10</td> 
-                <td>2023-02-10</td> 
-                <td>NDCM001</td> 
-                <td>5000</td> 
-                <td>0</td> 
-            </tr> 
+                <th>Descuento</th>
+                <th>Referencia</th>
+                <th>Abono Realizado en</th>
+            </tr>
+            <tr class="pago-row">
+                <td>EFECTIVO Bs</td>
+                <td>2023-01-15</td>
+                <td>5000</td>
+                <td>0</td>
+                <td>REF123</td>
+                <td>Cuenta Bancaria</td>
+            </tr>
         </table>
-    
-        <br> 
-        <div id="formas-de-pago"> 
-            <h3>Formas de Pagos</h3> 
-            <table class="styled-table" id="pago-table">
-                <tr>
-                    <th>Forma de Pago</th>
-                    <th>Fecha de Pago</th>
-                    <th>Monto</th>
-                    <th>Descuento</th>
-                    <th>Referencia</th>
-                    <th>Abono Realizado en</th>
-                </tr>
-                <tr class="pago-row">
-                    <td>EFECTIVO Bs</td>
-                    <td>2023-01-15</td>
-                    <td>5000</td>
-                    <td>0</td>
-                    <td>REF123</td>
-                    <td>Cuenta Bancaria</td>
-                </tr>
-            </table>
-        </div> 
-    
-        <br><br>
-        <div class="inline-label">
-            <label for="saldo_nota">Saldo Nota:</label>
-            <span id="saldo_nota" class="small-input">0</span> 
-            
-            <label for="dias_transcurridos">Días Transcurridos:</label>
-            <span id="dias_transcurridos" class="small-input">5</span> 
-        </div>   
-    
-        <br><br>
-        <div class="file-upload-container">
-            <label>Comprobante:</label><br><br>
-            <img src="{{ url_for('static', filename='IMG/sample_payment.jpeg') }}" alt="Comprobante" class="input-field paymentImage">
-        </div>
-    
-        <br><br>
-        <div class="inline-label">
-            <label for="saldo_nota">Comisión a Recibir:</label>
-            <span id="saldo_nota" class="small-input">1234</span>  
-        </div>   
-    
-        {% if not is_pdf %}
-        <div class="button-container">
-            <button type="submit" class="deny-button" id="denyBtn">Rechazar</button>
-            <button type="submit" class="validate-button" id="validateBtn">Validar</button>
-        </div>
-        {% endif %}
+    </div> 
+
+    <br><br>
+    <div class="inline-label">
+        <label for="saldo_nota">Saldo Nota:</label>
+        <span id="saldo_nota" class="small-input">0</span> 
         
-    </form>
-    
+        <label for="dias_transcurridos">Días Transcurridos:</label>
+        <span id="dias_transcurridos" class="small-input">5</span> 
+    </div>   
+
+    <br><br>
+    <div class="file-upload-container">
+        <label>Comprobante:</label><br><br>
+        <img src="../../static/IMG/sample_payment.jpeg" alt="Comprobante" class="input-field"> <!-- Muestra la imagen del comprobante -->
+    </div>
+
+    <br><br>
+    <div class="inline-label">
+        <label for="saldo_nota">Comisión a Recibir:</label>
+        <span id="saldo_nota" class="small-input">1234</span>  
+    </div>   
+
+    <div class="button-container">
+        <button type="button" class="deny-button">Rechazar</button>
+        <button type="button" class="validate-button">Validar</button>
+    </div>
 </div>
 
-{% endblock %}
-
-{% block extra_js %}
-<script>
-    // Acción al Validar (generar pdf)
-    /*
-    document.getElementById('pdfForm').addEventListener('submit', function(event) {
-        event.preventDefault();
-
-        const formData = new FormData(this);
-
-        fetch('/generate_pdf', {
-            method: 'POST',
-            body: formData,
-        })
-        .then(response => response.blob())
-        .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-
-            // Define el nombre del archivo
-            const storeName = formData.get('storeName');
-            const customerName = formData.get('customerName');
-            const currentDate = new Date().toISOString().split('T')[0];
-            const filename = `Cobranza_${storeName}_${customerName}_${currentDate}.pdf`;
-
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
-    });
-    */
-
-    document.getElementById('pdfForm').addEventListener('submit', function(event) {
-        event.preventDefault();
-
-        const formData = new FormData(this);
-
-        fetch('/generate_pdf', {
-            method: 'POST',
-            body: formData,
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Error al generar el PDF');
-            }
-            return response.blob();
-        })
-        .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-
-            // Define el nombre del archivo
-            const storeName = formData.get('storeName');
-            const customerName = formData.get('customerName');
-            const currentDate = new Date().toISOString().split('T')[0];
-            const filename = `Cobranza_${storeName}_${customerName}_${currentDate}.pdf`;
-
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
-    });
-
-
-    // Acción al Rechazar
-    document.getElementById('denyBtn').addEventListener('click', function() {
-        const formData = new FormData(document.getElementById('pdfForm'));
-
-        fetch('/enviar_correo', {  // Ruta para enviar el correo
-            method: 'POST',
-            body: formData,
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Correo enviado correctamente.');
-            } else {
-                alert('Error al enviar el correo.');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
-    });
-</script>
 {% endblock %}

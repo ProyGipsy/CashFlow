@@ -10,7 +10,6 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    {% if not is_pdf %}
     <div class="sidebar" id="sidebar">
         <div class="logo">
             <a href="{{ url_for('homeAdmin') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
@@ -53,11 +52,9 @@
         </div>
     </div>
     <div class="backgroundOpacity" id="backgroundOpacity" onclick="closeSidebar()"></div>
-    {% endif %}
-
+    
     <div class="main-content">
         <header>
-            {% if not is_pdf %}
             <div class="menu-icon" onclick="toggleSidebar(); toggleBackground()">
                 <img src="{{ url_for('static', filename='IMG/menu_icon.png') }}" alt="Menu Icon">
             </div>
@@ -65,7 +62,6 @@
                 <a href="{{ url_for('homeAdmin') }}"> <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"></a>
             </div>
             <div class="space2"></div>
-            {% endif %}
         </header>
         
         <!-- Contenido principal -->
