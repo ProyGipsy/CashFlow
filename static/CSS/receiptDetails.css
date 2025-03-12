@@ -132,3 +132,108 @@
     max-width: 500px;
     height: auto;
 }
+
+/* Generación del PDF */
+/* Estilos generales para la vista normal */
+.header {
+    display: none; /* Ocultar el membrete en la vista normal */
+}
+
+/* Estilos específicos para la impresión (PDF) */
+@media print {
+    @page {
+        margin: 1cm;
+    }
+
+    body {
+        -webkit-print-color-adjust: exact;
+        color: black !important;
+        background: white !important;
+    }
+
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        border-bottom: 2px solid black;
+        padding-bottom: 10px;
+    }
+
+    .header img {
+        max-height: 80px;
+        filter: grayscale(100%);
+    }
+
+    .header-text {
+        text-align: center;
+    }
+
+    .header-text h1, h3 {
+        font-size: 14px !important;
+        margin: 0;
+        color: black !important;
+    }
+
+    .header-text p {
+        margin: 5px 0;
+        color: black !important;
+    }
+
+    .title-container, .button-container, .back {
+        display: none;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+    }
+
+    table, th, td {
+        border: 1px solid black !important;
+    }
+
+    th, td {
+        padding: 6px !important;
+        text-align: left;
+        color: black !important;
+    }
+
+    th {
+        background-color: #f0f0f0 !important;
+    }
+
+    img {
+        max-width: 100%;
+        height: auto;
+        filter: grayscale(100%);
+    }
+
+    .client-info, .styled-table, .inline-label, .file-upload-container {
+        color: black !important;
+    }
+
+    .styled-table th {
+        background-color: #f0f0f0 !important;
+        color: black !important;
+    }
+
+    .styled-table td {
+        color: black !important;
+    }
+
+    .file-upload-container {
+        margin: 20px 0;
+    }
+
+    .file-upload-container img {
+        max-width: 500px;
+        height: auto;
+        display: block;
+    }
+
+    .paymentImage{
+        width: 500px !important;
+    }
+}
