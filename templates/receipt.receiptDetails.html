@@ -166,27 +166,5 @@
             console.error('Error:', error);
         });
     });
-
-
-    // Acción al Rechazar
-    document.getElementById('denyBtn').addEventListener('click', function() {
-        const formData = new FormData(document.getElementById('pdfForm'));
-
-        fetch('/enviar_correo', {  // Ruta para enviar el correo
-            method: 'POST',
-            body: formData,
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Correo enviado correctamente.');
-            } else {
-                alert('Error al enviar el correo.');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
-    });
 </script>
 {% endblock %}
