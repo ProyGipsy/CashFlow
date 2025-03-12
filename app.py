@@ -1,5 +1,5 @@
 import os
-#from weasyprint import HTML
+from weasyprint import HTML
 
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify)
 
