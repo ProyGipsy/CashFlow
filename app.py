@@ -1,4 +1,5 @@
 import os
+from weasyprint import HTML
 
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify)
 
@@ -177,6 +178,30 @@ def accountsReceivable():
 def accountsForm():
     tender = get_tender()
     return render_template('receipt.accountsForm.html', page='accountsForm', active_page='accountsReceivable', tender=tender)
+
+# Generación del PDF
+@app.route('/generate_pdf', methods=['POST'])
+def generate_pdf():
+    # Renderiza el template HTML con los datos de la solicitud
+    rendered = render_template('receipt.receiptDetails.html', 
+                               storeName=request.form.get('storeName'),
+                               customerName=request.form.get('customerName'),
+                               is_pdf=True)  # Pasar is_pdf=True para el PDF
+
+    # Convierte el HTML renderizado a PDF con WeasyPrint
+    pdf = HTML(string=rendered, base_url="https://gipsy-app-new-exdecybsd2cab7gk.westus-01.azurewebsites.net").write_pdf()
+
+    # Prepara la respuesta con el PDF generado
+    response = make_response(pdf)
+    response.headers['Content-Type'] = 'application/pdf'
+
+    # Nombre del archivo PDF que se descarga
+    store_name = request.form.get('storeName', 'Empresa')
+    customer_name = request.form.get('customerName', 'Cliente')
+    filename = f'Cobranza_{store_name}_{customer_name}.pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+
+    return response
 
 
 if __name__ == '__main__':
