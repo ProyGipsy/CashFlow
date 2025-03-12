@@ -201,8 +201,7 @@ def generate_pdf():
     #filename = f'Cobranza_{store_name}_{customer_name}.pdf'
     #response.headers['Content-Disposition'] = f'attachment; filename={filename}'
 
-    #return response
-   return rendered
+    return rendered
 
 
 if __name__ == '__main__':
