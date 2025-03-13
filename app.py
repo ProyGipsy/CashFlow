@@ -8,6 +8,7 @@ from cashflow_db import get_last_beneficiary_id, get_last_concept_id, get_motion
 from cashflow_db import set_beneficiaries, set_concepts, set_stores, set_operations
 
 from receipt_db import get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules
+from receipt_db import get_invoices_by_customer
 from receipt_db import set_commissionsRules
 
 app = Flask(__name__)
@@ -173,6 +174,21 @@ def accountsReceivable():
     stores = get_receiptStores()
     customers_by_store = {store[0]: get_customers(store[0]) for store in stores}
     return render_template('receipt.accountsReceivable.html', page='accountsReceivable', active_page='accountsReceivable', stores=stores, customers_by_store=customers_by_store)
+
+@app.route('/get_invoices/<customer_id>')
+def get_invoices(customer_id):
+    invoices = get_invoices_by_customer(customer_id)
+    # Formatear datos para JSON
+    formatted_invoices = [
+        {
+            'N_DCM': invoice[0],
+            'Amount': float(invoice[1]),
+            'Balance': float(invoice[2]),
+            'IVA': 0,
+            'Remaining': float(invoice[1] - invoice[2])
+        } for invoice in invoices
+    ]
+    return jsonify({'invoices': formatted_invoices})
 
 @app.route('/accountsForm')
 def accountsForm():

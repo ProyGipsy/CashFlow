@@ -34,7 +34,7 @@
         <div class="company-sellers" id="sellers-{{ store[0] }}" style="display: none;">
             {% for customer in customers_by_store[store[0]] %}
             <p>{{ customer[0] }} | {{ customer[1] }}{{ customer[2] }}
-                <a href="javascript:void(0)" onclick="openModal()">Registrar Cobranza</a>
+                <a href="javascript:void(0)" onclick="openModal('{{ customer[0]}}', '{{ customer[1]}}', '{{ customer[2]}}')">Registrar Cobranza</a>
             </p>
             {% endfor %}
         </div>
@@ -58,22 +58,7 @@
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>001</td>
-                    <td>$1000.00</td>
-                    <td>$200.00</td>
-                    <td>$50.00</td>
-                    <td>$750.00</td>
-                    <td><input type="checkbox" /></td>
-                </tr>
-                <tr>
-                    <td>002</td>
-                    <td>$2000.00</td>
-                    <td>$500.00</td>
-                    <td>$100.00</td>
-                    <td>$1400.00</td>
-                    <td><input type="checkbox" /></td>
-                </tr>
+                <!-- Llenado dinámico -->
             </tbody>
         </table>
         <button class="save-button" onclick="registerCollections()">Registrar Cobranza</button>
@@ -124,11 +109,68 @@
      });
 
     /*Listado de Facturas*/
+    function openModal(customerId, customerName, customerLastName) {
+        const modal = document.getElementById("modal");
+        modal.style.display = "block";
 
-    function openModal() {
-       document.getElementById("modal").style.display = "block";
+        const modalTitle = modal.querySelector("h2");
+        modalTitle.textContent = `Facturas de ${customerName} ${customerLastName}`;
+
+        // Carga de la tabla
+        const table = modal.querySelector(".styled-table");
+        const button = modal.querySelector(".save-button");
+        const loadingMessage = document.createElement("p");
+        loadingMessage.id = "loadingMessage";
+        loadingMessage.textContent = "Cargando facturas...";
+        table.style.display = "none";
+        button.style.display = "none";
+        modal.querySelector(".modal-content").insertBefore(loadingMessage, table);
+
+        // Cuerpo de la tabla
+        const tableBody = table.querySelector("tbody");
+        tableBody.innerHTML = "";
+
+        fetch(`/get_invoices/${customerId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Error al obtener las facturas");
+                }
+                return response.json();
+            })
+            .then(data => {
+                const invoices = data.invoices;
+                const pendingInvoices = invoices.filter(invoice => invoice.Remaining != 0);
+                document.getElementById("loadingMessage").remove();
+
+                if (pendingInvoices.length > 0) { // Mostrar facturas pendientes
+                    table.style.display = "table";
+                    pendingInvoices.forEach(invoice => {
+                        const row = document.createElement("tr");
+
+                        row.innerHTML = `
+                            <td>${invoice.N_DCM}</td>
+                            <td>${invoice.Amount.toFixed(2)}</td>
+                            <td>${invoice.Balance.toFixed(2)}</td>
+                            <td>${invoice.IVA.toFixed(2)}</td>
+                            <td>${invoice.Remaining.toFixed(2)}</td>
+                            <td><input type="checkbox" /></td>
+                        `;
+
+                        tableBody.appendChild(row);
+                    });
+                    button.style.display = "block";
+                } else {
+                    const noInvoicesMessage = document.createElement("p");
+                    noInvoicesMessage.textContent = "Este cliente no tiene facturas pendientes.";
+                    modal.querySelector(".modal-content").appendChild(noInvoicesMessage);
+                }
+            })
+            .catch(error => {
+                console.error("Error al cargar las facturas:", error);
+                document.getElementById("loadingMessage").textContent = "No se pudieron cargar las facturas.";
+            });
     }
-        
+
     function closeModal() {
         document.getElementById("modal").style.display = "none";
     }

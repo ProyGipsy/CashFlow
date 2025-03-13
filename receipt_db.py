@@ -69,6 +69,14 @@ def get_commissionsRules():
     conn.close()
     return rules
 
+def get_invoices_by_customer(customer_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT N_DCM, Amount, Balance FROM CommissionReceipt.DebtAccount WHERE CustomerID = %s', (customer_id,))
+    invoices = cursor.fetchall()
+    conn.close()
+    return invoices
+
 
 # Escritura de datos en la BD a través de la Interfaz
 
