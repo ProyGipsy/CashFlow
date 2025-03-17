@@ -233,7 +233,13 @@
         closeConfirmationModal();
         document.getElementById('loadingModal').style.display = 'flex';
         const formData = new FormData(document.getElementById('operationForm'));
+        const saveButton = document.querySelector('.save-button');
         saveButton.disabled = true;
+        
+        if (saveButton.disabled) {
+            event.preventDefault();
+            return;
+        }
     
         fetch("{{ url_for('operations') }}", {
             method: 'POST',
