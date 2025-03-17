@@ -117,24 +117,24 @@ function submitNewRule() {
     }
 }
 
+
 function editRow(btn) {
     const row = btn.closest('tr');
     const cells = row.getElementsByTagName('td');
-    
-    if (row.querySelector('input')) {
-        Array.from(cells).forEach((cell, index) => {
-            const input = cell.querySelector('input');
-            if (input) {
-                cell.textContent = input.value;
+
+    Array.from(cells).forEach((cell, index) => {
+        if (index <= 3) { // No cambiar el toggle ni el edit
+            if (!cell.querySelector('input')) {
+                const value = cell.textContent.trim();
+                let inputType = index === 1 || index === 2 ? 'number' : 'text'; // Número o texto
+                cell.innerHTML = `<input type="${inputType}" class="input-field" value="${value}"/>`;
             }
-        });
-    } else {
-        cells[0].innerHTML = `<input type="text" class="input-field" value="${cells[0].textContent}"/>`;
-        cells[1].innerHTML = `<input type="number" class="input-field" value="${cells[1].textContent}"/>`;
-        cells[2].innerHTML = `<input type="number" step="0.01" class="input-field" value="${cells[2].textContent}"/>`;
-    }
+        }
+    });
+
     isChanged = true;
 }
+
 
 function toggleRow(checkbox) {
     const row = checkbox.parentNode.parentNode.parentNode;
