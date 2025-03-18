@@ -120,11 +120,11 @@
 
 /* Clases dinámicas */
 .header-ingreso {
-    background-color: #01CC00 !important; /* Verde claro para Ingreso */
+    background-color: #01CC00 !important; /* Verde para Ingreso */
 }
 
 .header-egreso {
-    background-color: #fc7b90 !important; /* Rojo claro para Egreso */
+    background-color: #fc7b90 !important; /* Rojo para Egreso */
 }
 
 .styled-table th, .styled-table td, .modal-table th, .modal-table td {
