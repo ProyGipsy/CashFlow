@@ -78,8 +78,8 @@
         <span class="close" onclick="closeModal()">&times;</span>
         <h2>Nueva Operación</h2>
         <form id="operationForm" action="{{ url_for('operations') }}" method="POST">
-            <table class="styled-table modal-table">
-                <thead>
+            <table class="modal-table">
+                <thead id="tableHeader">
                     <tr>
                         <th>Fecha</th>
                         <th>Movimiento</th>
@@ -211,6 +211,7 @@
     function filterConcepts() {
         const motionType = document.getElementById("motionType").value;
         const conceptSelect = document.getElementById("concept");
+        const tableHeader = document.getElementById("tableHeader");
 
         conceptSelect.innerHTML = '<option value="">Concepto</option>';
 
@@ -222,6 +223,13 @@
             option.textContent = concept.name;
             conceptSelect.appendChild(option);
         });
+
+        tableHeader.classList.remove("header-ingreso", "header-egreso");
+        if (motionType === "1") {
+            tableHeader.classList.add("header-ingreso"); // Verde claro para Ingreso
+        } else {
+            tableHeader.classList.add("header-egreso"); // Rojo claro para Egreso
+        }
     }
 
     // Inicializar el filtro al cargar la página

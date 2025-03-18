@@ -105,7 +105,7 @@
     background-color: #bc9bfd;
 }
 
-.styled-table {
+.styled-table, .modal-table {
     width: 100%;
     border-collapse: collapse;
     margin: 20px 0;
@@ -118,7 +118,16 @@
     align-items: center;
 }
 
-.styled-table th, .styled-table td {
+/* Clases dinámicas */
+.header-ingreso {
+    background-color: #01CC00 !important; /* Verde claro para Ingreso */
+}
+
+.header-egreso {
+    background-color: #fc7b90 !important; /* Rojo claro para Egreso */
+}
+
+.styled-table th, .styled-table td, .modal-table th, .modal-table td {
     border: 1px solid #421d83;
     padding: 10px;
     text-align: left;
