@@ -23,11 +23,10 @@
     <br>
     <table class="styled-table heading-table"> 
         <tr> 
-            <th>Nro. Cuenta</th>
+            <th>N_CTA</th>
             <th>Total Deuda (T/D)</th>
             <th>Fecha Emisión</th>
             <th>Fecha Vencimiento</th>
-            <th>N CxC</th>
             <th>Monto</th>
             <th>Crédito</th>
         </tr> 
@@ -36,7 +35,6 @@
             <td><p>$1000.00</p></td> 
             <td><p>2023-10-01</p></td> 
             <td><p>2023-12-31</p></td> 
-            <td><p>001</p></td> 
             <td><p>$500.00</p></td> 
             <td><p>$200.00</p></td>
         </tr> 
@@ -64,7 +62,7 @@
                         {% endfor %}
                     </select>
                 </td>
-                <td><input type="date" name="fecha_pago" class="input-field"></td>
+                <td><input type="date" id="date_operation" name="date_operation" class="input-field"></td>
                 <td><input type="number" name="monto_pago" step="0.01" class="input-field"></td>
                 <td><input type="number" name="descuento" step="0.01" class="input-field"></td>
                 <td><input type="number" name="referencia" class="input-field"></td>
@@ -144,5 +142,15 @@
         row.parentNode.removeChild(row);
         isChanged = true;
     };
+
+    // Función para no permitir operaciones futuras
+    document.addEventListener("DOMContentLoaded", function() {
+        const today = new Date();
+        const day = String(today.getDate()).padStart(2, '0');
+        const month = String(today.getMonth() + 1).padStart(2, '0'); // Enero es 0
+        const year = today.getFullYear();
+        const maxDate = `${year}-${month}-${day}`;
+        document.getElementById("date_operation").setAttribute("max", maxDate);
+    });
 </script>
 {% endblock %}
