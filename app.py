@@ -1,4 +1,5 @@
 import os
+import urllib.parse
 #from weasyprint import HTML
 
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify)
@@ -8,7 +9,7 @@ from cashflow_db import get_last_beneficiary_id, get_last_concept_id, get_motion
 from cashflow_db import set_beneficiaries, set_concepts, set_stores, set_operations
 
 from receipt_db import get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules
-from receipt_db import get_invoices_by_customer
+from receipt_db import get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer
 from receipt_db import set_commissionsRules
 
 app = Flask(__name__)
@@ -181,19 +182,31 @@ def get_invoices(customer_id):
     # Formatear datos para JSON
     formatted_invoices = [
         {
-            'N_DCM': invoice[0],
-            'Amount': float(invoice[1]),
-            'Balance': float(invoice[2]),
+            'AccountID': invoice[0],
+            'N_CTA': invoice[1],
+            'Amount': float(invoice[2]),
+            'Balance': float(invoice[3]),
             'IVA': 0,
-            'Remaining': float(invoice[1] - invoice[2])
+            'Remaining': float(invoice[2] - invoice[3])
         } for invoice in invoices
     ]
     return jsonify({'invoices': formatted_invoices})
 
-@app.route('/accountsForm')
-def accountsForm():
+@app.route('/accountsForm/<string:account_ids>')
+def accountsForm(account_ids):
+    account_ids_list = account_ids.split('-')
     tender = get_tender()
-    return render_template('receipt.accountsForm.html', page='accountsForm', active_page='accountsReceivable', tender=tender)
+    receiptStoreCustomer = get_receiptsStoreCustomer(account_ids_list)
+    receiptsInfo = get_receiptsInfo(account_ids_list)
+    return render_template(
+        'receipt.accountsForm.html',
+        page='accountsForm',
+        active_page='accountsReceivable',
+        tender=tender,
+        receiptStoreCustomer=receiptStoreCustomer,
+        receiptDetails=receiptsInfo
+    )
+
 
 # Generación del PDF
 @app.route('/generate_pdf', methods=['POST'])

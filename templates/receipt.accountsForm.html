@@ -16,8 +16,8 @@
     </div> 
 
     <div class="client-info">
-        <p><strong>Empresa:</strong> NombreEmpresa</p>
-        <p><strong>Cliente:</strong> NombreCliente</p>
+        <p><strong>Empresa:</strong> {{ receiptStoreCustomer[0] }}</p>
+        <p><strong>Cliente:</strong> {{ receiptStoreCustomer[1] }} {{ receiptStoreCustomer[2] }}</p>
     </div>
 
     <br>
@@ -27,17 +27,17 @@
             <th>Total Deuda (T/D)</th>
             <th>Fecha Emisión</th>
             <th>Fecha Vencimiento</th>
-            <th>Monto</th>
-            <th>Crédito</th>
+            <th>Monto Abonado</th>
         </tr> 
+        {% for receipt in receiptDetails %}
         <tr> 
-            <td><p>12345</p></td>  
-            <td><p>$1000.00</p></td> 
-            <td><p>2023-10-01</p></td> 
-            <td><p>2023-12-31</p></td> 
-            <td><p>$500.00</p></td> 
-            <td><p>$200.00</p></td>
+            <td><p>{{ receipt[0] }}</p></td>
+            <td><p>{{ "%.2f"|format(receipt[1]) }}</p></td>
+            <td><p>{{ receipt[2] }}</p></td>
+            <td><p>{{ receipt[3] }}</p></td>
+            <td><p>{{ "%.2f"|format(receipt[4]) }}</p></td>
         </tr> 
+        {% endfor %}
     </table>
 
     <br> 
@@ -72,7 +72,7 @@
                 <td><span class="delete-icon" onclick="deleteRow(this)"><img src="{{ url_for('static', filename='IMG/trash.png') }}" alt="Eliminar"></span></td>
             </tr>
         </table>
-        <button type="button" id="add-pago" class="add-button">+</button>
+        <button type="button" id="add-payment" class="add-button">+</button>
     </div> 
 
     <br><br>
@@ -107,27 +107,37 @@
 
 {% block extra_js %}
 <script>
-    document.getElementById('add-pago').addEventListener('click', function() { 
-        const pagoRow = document.querySelector('.pago-row'); 
-        const newPagoRow = pagoRow.cloneNode(true); 
-        const inputs = newPagoRow.querySelectorAll('input'); 
+    document.getElementById('add-payment').addEventListener('click', function() {
+        const pagoRow = document.querySelector('.pago-row');
+        const newPagoRow = pagoRow.cloneNode(true);
+        const inputs = newPagoRow.querySelectorAll('input');
         inputs.forEach(input => input.value = '');
         const selects = newPagoRow.querySelectorAll('select');
         selects.forEach(select => select.selectedIndex = 0);
-        document.getElementById('pago-table').appendChild(newPagoRow); 
+
+        // Aplicar el límite de fecha al nuevo campo de fecha
+        const dateInput = newPagoRow.querySelector('input[type="date"]');
+        const today = new Date();
+        const day = String(today.getDate()).padStart(2, '0');
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const year = today.getFullYear();
+        const maxDate = `${year}-${month}-${day}`;
+        dateInput.setAttribute("max", maxDate);
+
+        document.getElementById('pago-table').appendChild(newPagoRow);
     });
 
     function updateFileName() {
         const fileInput = document.getElementById('comprobante_pago');
         const fileMessage = document.getElementById('file-message');
-        
+
         if (fileInput.files.length > 0) {
             fileMessage.textContent = `Archivo seleccionado: ${fileInput.files[0].name}`;
         } else {
             fileMessage.textContent = '';
         }
     }
-    
+
     function uploadFile() {
         const fileInput = document.getElementById('comprobante_pago');
         if (fileInput.files.length > 0) {
@@ -143,14 +153,15 @@
         isChanged = true;
     };
 
-    // Función para no permitir operaciones futuras
+    // Aplicar el límite de fecha a la primera fila original
     document.addEventListener("DOMContentLoaded", function() {
         const today = new Date();
         const day = String(today.getDate()).padStart(2, '0');
-        const month = String(today.getMonth() + 1).padStart(2, '0'); // Enero es 0
+        const month = String(today.getMonth() + 1).padStart(2, '0');
         const year = today.getFullYear();
         const maxDate = `${year}-${month}-${day}`;
         document.getElementById("date_operation").setAttribute("max", maxDate);
     });
+
 </script>
 {% endblock %}

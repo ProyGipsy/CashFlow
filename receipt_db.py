@@ -72,10 +72,36 @@ def get_commissionsRules():
 def get_invoices_by_customer(customer_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT N_CTA, Amount, Balance FROM CommissionReceipt.DebtAccount WHERE CustomerID = %s', (customer_id,))
+    cursor.execute('SELECT AccountID, N_CTA, Amount, Balance FROM CommissionReceipt.DebtAccount WHERE CustomerID = %s', (customer_id,))
     invoices = cursor.fetchall()
     conn.close()
     return invoices
+
+def get_receiptsStoreCustomer(account_ids):
+    account_ids_tuple = tuple(account_ids)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT TOP (1) S.Name, C.FirstName, C.LastName
+                   FROM CommissionReceipt.DebtAccount D
+                   JOIN Main.Store S ON D.StoreID = S.ID
+                   JOIN Main.Customer C ON D.CustomerID = C.ID
+                   WHERE AccountID IN %s''',
+                   (account_ids_tuple,))
+    receiptStoreCustomer = cursor.fetchone()
+    conn.close()
+    return receiptStoreCustomer
+
+def get_receiptsInfo(account_ids):
+    account_ids_tuple = tuple(account_ids)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT D.N_CTA, D.Amount, D.DueDate, D.DueDate, D.Balance
+                   FROM CommissionReceipt.DebtAccount D
+                   WHERE AccountID IN %s''',
+                   (account_ids_tuple,))
+    receipts = cursor.fetchall()
+    conn.close()
+    return receipts
 
 
 # Escritura de datos en la BD a través de la Interfaz

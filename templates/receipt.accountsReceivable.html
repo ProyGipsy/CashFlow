@@ -34,7 +34,7 @@
         <div class="company-sellers" id="sellers-{{ store[0] }}" style="display: none;">
             {% for customer in customers_by_store[store[0]] %}
             <p>{{ customer[0] }} | {{ customer[1] }}{{ customer[2] }}
-                <a href="javascript:void(0)" onclick="openModal('{{ customer[0]}}', '{{ customer[1]}}', '{{ customer[2]}}')">Registrar Cobranza</a>
+                <a href="javascript:void(0)" onclick="openModal('{{ customer[0] }}', '{{ customer[1]}}', '{{ customer[2]}}', '{{ store[1] }}')">Registrar Cobranza</a>
             </p>
             {% endfor %}
         </div>
@@ -68,6 +68,8 @@
 
 {% block extra_js %}
 <script>
+    let selectedAccountIDs = []; // Arreglo de AccountID de facturas seleccionadas
+
     function filterTable(searchTerm) {
         const companyButtons = document.querySelectorAll('.company-name');
         companyButtons.forEach(button => {
@@ -109,7 +111,8 @@
      });
 
     /*Listado de Facturas*/
-    function openModal(customerId, customerName, customerLastName) {
+    function openModal(customerId, customerName, customerLastName, storeName) {
+
         const modal = document.getElementById("modal");
         modal.style.display = "block";
 
@@ -119,6 +122,12 @@
         // Carga de la tabla
         const table = modal.querySelector(".styled-table");
         const button = modal.querySelector(".save-button");
+
+        // Eliminar mensajes anteriores (carga, error o "no tiene facturas")
+        const existingMessages = modal.querySelectorAll("#loadingMessage, .no-invoices-message");
+        existingMessages.forEach(message => message.remove());
+
+        // Crear y mostrar el mensaje de carga
         const loadingMessage = document.createElement("p");
         loadingMessage.id = "loadingMessage";
         loadingMessage.textContent = "Cargando facturas...";
@@ -140,6 +149,8 @@
             .then(data => {
                 const invoices = data.invoices;
                 const pendingInvoices = invoices.filter(invoice => invoice.Remaining != 0);
+
+                // Eliminar el mensaje de carga
                 document.getElementById("loadingMessage").remove();
 
                 if (pendingInvoices.length > 0) { // Mostrar facturas pendientes
@@ -148,35 +159,69 @@
                         const row = document.createElement("tr");
 
                         row.innerHTML = `
-                            <td>${invoice.N_DCM}</td>
+                            <td>${invoice.N_CTA}</td>
                             <td>${invoice.Amount.toFixed(2)}</td>
                             <td>${invoice.Balance.toFixed(2)}</td>
                             <td>${invoice.IVA.toFixed(2)}</td>
                             <td>${invoice.Remaining.toFixed(2)}</td>
-                            <td><input type="checkbox" /></td>
+                            <td><input type="checkbox" class="invoice-checkbox" data-account-id="${invoice.AccountID}" /></td>
                         `;
 
                         tableBody.appendChild(row);
                     });
                     button.style.display = "block";
                 } else {
+                    // Eliminar cualquier mensaje anterior antes de agregar uno nuevo
+                    const existingNoInvoicesMessage = modal.querySelector(".no-invoices-message");
+                    if (existingNoInvoicesMessage) {
+                        existingNoInvoicesMessage.remove();
+                    }
+
+                    // Crear y mostrar el mensaje "No tiene facturas pendientes"
                     const noInvoicesMessage = document.createElement("p");
+                    noInvoicesMessage.className = "no-invoices-message"; // Agregar una clase para identificarlo
                     noInvoicesMessage.textContent = "Este cliente no tiene facturas pendientes.";
                     modal.querySelector(".modal-content").appendChild(noInvoicesMessage);
                 }
             })
             .catch(error => {
                 console.error("Error al cargar las facturas:", error);
-                document.getElementById("loadingMessage").textContent = "No se pudieron cargar las facturas.";
+
+                // Actualizar el mensaje de carga con el mensaje de error
+                const loadingMessage = document.getElementById("loadingMessage");
+                if (loadingMessage) {
+                    loadingMessage.textContent = "No se pudieron cargar las facturas.";
+                }
             });
     }
 
     function closeModal() {
         document.getElementById("modal").style.display = "none";
     }
-        
+
+    // Manejo de Selección de Facturas
+    document.addEventListener("change", function(event) {
+        if (event.target.classList.contains("invoice-checkbox")) {
+            const accountID = event.target.getAttribute("data-account-id");
+            if (event.target.checked) {
+                selectedAccountIDs.push(accountID);
+            } else {
+                selectedAccountIDs = selectedAccountIDs.filter(id => id !== accountID);
+            }
+        }
+    });
+
     function registerCollections() {
-        window.location.href = "{{ url_for('accountsForm') }}";
-    };
+        console.log(selectedAccountIDs.length);
+        console.log(selectedAccountIDs);
+        if (selectedAccountIDs.length > 0) {
+            sessionStorage.setItem("selectedAccountIDs", JSON.stringify(selectedAccountIDs));
+            const accountIdsString = selectedAccountIDs.join('-');
+            window.location.href = "{{ url_for('accountsForm', account_ids='ACCOUNT_IDS') }}".replace('ACCOUNT_IDS', accountIdsString);
+        } else {
+            alert("Por favor, selecciona al menos una factura.");
+        }
+    }
+    
 </script>
 {% endblock %}
