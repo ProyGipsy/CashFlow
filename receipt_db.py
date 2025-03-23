@@ -103,6 +103,22 @@ def get_receiptsInfo(account_ids):
     conn.close()
     return receipts
 
+def get_bankAccounts():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT AccountID, BankName, Destiny FROM CommissionReceipt.PaymentOption')
+    bankAccounts = cursor.fetchall()
+    conn.close()
+    return bankAccounts
+
+def get_commissions():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT CommissionID, CommissionRate, DaysSinceDue, Active FROM CommissionReceipt.Commission')
+    commissions = cursor.fetchall()
+    conn.close()
+    return commissions
+
 
 # Escritura de datos en la BD a través de la Interfaz
 

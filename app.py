@@ -9,7 +9,7 @@ from cashflow_db import get_last_beneficiary_id, get_last_concept_id, get_motion
 from cashflow_db import set_beneficiaries, set_concepts, set_stores, set_operations
 
 from receipt_db import get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules
-from receipt_db import get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer
+from receipt_db import get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer, get_bankAccounts, get_commissions
 from receipt_db import set_commissionsRules
 
 app = Flask(__name__)
@@ -198,13 +198,17 @@ def accountsForm(account_ids):
     tender = get_tender()
     receiptStoreCustomer = get_receiptsStoreCustomer(account_ids_list)
     receiptsInfo = get_receiptsInfo(account_ids_list)
+    bankAccounts = get_bankAccounts()
+    commissions = get_commissions()
     return render_template(
         'receipt.accountsForm.html',
         page='accountsForm',
         active_page='accountsReceivable',
         tender=tender,
         receiptStoreCustomer=receiptStoreCustomer,
-        receiptDetails=receiptsInfo
+        receiptDetails=receiptsInfo,
+        bankAccounts=bankAccounts,
+        commissions=commissions
     )
 
 

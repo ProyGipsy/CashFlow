@@ -34,6 +34,7 @@
             <td><p>{{ receipt[0] }}</p></td>
             <td><p>{{ "%.2f"|format(receipt[1]) }}</p></td>
             <td><p>{{ receipt[2] }}</p></td>
+            <!--<td><p>{{ "2025-03-01 00:00:00" }}</p></td>-->
             <td><p>{{ receipt[3] }}</p></td>
             <td><p>{{ "%.2f"|format(receipt[4]) }}</p></td>
         </tr> 
@@ -42,8 +43,8 @@
 
     <br> 
     <div id="formas-de-pago"> 
-        <h3>Formas de Pagos</h3> 
-        <table class="styled-table" id="pago-table">
+        <h3>Formas de Pago</h3> 
+        <table class="styled-table" id="payment-table">
             <tr>
                 <th>Forma de Pago</th>
                 <th>Fecha de Pago</th>
@@ -53,21 +54,24 @@
                 <th>Abono Realizado en</th>
                 <th></th>
             </tr>
-            <tr class="pago-row">
+            <tr class="payment-row">
                 <td>
                     <select name="forma_pago" class="input-field"> 
                         <option value="">Forma de Pago</option> 
                         {% for t in tender | sort(attribute=1)  %}
-                        <option value="{{ t[0] }}">{{t[1] }}</option>
+                            <option value="{{ t[0] }}">{{t[1] }}</option>
                         {% endfor %}
                     </select>
                 </td>
                 <td><input type="date" id="date_operation" name="date_operation" class="input-field"></td>
-                <td><input type="number" name="monto_pago" step="0.01" class="input-field"></td>
-                <td><input type="number" name="descuento" step="0.01" class="input-field"></td>
-                <td><input type="number" name="referencia" class="input-field"></td>
-                <td><select name="abono_realizado" class="input-field">
+                <td><input type="number" name="payment_amount" step="0.01" class="input-field" value="0.00"></td>
+                <td><input type="number" name="discount" step="0.01" class="input-field" value="0.00"></td>
+                <td><input type="text" name="reference" class="input-field"></td>
+                <td><select name="payment_made" class="input-field">
                     <option value="">Cuenta Bancaria</option> 
+                    {% for b in bankAccounts | sort(attribute=1)  %}
+                        <option value="{{ b[0] }}">{{b[1] - b[2] }}</option>
+                    {% endfor %}
                 </td>
                 <td><span class="delete-icon" onclick="deleteRow(this)"><img src="{{ url_for('static', filename='IMG/trash.png') }}" alt="Eliminar"></span></td>
             </tr>
@@ -77,25 +81,25 @@
 
     <br><br>
     <div class="inline-label">
-        <label for="saldo_nota">Saldo Nota:</label>
-        <span id="saldo_nota" class="small-input">0</span> 
+        <label for="balance_note">Saldo Nota:</label>
+        <span id="balance_note" class="small-input">0.00</span> 
         
-        <label for="dias_transcurridos">Días Transcurridos:</label>
-        <span id="dias_transcurridos" class="small-input">5</span> 
+        <label for="days_passed">Días Transcurridos:</label>
+        <span id="days_passed" class="small-input">5</span> 
     </div>    
 
     <br><br>
     <div class="file-upload-container">
-        <label for="comprobante_pago">Cargar Comprobante:</label>
-        <input type="file" id="comprobante_pago" name="comprobante_pago" class="input-field" accept="image/*,.pdf" onchange="updateFileName()">
+        <label for="proof_of_payment">Cargar Comprobante:</label>
+        <input type="file" id="proof_of_payment" name="proof_of_payment" class="input-field" accept="image/*,.pdf" onchange="updateFileName()">
         <button type="button" class="upload-button" onclick="uploadFile()">Subir</button>
         <p id="file-message" class="file-message"></p>
     </div>
 
     <br><br>
     <div class="inline-label">
-        <label for="saldo_nota">Comisión a Recibir:</label>
-        <span id="saldo_nota" class="small-input">1234</span>  
+        <label for="commission_received">Comisión a Recibir:</label>
+        <span id="commission_received" class="small-input">0.00</span>  
     </div>
     
     <br><br>
@@ -107,15 +111,30 @@
 
 {% block extra_js %}
 <script>
+    // Actualización de Saldo con la escritura
+    function addInputListeners() {
+        const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
+        amountInputs.forEach(input => {
+            input.addEventListener('input', updateBalanceNote);
+        });
+    }
+    addInputListeners();
+
     document.getElementById('add-payment').addEventListener('click', function() {
-        const pagoRow = document.querySelector('.pago-row');
+        const pagoRow = document.querySelector('.payment-row');
         const newPagoRow = pagoRow.cloneNode(true);
         const inputs = newPagoRow.querySelectorAll('input');
-        inputs.forEach(input => input.value = '');
+        inputs.forEach(input => {
+            if (input.type === "number") {
+                input.value = "0.00";
+            } else {
+                input.value = '';
+            }
+        })
         const selects = newPagoRow.querySelectorAll('select');
         selects.forEach(select => select.selectedIndex = 0);
 
-        // Aplicar el límite de fecha al nuevo campo de fecha
+        // Límite de fecha para el nuevo campo de fecha
         const dateInput = newPagoRow.querySelector('input[type="date"]');
         const today = new Date();
         const day = String(today.getDate()).padStart(2, '0');
@@ -124,11 +143,12 @@
         const maxDate = `${year}-${month}-${day}`;
         dateInput.setAttribute("max", maxDate);
 
-        document.getElementById('pago-table').appendChild(newPagoRow);
+        document.getElementById('payment-table').appendChild(newPagoRow);
+        addInputListeners();
     });
 
     function updateFileName() {
-        const fileInput = document.getElementById('comprobante_pago');
+        const fileInput = document.getElementById('proof_of_payment');
         const fileMessage = document.getElementById('file-message');
 
         if (fileInput.files.length > 0) {
@@ -139,7 +159,7 @@
     }
 
     function uploadFile() {
-        const fileInput = document.getElementById('comprobante_pago');
+        const fileInput = document.getElementById('proof_of_payment');
         if (fileInput.files.length > 0) {
             alert(`Subiendo archivo: ${fileInput.files[0].name}`);
         } else {
@@ -149,11 +169,16 @@
 
     function deleteRow(btn) {
         const row = btn.parentNode.parentNode;
-        row.parentNode.removeChild(row);
-        isChanged = true;
+        const table = document.getElementById('payment-table');
+        if (table.rows.length > 2) {
+            row.parentNode.removeChild(row);
+            isChanged = true;
+        } else {
+            alert('Debe existir al menos una forma de pago.');
+        }
     };
 
-    // Aplicar el límite de fecha a la primera fila original
+    // Límite de fecha para la primera fila original
     document.addEventListener("DOMContentLoaded", function() {
         const today = new Date();
         const day = String(today.getDate()).padStart(2, '0');
@@ -161,7 +186,59 @@
         const year = today.getFullYear();
         const maxDate = `${year}-${month}-${day}`;
         document.getElementById("date_operation").setAttribute("max", maxDate);
+    
+        calculateDaysPassed();
     });
+
+    // Cálculo del Saldo de la Nota
+    function updateBalanceNote() {
+        let totalBalance = 0;
+        const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
+        amountInputs.forEach(input => {
+            totalBalance += parseFloat(input.value) || 0;
+        });
+        document.getElementById('balance_note').textContent = totalBalance.toFixed(2);
+        updateCommission();
+    }
+
+    // Cálculo de Días Transcurridos
+    function calculateDaysPassed() {
+        //const emissionDateStr = "2025-03-01T00:00:00";
+        const emissionDateStr = "{{ receiptDetails[0][2] }}"; // Obtener la fecha de emisión del primer recibo
+        const emissionDate = new Date(emissionDateStr);
+        const today = new Date();
+        const difference = today - emissionDate;
+        const daysElapsed = Math.floor(difference / (1000 * 60 * 60 * 24));
+        document.getElementById('days_passed').textContent = daysElapsed;
+    }
+
+    // Cálculo de la Comisión a Aplicar
+    function updateCommission() {
+        const daysPassed = parseInt(document.getElementById('days_passed').textContent);
+        console.log("daysPassed = ", daysPassed);
+        const totalBalance = parseFloat(document.getElementById('balance_note').textContent);
+        console.log("totalBalance = ", totalBalance);
+        const businessRules = {{ commissions | tojson }}; // Convertir a JSON para usar en JavaScript
+
+        let commission = 0;
+        let commissionApplied = false;
+
+        businessRules.forEach(comm => {
+            console.log("commissionApplied = ", commissionApplied);
+            if (!commissionApplied){
+                console.log("comm[2] = ", comm[2], "; ", daysPassed, " <= ", comm[2]);
+                if (daysPassed <= comm[2]) { // Comparar con DaysSinceDue
+                    if (comm[3] == 1) { // Si la comisión está activa
+                        commission = totalBalance * (comm[1] / 100);
+                        commissionApplied = true;
+                        console.log("Comisión aplicada = ", commission);
+                    }
+                }
+            }
+        });
+
+        document.getElementById('commission_received').textContent = commission.toFixed(2);
+    }
 
 </script>
 {% endblock %}
