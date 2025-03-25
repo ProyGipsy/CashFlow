@@ -90,10 +90,18 @@
 
     <br><br>
     <div class="file-upload-container">
-        <label for="proof_of_payment">Cargar Comprobante:</label>
-        <input type="file" id="proof_of_payment" name="proof_of_payment" class="input-field" accept="image/*,.pdf" onchange="updateFileName()">
-        <button type="button" class="upload-button" onclick="uploadFile()">Subir</button>
-        <p id="file-message" class="file-message"></p>
+        <div class="upload-header">
+            <label for="proof_of_payment">Cargar Comprobante(s):</label>
+        </div>
+        <div class="upload-area">
+            <div class="file-input-wrapper">
+                <input type="file" id="proof_of_payment" name="proof_of_payment[]" class="input-field" 
+                    accept="image/*,.pdf" multiple onchange="handleFileSelection(this)">
+            </div>
+            <div id="selected-files-container" class="selected-files">
+                <!-- Aquí se mostrarán las imágenes seleccionadas -->
+            </div>
+        </div>
     </div>
 
     <br><br>
@@ -158,13 +166,54 @@
         }
     }
 
-    function uploadFile() {
-        const fileInput = document.getElementById('proof_of_payment');
-        if (fileInput.files.length > 0) {
-            alert(`Subiendo archivo: ${fileInput.files[0].name}`);
-        } else {
-            alert('Por favor, selecciona un archivo antes de subir.');
+    function handleFileSelection(input) {
+        const container = document.getElementById('selected-files-container');
+        
+        if (input.files && input.files.length > 0) {
+            for (let i = 0; i < input.files.length; i++) {
+                const file = input.files[i];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    const previewDiv = document.createElement('div');
+                    previewDiv.className = 'file-preview';
+                    previewDiv.dataset.index = i;
+                    
+                    if (file.type.startsWith('image/')) {
+                        previewDiv.innerHTML = `
+                            <img src="${e.target.result}" alt="${file.name}">
+                            <button class="remove-file" onclick="removeFile(${i})">×</button>
+                            <div class="file-name">${file.name}</div>
+                        `;
+                    } else {
+                        previewDiv.innerHTML = `
+                            <div style="padding: 10px; text-align: center;">
+                                <p>PDF</p>
+                                <p>${file.name}</p>
+                            </div>
+                            <button class="remove-file" onclick="removeFile(${i})">×</button>
+                        `;
+                    }
+                    
+                    container.appendChild(previewDiv);
+                };
+                
+                reader.readAsDataURL(file);
+            }
         }
+    }
+
+    function removeFile(index) {
+        const input = document.getElementById('proof_of_payment');
+        const files = Array.from(input.files);
+        files.splice(index, 1);
+        
+        // Creación de nueva DataTransfer y asignar los archivos restantes
+        const dataTransfer = new DataTransfer();
+        files.forEach(file => dataTransfer.items.add(file));
+        input.files = dataTransfer.files;
+        
+        handleFileSelection(input);
     }
 
     function deleteRow(btn) {
