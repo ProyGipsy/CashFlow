@@ -255,41 +255,6 @@
         updateBalanceNote();
         updateCommission();
         
-        // Listener para el botón de agregar pago
-        document.getElementById('add-payment').addEventListener('click', function() {
-            const pagoRow = document.querySelector('.payment-row');
-            const newPagoRow = pagoRow.cloneNode(true);
-            const inputs = newPagoRow.querySelectorAll('input');
-            
-            inputs.forEach(input => {
-                if (input.type === "number") {
-                    input.value = "0.00";
-                } else {
-                    input.value = '';
-                }
-            });
-            
-            const selects = newPagoRow.querySelectorAll('select');
-            selects.forEach(select => select.selectedIndex = 0);
-            
-            // Configurar fecha máxima para la nueva fila
-            const dateInput = newPagoRow.querySelector('input[type="date"]');
-            dateInput.setAttribute("max", maxDate);
-            
-            // Agregar listeners para la nueva fila
-            dateInput.addEventListener('change', function() {
-                calculateDaysPassed();
-                updateCommission();
-            });
-            
-            newPagoRow.querySelector('input[name="payment_amount"]').addEventListener('input', function() {
-                updateBalanceNote();
-                updateCommission();
-            });
-            
-            document.getElementById('payment-table').appendChild(newPagoRow);
-        });
-        
         // Listener para cambios en la fecha de pago (fila original)
         document.querySelector('input[name="date_operation"]').addEventListener('change', function() {
             calculateDaysPassed();
@@ -319,6 +284,7 @@
             totalBalance += parseFloat(input.value) || 0;
         });
         document.getElementById('balance_note').textContent = totalBalance.toFixed(2);
+        amountOwed(totalBalance);
         updateCommission();
     }
 
@@ -345,29 +311,34 @@
     // Cálculo de la Comisión a Aplicar
     function updateCommission() {
         const daysPassed = parseInt(document.getElementById('days_passed').textContent);
-        console.log("daysPassed = ", daysPassed);
         const totalBalance = parseFloat(document.getElementById('balance_note').textContent);
-        console.log("totalBalance = ", totalBalance);
-        const businessRules = {{ commissions | tojson }}; // Convertir a JSON para usar en JavaScript
+        const businessRules = {{ commissions | tojson }}; // Conversión a JSON para usar en JavaScript
 
         let commission = 0;
         let commissionApplied = false;
 
         businessRules.forEach(comm => {
-            console.log("commissionApplied = ", commissionApplied);
             if (!commissionApplied){
-                console.log("comm[2] = ", comm[2], "; ", daysPassed, " <= ", comm[2]);
                 if (daysPassed <= comm[2]) { // Comparar con DaysSinceDue
                     if (comm[3] == 1) { // Si la comisión está activa
                         commission = totalBalance * (comm[1] / 100);
                         commissionApplied = true;
-                        console.log("Comisión aplicada = ", commission);
                     }
                 }
             }
         });
 
         document.getElementById('commission_received').textContent = commission.toFixed(2);
+    }
+
+    // Cálculo de Impuesto Adeudado
+    function amountOwed(balanceNote) {
+        const balanceCalculationFields = document.querySelectorAll('#balance_calculation');
+        balanceCalculationFields.forEach((field, index) => {
+            const originalValue = parseFloat(field.textContent) || 0;
+            const updatedValue = originalValue - balanceNote;
+            field.textContent = updatedValue.toFixed(2);
+        });
     }
 
 </script>
