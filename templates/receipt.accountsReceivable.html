@@ -216,10 +216,25 @@
     function registerCollections() {
         console.log(selectedAccountIDs.length);
         console.log(selectedAccountIDs);
+
         if (selectedAccountIDs.length > 0) {
             sessionStorage.setItem("selectedAccountIDs", JSON.stringify(selectedAccountIDs));
+
+            let selectedCurrencies = new Set();
+
+            for (const accountID of selectedAccountIDs) {
+                const invoice = document.querySelector(`.invoice-checkbox[data-account-id="${accountID}"]`).closest("tr");
+                const currency = invoice.querySelector("td:nth-child(2)").textContent.trim();
+                selectedCurrencies.add(currency);
+                if (selectedCurrencies.size > 1) {
+                    alert("Las facturas seleccionadas tienen diferentes monedas. Seleccione facturas de una misma moneda para registrar la cobranza.");
+                    return;
+                }
+            }
+
             const accountIdsString = selectedAccountIDs.join('-');
             window.location.href = "{{ url_for('accountsForm', account_ids='ACCOUNT_IDS') }}".replace('ACCOUNT_IDS', accountIdsString);
+        
         } else {
             alert("Por favor, selecciona al menos una factura.");
         }
