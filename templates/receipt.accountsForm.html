@@ -112,7 +112,7 @@
         {% for receipt in receiptDetails %}
         <tr> 
             <td><p>{{ receipt[0] }}</p></td>
-            <td><p id="balance_calculation">{{ "%.2f"|format(receipt[1] - receipt[4]) }}</p></td>
+            <td><p id="balance_calculation" data-original-value="{{ "%.2f"|format(receipt[1] - receipt[4]) }}">{{ "%.2f"|format(receipt[1] - receipt[4]) }}</p></td>
             <td><p id="days_passed"></p></td>
             <td><p id="commission_received"></p></td>
         </tr> 
@@ -284,7 +284,7 @@
             totalBalance += parseFloat(input.value) || 0;
         });
         document.getElementById('balance_note').textContent = totalBalance.toFixed(2);
-        amountOwed(totalBalance);
+        distributeBalanceAcrossReceipts(totalBalance);
         updateCommission();
     }
 
@@ -332,12 +332,25 @@
     }
 
     // Cálculo de Impuesto Adeudado
-    function amountOwed(balanceNote) {
+    function distributeBalanceAcrossReceipts(balanceNote) {
         const balanceCalculationFields = document.querySelectorAll('#balance_calculation');
-        balanceCalculationFields.forEach((field, index) => {
-            const originalValue = parseFloat(field.textContent) || 0;
-            const updatedValue = originalValue - balanceNote;
-            field.textContent = updatedValue.toFixed(2);
+        let remainingBalance = balanceNote;
+
+        balanceCalculationFields.forEach((field) => {
+            const originalValue = parseFloat(field.getAttribute('data-original-value')) || 0;
+
+            // Cálculo del nuevo valor
+            if (remainingBalance > 0) {
+                if (remainingBalance >= originalValue) {
+                    remainingBalance -= originalValue;
+                    field.textContent = "0.00";
+                } else {
+                    field.textContent = (originalValue - remainingBalance).toFixed(2);
+                    remainingBalance = 0;
+                }
+            } else {
+                field.textContent = originalValue.toFixed(2);
+            }
         });
     }
 
