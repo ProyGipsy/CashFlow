@@ -85,10 +85,11 @@ def get_receiptsStoreCustomer(account_ids):
     account_ids_tuple = tuple(account_ids)
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT TOP (1) S.Name, C.FirstName, C.LastName
+    cursor.execute('''SELECT TOP (1) S.Name, C.FirstName, C.LastName, Y.Description
                    FROM CommissionReceipt.DebtAccount D
                    JOIN Main.Store S ON D.StoreID = S.ID
                    JOIN Main.Customer C ON D.CustomerID = C.ID
+                   JOIN Main.Currency Y ON D.CurrencyID = Y.ID
                    WHERE AccountID IN %s''',
                    (account_ids_tuple,))
     receiptStoreCustomer = cursor.fetchone()
