@@ -50,6 +50,7 @@
             <thead>
                 <tr>
                     <th>N_CTA</th>
+                    <th>Moneda</th>
                     <th>Monto Original</th>
                     <th>Monto Abonado</th>
                     <th>Monto IVA Retenido</th>
@@ -160,6 +161,7 @@
 
                         row.innerHTML = `
                             <td>${invoice.N_CTA}</td>
+                            <td>${invoice.Currency}</td>
                             <td>${invoice.Amount.toFixed(2)}</td>
                             <td>${invoice.Balance.toFixed(2)}</td>
                             <td>${invoice.IVA.toFixed(2)}</td>

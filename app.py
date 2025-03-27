@@ -187,7 +187,8 @@ def get_invoices(customer_id):
             'Amount': float(invoice[2]),
             'Balance': float(invoice[3]),
             'IVA': 0,
-            'Remaining': float(invoice[2] - invoice[3])
+            'Remaining': float(invoice[2] - invoice[3]),
+            'Currency': invoice[4]
         } for invoice in invoices
     ]
     return jsonify({'invoices': formatted_invoices})

@@ -72,7 +72,11 @@ def get_commissionsRules():
 def get_invoices_by_customer(customer_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT AccountID, N_CTA, Amount, Balance FROM CommissionReceipt.DebtAccount WHERE CustomerID = %s', (customer_id,))
+    cursor.execute('''SELECT D.AccountID, D.N_CTA, D.Amount, D.Balance, C.Description
+                   FROM CommissionReceipt.DebtAccount D
+                   JOIN Main.Currency C ON D.CurrencyID = C.ID
+                   WHERE CustomerID = %s''',
+                   (customer_id,))
     invoices = cursor.fetchall()
     conn.close()
     return invoices
