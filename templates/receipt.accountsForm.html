@@ -301,64 +301,91 @@
         const balanceCalculationFields = document.querySelectorAll('#balance_calculation');
         const daysPassedFields = document.querySelectorAll('#days_passed');
         const commissionFields = document.querySelectorAll('#commission_received');
-        const paymentDateInputs = document.querySelectorAll('input[name="date_operation"]');
+        
+        // Obtener todas las filas de pago
+        const paymentRows = document.querySelectorAll('.payment-row');
+        const paymentData = Array.from(paymentRows).map(row => {
+            return {
+                amount: parseFloat(row.querySelector('input[name="payment_amount"]').value) || 0,
+                date: row.querySelector('input[name="date_operation"]').value,
+                dateObj: row.querySelector('input[name="date_operation"]').value ? 
+                        new Date(row.querySelector('input[name="date_operation"]').value) : null
+            };
+        });
 
         let remainingBalance = balanceNote;
         let totalCommission = 0;
+        
+        // Para cada factura, llevar registro de:
+        // - Saldo pendiente
+        // - Fecha de pago (primera fecha que contribuyó)
+        // - Monto pagado
+        const receiptData = Array.from(balanceCalculationFields).map((field, index) => {
+            return {
+                originalValue: parseFloat(field.getAttribute('data-original-value')) || 0,
+                dueDate: new Date(field.getAttribute('data-due-date')),
+                remaining: parseFloat(field.getAttribute('data-original-value')) || 0,
+                paymentDate: null,
+                amountPaid: 0
+            };
+        });
 
-        balanceCalculationFields.forEach((field, index) => {
-            const originalValue = parseFloat(field.getAttribute('data-original-value')) || 0;
-            const dueDateStr = field.getAttribute('data-due-date');
-            const dueDate = new Date(dueDateStr);
-
-            // Obtener la fecha de pago de la fila correspondiente
-            const paymentDateInput = paymentDateInputs[index];
-            const paymentDateStr = paymentDateInput ? paymentDateInput.value : null;
-            const paymentDate = paymentDateStr ? new Date(paymentDateStr) : null;
-
-            let balanceUsed = 0;
-
-            if (remainingBalance > 0) {
-                if (remainingBalance >= originalValue) {
-                    balanceUsed = originalValue;
-                    remainingBalance -= originalValue;
-                    field.textContent = "0.00";
-                } else {
-                    balanceUsed = remainingBalance;
-                    field.textContent = (originalValue - remainingBalance).toFixed(2);
-                    remainingBalance = 0;
+        // Distribuir los pagos a las facturas
+        paymentData.forEach(payment => {
+            let paymentAmount = payment.amount;
+            
+            for (let i = 0; i < receiptData.length && paymentAmount > 0; i++) {
+                const receipt = receiptData[i];
+                
+                if (receipt.remaining > 0) {
+                    const amountToApply = Math.min(paymentAmount, receipt.remaining);
+                    
+                    // Si es la primera vez que se paga esta factura, asignar la fecha de pago
+                    if (receipt.amountPaid === 0 && payment.dateObj) {
+                        receipt.paymentDate = payment.dateObj;
+                    }
+                    
+                    receipt.amountPaid += amountToApply;
+                    receipt.remaining -= amountToApply;
+                    paymentAmount -= amountToApply;
                 }
-            } else {
-                field.textContent = originalValue.toFixed(2);
             }
+        });
 
-            // Calcular Días Transcurridos si hay una fecha de pago válida y fecha de vencimiento
+        // Actualizar la interfaz con los resultados
+        receiptData.forEach((receipt, index) => {
+            // Mostrar saldo pendiente
+            balanceCalculationFields[index].textContent = receipt.remaining.toFixed(2);
+            
+            // Calcular días transcurridos si hay fecha de pago
             let daysElapsed = 0;
-            if (paymentDate && !isNaN(dueDate.getTime())) {
-                const difference = paymentDate - dueDate;
+            if (receipt.paymentDate && !isNaN(receipt.dueDate.getTime())) {
+                const difference = receipt.paymentDate - receipt.dueDate;
                 daysElapsed = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
             }
             daysPassedFields[index].textContent = isNaN(daysElapsed) ? "0" : daysElapsed;
-
-            // Calcular Comisión
+            
+            // Calcular comisión
             const daysPassed = parseInt(daysPassedFields[index].textContent) || 0;
             const businessRules = {{ commissions | tojson }};
             let commission = 0;
             let commissionApplied = false;
 
             businessRules.forEach(comm => {
-                if (!commissionApplied){
+                if (!commissionApplied) {
                     if (daysPassed <= comm[2]) { // Comparar con DaysSinceDue
                         if (comm[3] == 1) { // Si la comisión está activa
-                            commission = balanceUsed * (comm[1] / 100); // Usar sólo el saldo que afectó esta factura
+                            commission = receipt.amountPaid * (comm[1] / 100);
                             commissionApplied = true;
                         }
                     }
                 }
             });
+            
             commissionFields[index].textContent = commission.toFixed(2);
             totalCommission += commission;
         });
+        
         document.getElementById('commission_note').textContent = totalCommission.toFixed(2);
     }
 </script>
