@@ -112,12 +112,18 @@
         {% for receipt in receiptDetails %}
         <tr> 
             <td><p>{{ receipt[0] }}</p></td>
-            <td><p id="balance_calculation" data-original-value="{{ "%.2f"|format(receipt[1] - receipt[4]) }}">{{ "%.2f"|format(receipt[1] - receipt[4]) }}</p></td>
+            <td><p id="balance_calculation" data-original-value="{{ "%.2f"|format(receipt[1] - receipt[4]) }}" data-due-date="{{ receipt[3] }}">{{ "%.2f"|format(receipt[1] - receipt[4]) }}</p></td>
             <td><p id="days_passed"></p></td>
             <td><p id="commission_received"></p></td>
         </tr> 
         {% endfor %}
     </table>
+
+    <br><br>
+    <div class="inline-label">
+        <label for="commission_note">Comisión Total:</label>
+        <span id="commission_note" class="small-input">0.00</span> 
+    </div>
     
     <br><br>
     <div class="submit-container">
@@ -133,6 +139,10 @@
         const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
         amountInputs.forEach(input => {
             input.addEventListener('input', updateBalanceNote);
+        });
+        const dateInputs = document.querySelectorAll('input[name="date_operation"]');
+        dateInputs.forEach(input => {
+            input.addEventListener('change', updateDaysAndCommission);
         });
     }
     addInputListeners();
@@ -177,17 +187,17 @@
 
     function handleFileSelection(input) {
         const container = document.getElementById('selected-files-container');
-        
+
         if (input.files && input.files.length > 0) {
             for (let i = 0; i < input.files.length; i++) {
                 const file = input.files[i];
                 const reader = new FileReader();
-                
+
                 reader.onload = function(e) {
                     const previewDiv = document.createElement('div');
                     previewDiv.className = 'file-preview';
                     previewDiv.dataset.index = i;
-                    
+
                     if (file.type.startsWith('image/')) {
                         previewDiv.innerHTML = `
                             <img src="${e.target.result}" alt="${file.name}">
@@ -203,10 +213,10 @@
                             <button class="remove-file" onclick="removeFile(${i})">×</button>
                         `;
                     }
-                    
+
                     container.appendChild(previewDiv);
                 };
-                
+
                 reader.readAsDataURL(file);
             }
         }
@@ -216,12 +226,12 @@
         const input = document.getElementById('proof_of_payment');
         const files = Array.from(input.files);
         files.splice(index, 1);
-        
+
         // Creación de nueva DataTransfer y asignar los archivos restantes
         const dataTransfer = new DataTransfer();
         files.forEach(file => dataTransfer.items.add(file));
         input.files = dataTransfer.files;
-        
+
         handleFileSelection(input);
     }
 
@@ -243,36 +253,30 @@
         const month = String(today.getMonth() + 1).padStart(2, '0');
         const year = today.getFullYear();
         const maxDate = `${year}-${month}-${day}`;
-        
+
         // Establecer fecha máxima para el primer campo de fecha
-        document.getElementById("date_operation").setAttribute("max", maxDate);
-        
+        const firstDateInput = document.querySelector('input[name="date_operation"]');
+        if (firstDateInput) {
+            firstDateInput.setAttribute("max", maxDate);
+        }
+
         // Configurar listeners para inputs existentes
         addInputListeners();
-        
+
         // Calcular valores iniciales
-        calculateDaysPassed();
+        updateDaysAndCommission();
         updateBalanceNote();
-        updateCommission();
-        
-        // Listener para cambios en la fecha de pago (fila original)
-        document.querySelector('input[name="date_operation"]').addEventListener('change', function() {
-            calculateDaysPassed();
-            updateCommission();
-        });
-        
-        // Listener para cambios en el monto de pago (fila original)
-        document.querySelector('input[name="payment_amount"]').addEventListener('input', function() {
-            updateBalanceNote();
-            updateCommission();
-        });
     });
 
-    // Función para agregar listeners a todos los inputs de monto
+    // Función para agregar listeners a todos los inputs de monto y fecha
     function addInputListeners() {
         const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
         amountInputs.forEach(input => {
             input.addEventListener('input', updateBalanceNote);
+        });
+        const dateInputs = document.querySelectorAll('input[name="date_operation"]');
+        dateInputs.forEach(input => {
+            input.addEventListener('change', updateDaysAndCommission);
         });
     }
 
@@ -285,74 +289,77 @@
         });
         document.getElementById('balance_note').textContent = totalBalance.toFixed(2);
         distributeBalanceAcrossReceipts(totalBalance);
-        updateCommission();
     }
 
-    // Cálculo de Días Transcurridos
-    function calculateDaysPassed() {
-        const dueDateStr = "{{ receiptDetails[0][3] }}";
-        const dueDate = new Date(dueDateStr);
-        
-        // Obtener la fecha de operación del primer input de fecha (puedes ajustar según necesites)
-        const paymentDateInput = document.querySelector('input[name="date_operation"]');
-        const paymentDateStr = paymentDateInput.value;
-        
-        if (!paymentDateStr) {
-            document.getElementById('days_passed').textContent = "0";
-            return;
-        }
-        
-        const paymentDate = new Date(paymentDateStr);
-        const difference = paymentDate - dueDate;
-        const daysElapsed = (Math.floor(difference / (1000 * 60 * 60 * 24))) + 1;
-        document.getElementById('days_passed').textContent = daysElapsed;
+    // Cálculo de Días Transcurridos y Comisión (Ahora se llama al cambiar la fecha o el monto)
+    function updateDaysAndCommission() {
+        distributeBalanceAcrossReceipts(parseFloat(document.getElementById('balance_note').textContent) || 0);
     }
 
-    // Cálculo de la Comisión a Aplicar
-    function updateCommission() {
-        const daysPassed = parseInt(document.getElementById('days_passed').textContent);
-        const totalBalance = parseFloat(document.getElementById('balance_note').textContent);
-        const businessRules = {{ commissions | tojson }}; // Conversión a JSON para usar en JavaScript
-
-        let commission = 0;
-        let commissionApplied = false;
-
-        businessRules.forEach(comm => {
-            if (!commissionApplied){
-                if (daysPassed <= comm[2]) { // Comparar con DaysSinceDue
-                    if (comm[3] == 1) { // Si la comisión está activa
-                        commission = totalBalance * (comm[1] / 100);
-                        commissionApplied = true;
-                    }
-                }
-            }
-        });
-
-        document.getElementById('commission_received').textContent = commission.toFixed(2);
-    }
-
-    // Cálculo de Impuesto Adeudado
+    // Cálculo de Impuesto Adeudado. Días Transcurridos y Comisión para las demás filas
     function distributeBalanceAcrossReceipts(balanceNote) {
         const balanceCalculationFields = document.querySelectorAll('#balance_calculation');
+        const daysPassedFields = document.querySelectorAll('#days_passed');
+        const commissionFields = document.querySelectorAll('#commission_received');
+        const paymentDateInputs = document.querySelectorAll('input[name="date_operation"]');
+
         let remainingBalance = balanceNote;
+        let totalCommission = 0;
 
-        balanceCalculationFields.forEach((field) => {
+        balanceCalculationFields.forEach((field, index) => {
             const originalValue = parseFloat(field.getAttribute('data-original-value')) || 0;
+            const dueDateStr = field.getAttribute('data-due-date');
+            const dueDate = new Date(dueDateStr);
 
-            // Cálculo del nuevo valor
+            // Obtener la fecha de pago de la fila correspondiente
+            const paymentDateInput = paymentDateInputs[index];
+            const paymentDateStr = paymentDateInput ? paymentDateInput.value : null;
+            const paymentDate = paymentDateStr ? new Date(paymentDateStr) : null;
+
+            let balanceUsed = 0;
+
             if (remainingBalance > 0) {
                 if (remainingBalance >= originalValue) {
+                    balanceUsed = originalValue;
                     remainingBalance -= originalValue;
                     field.textContent = "0.00";
                 } else {
+                    balanceUsed = remainingBalance;
                     field.textContent = (originalValue - remainingBalance).toFixed(2);
                     remainingBalance = 0;
                 }
             } else {
                 field.textContent = originalValue.toFixed(2);
             }
-        });
-    }
 
+            // Calcular Días Transcurridos si hay una fecha de pago válida y fecha de vencimiento
+            let daysElapsed = 0;
+            if (paymentDate && !isNaN(dueDate.getTime())) {
+                const difference = paymentDate - dueDate;
+                daysElapsed = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
+            }
+            daysPassedFields[index].textContent = isNaN(daysElapsed) ? "0" : daysElapsed;
+
+            // Calcular Comisión
+            const daysPassed = parseInt(daysPassedFields[index].textContent) || 0;
+            const businessRules = {{ commissions | tojson }};
+            let commission = 0;
+            let commissionApplied = false;
+
+            businessRules.forEach(comm => {
+                if (!commissionApplied){
+                    if (daysPassed <= comm[2]) { // Comparar con DaysSinceDue
+                        if (comm[3] == 1) { // Si la comisión está activa
+                            commission = balanceUsed * (comm[1] / 100); // Usar sólo el saldo que afectó esta factura
+                            commissionApplied = true;
+                        }
+                    }
+                }
+            });
+            commissionFields[index].textContent = commission.toFixed(2);
+            totalCommission += commission;
+        });
+        document.getElementById('commission_note').textContent = totalCommission.toFixed(2);
+    }
 </script>
 {% endblock %}
