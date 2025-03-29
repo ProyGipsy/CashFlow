@@ -49,7 +49,7 @@
                 <th>Forma de Pago</th>
                 <th>Fecha de Pago</th>
                 <th>Monto</th>
-                <th>Descuento</th>
+                <th>Descuento (%)</th>
                 <th>Referencia</th>
                 <th>Abono Realizado en</th>
                 <th></th>
@@ -90,7 +90,7 @@
                     accept="image/*,.pdf" multiple onchange="handleFileSelection(this)">
             </div>
             <div id="selected-files-container" class="selected-files">
-                <!-- Previsualización de imágenes seleccionadas -->
+                <!-- Aquí se mostrarán las imágenes seleccionadas -->
             </div>
         </div>
     </div>
@@ -139,10 +139,13 @@
         const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
         amountInputs.forEach(input => {
             input.addEventListener('input', updateBalanceNote);
+            input.addEventListener('input', updateDaysAndCommission); // Añadir este también
         });
+        
         const dateInputs = document.querySelectorAll('input[name="date_operation"]');
         dateInputs.forEach(input => {
             input.addEventListener('change', updateDaysAndCommission);
+            input.addEventListener('input', updateDaysAndCommission); // Añadir evento input también
         });
     }
     addInputListeners();
@@ -185,8 +188,21 @@
         }
     }
 
+    function deleteRow(btn) {
+        const row = btn.parentNode.parentNode;
+        const table = document.getElementById('payment-table');
+        if (table.rows.length > 2) {
+            row.parentNode.removeChild(row);
+            isChanged = true;
+        } else {
+            alert('Debe existir al menos una forma de pago.');
+        }
+    };
+
+    // Selección de Comprobantes de Pago
     function handleFileSelection(input) {
         const container = document.getElementById('selected-files-container');
+        container.innerHTML = '';
 
         if (input.files && input.files.length > 0) {
             for (let i = 0; i < input.files.length; i++) {
@@ -197,7 +213,7 @@
                     const previewDiv = document.createElement('div');
                     previewDiv.className = 'file-preview';
                     previewDiv.dataset.index = i;
-
+                    
                     if (file.type.startsWith('image/')) {
                         previewDiv.innerHTML = `
                             <img src="${e.target.result}" alt="${file.name}">
@@ -227,7 +243,6 @@
         const files = Array.from(input.files);
         files.splice(index, 1);
 
-        // Creación de nueva DataTransfer y asignar los archivos restantes
         const dataTransfer = new DataTransfer();
         files.forEach(file => dataTransfer.items.add(file));
         input.files = dataTransfer.files;
@@ -235,17 +250,7 @@
         handleFileSelection(input);
     }
 
-    function deleteRow(btn) {
-        const row = btn.parentNode.parentNode;
-        const table = document.getElementById('payment-table');
-        if (table.rows.length > 2) {
-            row.parentNode.removeChild(row);
-            isChanged = true;
-        } else {
-            alert('Debe existir al menos una forma de pago.');
-        }
-    };
-
+    // Listener
     document.addEventListener("DOMContentLoaded", function() {
         // Configuración inicial de la fecha máxima
         const today = new Date();
@@ -293,7 +298,12 @@
 
     // Cálculo de Días Transcurridos y Comisión (Ahora se llama al cambiar la fecha o el monto)
     function updateDaysAndCommission() {
-        distributeBalanceAcrossReceipts(parseFloat(document.getElementById('balance_note').textContent) || 0);
+        // Forzar el cálculo del balance primero
+        updateBalanceNote();
+        
+        // Luego actualizar días y comisión
+        const balanceNoteValue = parseFloat(document.getElementById('balance_note').textContent) || 0;
+        distributeBalanceAcrossReceipts(balanceNoteValue);
     }
 
     // Cálculo de Impuesto Adeudado. Días Transcurridos y Comisión para las demás filas
