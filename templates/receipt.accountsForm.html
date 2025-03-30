@@ -30,7 +30,7 @@
             <th>Fecha Vencimiento</th>
             <th>Monto Abonado</th>
         </tr> 
-        {% for receipt in receiptDetails %}
+        {% for receipt in receiptDetails | sort(attribute=3) %}
         <tr> 
             <td><p>{{ receipt[0] }}</p></td>
             <td><p>{{ "%.2f"|format(receipt[1]) }}</p></td>
@@ -138,18 +138,29 @@
     function addInputListeners() {
         const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
         amountInputs.forEach(input => {
-            input.addEventListener('input', updateBalanceNote);
-            input.addEventListener('input', updateDaysAndCommission); // Añadir este también
+            // Eliminar listeners antiguos para evitar duplicados
+            input.removeEventListener('input', updateBalanceNote);
+            input.removeEventListener('input', updateDaysAndCommission);
+            
+            // Agregar nuevos listeners
+            input.addEventListener('input', function() {
+                updateBalanceNote();
+                updateDaysAndCommission();
+            });
         });
         
         const dateInputs = document.querySelectorAll('input[name="date_operation"]');
         dateInputs.forEach(input => {
+            input.removeEventListener('change', updateDaysAndCommission);
+            input.removeEventListener('input', updateDaysAndCommission);
+            
             input.addEventListener('change', updateDaysAndCommission);
-            input.addEventListener('input', updateDaysAndCommission); // Añadir evento input también
+            input.addEventListener('input', updateDaysAndCommission);
         });
     }
     addInputListeners();
 
+    // Agregar y Eliminar forma de pago
     document.getElementById('add-payment').addEventListener('click', function() {
         const pagoRow = document.querySelector('.payment-row');
         const newPagoRow = pagoRow.cloneNode(true);
@@ -160,7 +171,7 @@
             } else {
                 input.value = '';
             }
-        })
+        });
         const selects = newPagoRow.querySelectorAll('select');
         selects.forEach(select => select.selectedIndex = 0);
 
@@ -174,30 +185,29 @@
         dateInput.setAttribute("max", maxDate);
 
         document.getElementById('payment-table').appendChild(newPagoRow);
+        
+        // Establecer listeners para los nuevos inputs
         addInputListeners();
     });
-
-    function updateFileName() {
-        const fileInput = document.getElementById('proof_of_payment');
-        const fileMessage = document.getElementById('file-message');
-
-        if (fileInput.files.length > 0) {
-            fileMessage.textContent = `Archivo seleccionado: ${fileInput.files[0].name}`;
-        } else {
-            fileMessage.textContent = '';
-        }
-    }
-
     function deleteRow(btn) {
         const row = btn.parentNode.parentNode;
         const table = document.getElementById('payment-table');
+        
+        // Verificar si esta fila tenía un descuento aplicado
+        const discountInput = row.querySelector('input[name="discount"]');
+        if (discountInput && parseFloat(discountInput.value) > 0) {
+            // Resetear el descuento en la factura correspondiente
+            resetDiscountForRow(row);
+        }
+        
         if (table.rows.length > 2) {
             row.parentNode.removeChild(row);
             isChanged = true;
+            updateBalanceNote(); // Recalcular todo
         } else {
             alert('Debe existir al menos una forma de pago.');
         }
-    };
+    }
 
     // Selección de Comprobantes de Pago
     function handleFileSelection(input) {
@@ -237,7 +247,16 @@
             }
         }
     }
+    function updateFileName() {
+        const fileInput = document.getElementById('proof_of_payment');
+        const fileMessage = document.getElementById('file-message');
 
+        if (fileInput.files.length > 0) {
+            fileMessage.textContent = `Archivo seleccionado: ${fileInput.files[0].name}`;
+        } else {
+            fileMessage.textContent = '';
+        }
+    }
     function removeFile(index) {
         const input = document.getElementById('proof_of_payment');
         const files = Array.from(input.files);
@@ -319,53 +338,103 @@
                 amount: parseFloat(row.querySelector('input[name="payment_amount"]').value) || 0,
                 date: row.querySelector('input[name="date_operation"]').value,
                 dateObj: row.querySelector('input[name="date_operation"]').value ? 
-                        new Date(row.querySelector('input[name="date_operation"]').value) : null
+                        new Date(row.querySelector('input[name="date_operation"]').value) : null,
+                row: row
             };
         });
 
         let remainingBalance = balanceNote;
         let totalCommission = 0;
         
+        paymentToInvoiceMap = new Map();
+        const balanceFields = document.querySelectorAll('#balance_calculation');
+
         // Para cada factura, llevar registro de:
-        // - Saldo pendiente
-        // - Fecha de pago (primera fecha que contribuyó)
-        // - Monto pagado
-        const receiptData = Array.from(balanceCalculationFields).map((field, index) => {
+        const receiptData = Array.from(balanceFields).map((field, index) => {
+            // Resetear el flag de descuento (se volverá a establecer al aplicar descuentos)
+            field.dataset.hasDiscount = 'false';
             return {
+                element: field,
                 originalValue: parseFloat(field.getAttribute('data-original-value')) || 0,
+                currentValue: parseFloat(field.textContent) || 0,
                 dueDate: new Date(field.getAttribute('data-due-date')),
-                remaining: parseFloat(field.getAttribute('data-original-value')) || 0,
-                paymentDate: null,
-                amountPaid: 0
+                remaining: parseFloat(field.getAttribute('data-original-value')) || 0, // Usar el valor original
+                paymentDate: null, // Esta es la fecha del primer pago que contribuyó
+                amountPaid: 0.00,
+                discountApplied: 0.00
             };
         });
 
-        // Distribuir los pagos a las facturas
+        // Aplicar primero los descuentos
         paymentData.forEach(payment => {
-            let paymentAmount = payment.amount;
+            const discountInput = payment.row.querySelector('input[name="discount"]');
+            if (discountInput) {
+                const discountValue = parseFloat(discountInput.value) || 0;
+                if (discountValue > 0) {
+                    // Encontrar la factura correspondiente a esta forma de pago
+                    let invoiceIndex = paymentToInvoiceMap.get(payment.row);
+                    if (invoiceIndex === undefined) {
+                        invoiceIndex = receiptData.findIndex(inv => inv.remaining > 0);
+                        if (invoiceIndex !== -1) {
+                            paymentToInvoiceMap.set(payment.row, invoiceIndex);
+                        }
+                    }
+                    
+                    if (invoiceIndex !== undefined && invoiceIndex !== -1) {
+                        const invoice = receiptData[invoiceIndex];
+                        const discountAmount = invoice.originalValue * (discountValue / 100);
+                        invoice.discountApplied = discountAmount;
+                        invoice.remaining = invoice.originalValue - discountAmount;
+                        invoice.element.textContent = invoice.remaining.toFixed(2);
+                        invoice.element.dataset.hasDiscount = 'true';
+                        payment.row.dataset.hasAppliedDiscount = 'true';
+                    }
+                }
+            }
+        });
+
+        // Para cada forma de pago, determinar a qué factura corresponde
+        paymentRows.forEach(paymentRow => {
+            paymentRow.dataset.hasAppliedDiscount = 'false';
+            
+            // Encontrar la factura correspondiente (primera con saldo)
+            let invoiceIndex = receiptData.findIndex(inv => inv.remaining > 0);
+            if (invoiceIndex !== -1) {
+                paymentToInvoiceMap.set(paymentRow, invoiceIndex);
+            }
+        });
+
+        // Distribuir los pagos a las facturas con precisión decimal
+        paymentData.forEach(payment => {
+            let paymentAmount = parseFloat(payment.amount.toFixed(2)); // Trabajar con 2 decimales
             
             for (let i = 0; i < receiptData.length && paymentAmount > 0; i++) {
                 const receipt = receiptData[i];
                 
-                if (receipt.remaining > 0) {
-                    const amountToApply = Math.min(paymentAmount, receipt.remaining);
+                // Considerar el saldo con precisión decimal
+                const remainingWithPrecision = parseFloat((receipt.originalValue - receipt.discountApplied - receipt.amountPaid).toFixed(2));
+                
+                if (remainingWithPrecision > 0) {
+                    const amountToApply = Math.min(paymentAmount, remainingWithPrecision);
                     
                     // Si es la primera vez que se paga esta factura, asignar la fecha de pago
-                    if (receipt.amountPaid === 0 && payment.dateObj) {
-                        receipt.paymentDate = payment.dateObj;
+                    if (receipt.amountPaid === 0.00 && payment.dateObj) {
+                        receipt.paymentDate = payment.dateObj; // <-- Aquí asignamos la fecha del primer pago
                     }
                     
-                    receipt.amountPaid += amountToApply;
-                    receipt.remaining -= amountToApply;
-                    paymentAmount -= amountToApply;
+                    receipt.amountPaid = parseFloat((receipt.amountPaid + amountToApply).toFixed(2));
+                    receipt.remaining = parseFloat((receipt.originalValue - receipt.discountApplied - receipt.amountPaid).toFixed(2));
+                    paymentAmount = parseFloat((paymentAmount - amountToApply).toFixed(2));
                 }
             }
         });
 
         // Actualizar la interfaz con los resultados
         receiptData.forEach((receipt, index) => {
-            // Mostrar saldo pendiente
-            balanceCalculationFields[index].textContent = receipt.remaining.toFixed(2);
+            // Mostrar saldo pendiente con precisión
+            const remainingWithPrecision = parseFloat((receipt.originalValue - receipt.discountApplied - receipt.amountPaid).toFixed(2));
+            balanceCalculationFields[index].textContent = remainingWithPrecision.toFixed(2);
+            receipt.remaining = remainingWithPrecision;
             
             // Calcular días transcurridos si hay fecha de pago
             let daysElapsed = 0;
@@ -398,5 +467,92 @@
         
         document.getElementById('commission_note').textContent = totalCommission.toFixed(2);
     }
+    
+
+    // Descuentos
+
+    let paymentToInvoiceMap = new Map(); // Para rastrear qué factura está asociada a cada forma de pago
+
+    document.addEventListener("input", function(event) {
+        if (event.target.name === "discount") {
+            applyDiscount(event.target);
+        }
+    });
+
+    function applyDiscount(discountInput) {
+        const discountValue = parseFloat(discountInput.value) || 0;
+        
+        // Validar el descuento
+        if (discountValue < 0 || discountValue > 100) {
+            if (discountValue > 100) {
+                alert("El descuento no puede ser mayor al 100%");
+            }
+            discountInput.value = 0;
+            return;
+        }
+
+        // Obtener todas las facturas con su información
+        const balanceFields = document.querySelectorAll('#balance_calculation');
+        const receiptData = Array.from(balanceFields).map((field, index) => ({
+            index: index,
+            element: field,
+            originalValue: parseFloat(field.dataset.originalValue),
+            dueDate: field.dataset.dueDate,
+            currentValue: parseFloat(field.textContent),
+            hasDiscount: field.dataset.hasDiscount === 'true'
+        }));
+
+        // Obtener la fila de pago completa
+        const paymentRow = discountInput.closest('.payment-row');
+        
+        // Determinar a qué factura corresponde esta forma de pago
+        let targetInvoiceIndex = paymentToInvoiceMap.get(paymentRow);
+        
+        // Si no está mapeada, encontrar la primera factura con saldo
+        if (targetInvoiceIndex === undefined) {
+            targetInvoiceIndex = receiptData.findIndex(invoice => invoice.currentValue > 0);
+            if (targetInvoiceIndex === -1) {
+                alert("No hay facturas con saldo pendiente");
+                discountInput.value = 0;
+                return;
+            }
+            paymentToInvoiceMap.set(paymentRow, targetInvoiceIndex);
+        }
+
+        // Verificar si la factura objetivo ya tiene descuento de otra forma de pago
+        if (receiptData[targetInvoiceIndex].hasDiscount && !paymentRow.dataset.hasAppliedDiscount) {
+            alert("Esta factura ya tiene un descuento aplicado desde otra forma de pago");
+            discountInput.value = 0;
+            return;
+        }
+
+        // Aplicar el descuento
+        const targetInvoice = receiptData[targetInvoiceIndex];
+        const discountAmount = targetInvoice.originalValue * (discountValue / 100);
+        const newValue = targetInvoice.originalValue - discountAmount;
+        
+        // Actualizar la interfaz
+        targetInvoice.element.textContent = newValue.toFixed(2);
+        targetInvoice.element.dataset.hasDiscount = 'true';
+        paymentRow.dataset.hasAppliedDiscount = 'true';
+        
+        // Recalcular días y comisiones
+        updateDaysAndCommission();
+    }
+    function deleteRow(btn) {
+        const row = btn.parentNode.parentNode;
+        const table = document.getElementById('payment-table');
+        
+        // Eliminar del mapeo si existe
+        paymentToInvoiceMap.delete(row);
+        
+        if (table.rows.length > 2) {
+            row.parentNode.removeChild(row);
+            updateBalanceNote(); // Recalcular todo
+        } else {
+            alert('Debe existir al menos una forma de pago.');
+        }
+    }
+
 </script>
 {% endblock %}
