@@ -75,7 +75,8 @@ def get_invoices_by_customer(customer_id):
     cursor.execute('''SELECT D.AccountID, D.N_CTA, D.Amount, D.Balance, C.Description
                    FROM CommissionReceipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = %s''',
+                   WHERE CustomerID = %s
+                   ORDER BY D.N_CTA''',
                    (customer_id,))
     invoices = cursor.fetchall()
     conn.close()
@@ -102,7 +103,8 @@ def get_receiptsInfo(account_ids):
     cursor = conn.cursor()
     cursor.execute('''SELECT D.N_CTA, D.Amount, D.DueDate, D.DueDate, D.Balance
                    FROM CommissionReceipt.DebtAccount D
-                   WHERE AccountID IN %s''',
+                   WHERE AccountID IN %s
+                   ORDER BY D.DueDate''',
                    (account_ids_tuple,))
     receipts = cursor.fetchall()
     conn.close()

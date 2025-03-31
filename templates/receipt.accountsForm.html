@@ -30,7 +30,7 @@
             <th>Fecha Vencimiento</th>
             <th>Monto Abonado</th>
         </tr> 
-        {% for receipt in receiptDetails | sort(attribute=3) %}
+        {% for receipt in receiptDetails %}
         <tr> 
             <td><p>{{ receipt[0] }}</p></td>
             <td><p>{{ "%.2f"|format(receipt[1]) }}</p></td>
@@ -315,12 +315,9 @@
         distributeBalanceAcrossReceipts(totalBalance);
     }
 
-    // Cálculo de Días Transcurridos y Comisión (Ahora se llama al cambiar la fecha o el monto)
+    // Cálculo de Días Transcurridos y Comisión
     function updateDaysAndCommission() {
-        // Forzar el cálculo del balance primero
         updateBalanceNote();
-        
-        // Luego actualizar días y comisión
         const balanceNoteValue = parseFloat(document.getElementById('balance_note').textContent) || 0;
         distributeBalanceAcrossReceipts(balanceNoteValue);
     }
