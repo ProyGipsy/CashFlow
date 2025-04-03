@@ -1,6 +1,7 @@
 import os
 import pymssql
 from datetime import datetime
+from werkzeug.utils import secure_filename
 
 def get_db_connection():
     server = os.environ.get('DB_SERVER')
@@ -86,7 +87,7 @@ def get_receiptsStoreCustomer(account_ids):
     account_ids_tuple = tuple(account_ids)
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT TOP (1) S.Name, C.FirstName, C.LastName, Y.Description
+    cursor.execute('''SELECT TOP (1) S.ID, S.Name, C.ID, C.FirstName, C.LastName, Y.Description
                    FROM CommissionReceipt.DebtAccount D
                    JOIN Main.Store S ON D.StoreID = S.ID
                    JOIN Main.Customer C ON D.CustomerID = C.ID
@@ -101,12 +102,13 @@ def get_receiptsInfo(account_ids):
     account_ids_tuple = tuple(account_ids)
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT D.N_CTA, D.Amount, D.DueDate, D.DueDate, D.Balance
+    cursor.execute('''SELECT D.N_CTA, D.Amount, D.DueDate, D.DueDate, D.Balance, D.AccountID
                    FROM CommissionReceipt.DebtAccount D
                    WHERE AccountID IN %s
                    ORDER BY D.DueDate''',
                    (account_ids_tuple,))
     receipts = cursor.fetchall()
+    print("Receipts:", receipts)
     conn.close()
     return receipts
 
@@ -155,5 +157,63 @@ def set_commissionsRules(rules):
                 VALUES (source.CommissionName, source.CommissionRate, source.DaysSinceDue, source.Active, GETDATE());
         """, (id, name, percentage, days, is_active, None))
     
+    conn.commit()
+    conn.close()
+
+def set_paymentReceipt(balance_note, commission_note):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+                   INSERT INTO CommissionReceipt.PaymentReceipt
+                   (Amount, CommissionAmount, IsValidated, FilePath, isRetail)
+                   VALUES (%s, %s, %s, %s, %s)
+                   ''', (balance_note, commission_note, 0, '', 0))
+    conn.commit()
+
+    #Obtención del ReceiptID generado
+    cursor.execute("SELECT SCOPE_IDENTITY()")
+    receipt_id = cursor.fetchone()[0]
+    conn.close()
+    
+    return receipt_id
+
+def set_paymentEntry(receipt_id, payment_date, amount, discount, reference, destination_id, proof_path):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO CommissionReceipt.PaymentReceiptEntry
+        (ReceiptID, PaymentDate, Amount, Discount, Reference, PaymentDestinationID, isRetail, ProofOfPaymentPath)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (receipt_id, payment_date, amount, discount, reference, destination_id, 0, proof_path))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+def save_proofOfPayment(proof_of_payments, receipt_id, payment_date):
+    saved_file_paths = []
+    for index, file in enumerate(proof_of_payments):
+        if file:
+            formatted_date = payment_date.strftime('%Y-%m-%d')
+            new_filename = f"{receipt_id}_{formatted_date}_{index}{os.path.splitext(file.filename)[1]}"
+            file_path = os.path.join('static/ProofsOfPayment', new_filename)
+            file.save(file_path)
+            saved_file_paths.append(file_path)
+    return saved_file_paths
+
+def set_invoiceBalance(account_id, new_balance):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    print('''
+                   UPDATE CommissionReceipt.DebtAccount
+                   SET Balance = %s
+                   WHERE AccountID = %s
+                   ''', (new_balance, account_id))
+    """
+    cursor.execute('''
+                   UPDATE CommissionReceipt.DebtAccount
+                   SET Balance = Balance + %s
+                   WHERE AccountID = %s
+                   ''', (new_balance, account_id))"
+    """
     conn.commit()
     conn.close()

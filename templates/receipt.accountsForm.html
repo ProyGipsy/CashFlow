@@ -16,9 +16,9 @@
     </div> 
 
     <div class="client-info">
-        <p><strong>Empresa:</strong> {{ receiptStoreCustomer[0] }}</p>
-        <p><strong>Cliente:</strong> {{ receiptStoreCustomer[1] }} {{ receiptStoreCustomer[2] }}</p>
-        <p><strong>Moneda:</strong> {{ receiptStoreCustomer[3] }}</p>
+        <p><strong>Empresa:</strong> {{ receiptStoreCustomer[0] }} | {{ receiptStoreCustomer[1] }}</p>
+        <p><strong>Cliente:</strong> {{ receiptStoreCustomer[2] }} | {{ receiptStoreCustomer[3] }} {{ receiptStoreCustomer[4] }}</p>
+        <p><strong>Moneda:</strong> {{ receiptStoreCustomer[5] }}</p>
     </div>
 
     <br>
@@ -33,10 +33,16 @@
         {% for receipt in receiptDetails %}
         <tr> 
             <td><p>{{ receipt[0] }}</p></td>
-            <td><p>{{ "%.2f"|format(receipt[1]) }}</p></td>
+            <td>
+                <p>{{ "%.2f"|format(receipt[1]) }}</p>
+                <input type="hidden" name="original_amount[]" value="{{ "%.2f"|format(receipt[1]) }}" />
+            </td>
             <td><p>{{ receipt[2] }}</p></td>
             <td><p>{{ receipt[3] }}</p></td>
             <td><p>{{ "%.2f"|format(receipt[4]) }}</p></td>
+            <td class="hidden-column">
+                <input type="hidden" name="account_id[]" value="{{ receipt[5] }}" />
+            </td>
         </tr> 
         {% endfor %}
     </table>
@@ -70,7 +76,7 @@
                 <td><select name="payment_made" class="input-field">
                     <option value="">Cuenta Bancaria</option> 
                     {% for b in bankAccounts | sort(attribute=1)  %}
-                        <option value="{{ b[0] }}">{{b[1] - b[2] }}</option>
+                        <option value="{{ b[0] }}">{{b[1]}} | {{b[2]}}</option>
                     {% endfor %}
                 </td>
                 <td><span class="delete-icon" onclick="deleteRow(this)"><img src="{{ url_for('static', filename='IMG/trash.png') }}" alt="Eliminar"></span></td>
@@ -124,12 +130,46 @@
         <label for="commission_note">Comisión Total:</label>
         <span id="commission_note" class="small-input">0.00</span> 
     </div>
+
+    <!-- Formulario Oculto -->
+    <form action="{{ url_for('submit_receipt') }}" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="balance_note" id="balance_note" value="0.00">
+        <input type="hidden" name="commission_note" id="commission_note" value="0.00">
+        <input type="hidden" name="payment_entries" id="payment_entries" value='[...]'>
+        <input type="hidden" name="proof_of_payment[]" multiple>
+    </form>
     
     <br><br>
     <div class="submit-container">
-        <input type="submit" value="Enviar">
+        <button class="save-button" type="button" onclick="openConfirmationModal()">Enviar</button>
     </div>
 </div>
+
+<!-- Modal de confirmación -->
+<div id="confirmationModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeConfirmationModal()">&times;</span>
+        <h2>¿Está seguro de registrar esta cobranza?</h2>
+        <button class="save-button" onclick="sendReceipt()">Aceptar</button>
+        <button class="cancel-button" onclick="closeConfirmationModal()">Cancelar</button>
+    </div>
+</div>
+
+<!-- Modal de "Enviando" -->
+<div id="loadingModal" class="loading-modal">
+    <div class="loading-content">
+        <p>Enviando...</p>
+    </div>
+</div>
+
+<!-- Modal de confirmación -->
+<div id="finalModal" class="modal">
+    <div class="modal-content">
+        <h2>La cobranza ha sido registrada exitosamente</h2>
+        <button class="save-button" onclick="window.location.href='{{ url_for("accountsReceivable") }}'">Aceptar</button>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -138,11 +178,9 @@
     function addInputListeners() {
         const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
         amountInputs.forEach(input => {
-            // Eliminar listeners antiguos para evitar duplicados
             input.removeEventListener('input', updateBalanceNote);
             input.removeEventListener('input', updateDaysAndCommission);
             
-            // Agregar nuevos listeners
             input.addEventListener('input', function() {
                 updateBalanceNote();
                 updateDaysAndCommission();
@@ -193,10 +231,9 @@
         const row = btn.parentNode.parentNode;
         const table = document.getElementById('payment-table');
         
-        // Verificar si esta fila tenía un descuento aplicado
+        // Deshacer descuento
         const discountInput = row.querySelector('input[name="discount"]');
         if (discountInput && parseFloat(discountInput.value) > 0) {
-            // Resetear el descuento en la factura correspondiente
             resetDiscountForRow(row);
         }
         
@@ -271,23 +308,19 @@
 
     // Listener
     document.addEventListener("DOMContentLoaded", function() {
-        // Configuración inicial de la fecha máxima
         const today = new Date();
         const day = String(today.getDate()).padStart(2, '0');
         const month = String(today.getMonth() + 1).padStart(2, '0');
         const year = today.getFullYear();
         const maxDate = `${year}-${month}-${day}`;
 
-        // Establecer fecha máxima para el primer campo de fecha
         const firstDateInput = document.querySelector('input[name="date_operation"]');
         if (firstDateInput) {
             firstDateInput.setAttribute("max", maxDate);
         }
 
-        // Configurar listeners para inputs existentes
         addInputListeners();
 
-        // Calcular valores iniciales
         updateDaysAndCommission();
         updateBalanceNote();
     });
@@ -549,6 +582,90 @@
         } else {
             alert('Debe existir al menos una forma de pago.');
         }
+    }
+
+    // Envío de Datos
+
+    function openConfirmationModal() {
+        document.getElementById("confirmationModal").style.display = "block";
+    }
+
+    function closeConfirmationModal() {
+        document.getElementById("confirmationModal").style.display = "none";
+    }
+
+    function sendReceipt() {
+        closeConfirmationModal();
+        document.getElementById('loadingModal').style.display = 'flex';
+        const saveButton = document.querySelector('.save-button');
+        saveButton.disabled = true;
+
+        // Recolección de Datos
+        const formData = new FormData();
+
+        // Saldo Nota y Comisión Total
+        formData.append('balance_note', document.getElementById('balance_note').textContent);
+        formData.append('commission_note', document.getElementById('commission_note').textContent);
+
+        // Datos para PaymentReceiptEntry
+        const paymentRows = document.querySelectorAll('.payment-row');
+        const accountIds = document.querySelectorAll('input[name="account_id[]"]');
+
+        paymentRows.forEach((row, index) => {
+            const paymentDate = row.querySelector('input[name="date_operation"]').value;
+            const amount = row.querySelector('input[name="payment_amount"]').value;
+            const discount = row.querySelector('input[name="discount"]').value;
+            const reference = row.querySelector('input[name="reference"]').value;
+            const paymentDestinationId = row.querySelector('select[name="payment_made"]').value;
+            const accountId = accountIds[index] ? accountIds[index].value : null;
+
+            formData.append('payment_entries[]', JSON.stringify({
+                date: paymentDate,
+                amount: amount,
+                discount: discount,
+                reference: reference,
+                payment_destination_id: paymentDestinationId,
+                account_id: accountId
+            }));
+        });
+
+        // Adición de Comprobantes de Pago
+        const proofOfPayments = document.querySelector('input[type="file"][name="proof_of_payment[]"]');
+        for (let i = 0; i < proofOfPayments.files.length; i++) {
+            formData.append('proof_of_payment[]', proofOfPayments.files[i]);
+        }
+
+        // Adición de Importe Adeudado -- Para Actualización Monto Abonado de Factura
+        /*
+        const balanceCalculations = document.querySelectorAll('#balance_calculation');
+        console.log("balanceCalculations", balanceCalculations);
+        const originalAmounts = document.querySelectorAll('input[name="original_amount[]"]');
+        console.log("originalAmounts", originalAmounts)
+        balanceCalculations.forEach((balance, index) => {
+            formData.append(`balance_calculation_${index}`, balance.textContent);
+            formData.append(`original_amount_${index}`, originalAmounts[index].value);
+        });
+        */
+
+        // Envío de Datos al Servidor
+        fetch("{{ url_for('submit_receipt') }}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                document.getElementById('loadingModal').style.display = 'none';
+                document.getElementById('finalModal').style.display = 'block';
+            } else {
+                alert("Error al enviar los datos.");
+                saveButton.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert("Error al enviar los datos.");
+            saveButton.disabled = false;
+        });
     }
 
 </script>

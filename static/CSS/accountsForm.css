@@ -67,6 +67,10 @@
     padding: 5px;
 }
 
+.hidden-column {
+    display: none; /* Oculta la columna */
+}
+
 .input-field {
     margin: auto;
     width: 80%;
@@ -191,7 +195,7 @@ input[type="submit"] {
     justify-content: center;
 }
 
-.upload-button {
+.upload-button  {
     margin-left: 10px;
     background-color: #d0ebff;
     border: none;
@@ -201,6 +205,7 @@ input[type="submit"] {
     font-size: 16px;
     transition: background-color 0.3s ease;
 }
+
 
 .submit-container {
     display: flex;
@@ -215,10 +220,90 @@ input[type="submit"] {
 
 input[type="submit"]:hover {
     background-color: #4068f8;
+    cursor: pointer;
 }
 
+.undo-button, .save-button, .cancel-button {
+    background-color: #324bab;
+    color: #ffffff;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 1em;
+    margin: 0 10px;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.3s ease;
+}
+
+.save-button:hover {
+    background-color: #4068f8;
+}
+
+.cancel-button:hover {
+    background-color: #b21554;
+}
 
 .edit-icon img, .delete-icon img{
     width: 24px;
     height: auto;
+}
+
+/*Modal*/
+
+.modal {
+    color: #324bab;
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 20%;
+    top: 0;
+    width: 80%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    text-align: center;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.loading-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 20%;
+    top: 0;
+    width: 80%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+}
+
+.loading-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    text-align: center;
 }
