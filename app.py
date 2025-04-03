@@ -234,10 +234,6 @@ def submit_receipt():
             balance_calculations.append(float(request.form[f'balance_calculation_{index}']))
             index += 1
 
-    # IDs de DebtAccount
-    account_ids = [entry['account_id'] for entry in payment_entries if entry.get('account_id')]
-    print("account_ids", account_ids)
-
     for index, entry in enumerate(payment_entries):
         payment_date = datetime.strptime(entry['date'], '%Y-%m-%d').date()
         amount = float(entry['amount'])
@@ -254,16 +250,13 @@ def submit_receipt():
         set_paymentEntry(receipt_id, payment_date, amount, discount, reference, payment_destination_id, file_path)
 
     # Actualización de Monto Abonado
-    """
+    account_ids = [entry['account_id'] for entry in payment_entries if entry.get('account_id')]
+    amount_paid_list = request.form.getlist('amount_paid[]')
     original_amounts = request.form.getlist('original_amount[]')
-    print("original_amounts", original_amounts)
-    for index, account_id in enumerate(account_ids):
-        original_amount = float(original_amounts[index])
-        print("original_amount", original_amounts)
-        new_balance = original_amount - balance_calculations[index]
-        print("new_balance", new_balance)
-        set_invoiceBalance(account_id, new_balance)"
-    """
+    for index in range(len(original_amounts)):
+        account_id = account_ids[index]
+        amount_paid = float(amount_paid_list[index])
+        set_invoiceBalance(account_id, amount_paid)
 
     return redirect(url_for('accountsReceivable'))
 

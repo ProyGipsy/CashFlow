@@ -636,16 +636,16 @@
         }
 
         // Adición de Importe Adeudado -- Para Actualización Monto Abonado de Factura
-        /*
-        const balanceCalculations = document.querySelectorAll('#balance_calculation');
-        console.log("balanceCalculations", balanceCalculations);
         const originalAmounts = document.querySelectorAll('input[name="original_amount[]"]');
-        console.log("originalAmounts", originalAmounts)
-        balanceCalculations.forEach((balance, index) => {
-            formData.append(`balance_calculation_${index}`, balance.textContent);
-            formData.append(`original_amount_${index}`, originalAmounts[index].value);
+        const balanceCalculations = document.querySelectorAll('[id="balance_calculation"]');
+
+        originalAmounts.forEach((input, index) => {
+            const originalAmount = parseFloat(input.value);
+            formData.append('original_amount[]', originalAmount.toFixed(2));
+            const balanceAmount = parseFloat(balanceCalculations[index].textContent);
+            const amountPaid = parseFloat(originalAmount) - parseFloat(balanceAmount);
+            formData.append('amount_paid[]', amountPaid.toFixed(2));
         });
-        */
 
         // Envío de Datos al Servidor
         fetch("{{ url_for('submit_receipt') }}", {

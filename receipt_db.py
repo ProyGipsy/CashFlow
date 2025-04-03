@@ -108,7 +108,6 @@ def get_receiptsInfo(account_ids):
                    ORDER BY D.DueDate''',
                    (account_ids_tuple,))
     receipts = cursor.fetchall()
-    print("Receipts:", receipts)
     conn.close()
     return receipts
 
@@ -203,17 +202,10 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date):
 def set_invoiceBalance(account_id, new_balance):
     conn = get_db_connection()
     cursor = conn.cursor()
-    print('''
+    cursor.execute('''
                    UPDATE CommissionReceipt.DebtAccount
                    SET Balance = %s
                    WHERE AccountID = %s
                    ''', (new_balance, account_id))
-    """
-    cursor.execute('''
-                   UPDATE CommissionReceipt.DebtAccount
-                   SET Balance = Balance + %s
-                   WHERE AccountID = %s
-                   ''', (new_balance, account_id))"
-    """
     conn.commit()
     conn.close()
