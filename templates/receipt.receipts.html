@@ -58,7 +58,6 @@
             let storeMatches = storeName.includes(searchTerm.toLowerCase());
             let sellerMatches = false;
 
-            // Mostrar u ocultar vendedores según el término de búsqueda
             for (let seller of sellers) {
                 const sellerName = seller.textContent.toLowerCase();
                 if (sellerName.includes(searchTerm.toLowerCase())) {
@@ -69,7 +68,6 @@
                 }
             }
 
-            // Mostrar u ocultar la tienda según si coincide con el término de búsqueda o tiene vendedores que coincidan
             if (storeMatches || sellerMatches) {
                 button.style.display = '';
                 sellersDiv.style.display = 'block';

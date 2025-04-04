@@ -54,6 +54,20 @@ def get_customers(store_id):
     conn.close()
     return sellers
 
+def get_customers_with_unvalidated_receipts(store_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT C.ID, C.FirstName, C.LastName, COUNT(R.ReceiptID) AS UnvalidatedCount
+        FROM Main.Customer C
+        JOIN CommissionReceipt.PaymentReceipt R ON C.ID = R.CustomerID AND R.IsValidated = 0
+        WHERE C.StoreID = %s
+        GROUP BY C.ID, C.FirstName, C.LastName
+    ''', (store_id,))
+    customers = cursor.fetchall()
+    conn.close()
+    return customers
+
 def get_tender():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -159,38 +173,32 @@ def set_commissionsRules(rules):
     conn.commit()
     conn.close()
 
-def set_paymentReceipt(balance_note, commission_note):
-    conn = get_db_connection()
-    cursor = conn.cursor()
+
+def set_paymentReceipt(cursor, balance_note, commission_note):
     cursor.execute('''
                    INSERT INTO CommissionReceipt.PaymentReceipt
                    (Amount, CommissionAmount, IsValidated, FilePath, isRetail)
                    VALUES (%s, %s, %s, %s, %s)
                    ''', (balance_note, commission_note, 0, '', 0))
-    conn.commit()
 
     #Obtención del ReceiptID generado
     cursor.execute("SELECT SCOPE_IDENTITY()")
     receipt_id = cursor.fetchone()[0]
-    conn.close()
     
     return receipt_id
 
-def set_paymentEntry(receipt_id, payment_date, amount, discount, reference, destination_id, proof_path):
-    conn = get_db_connection()
-    cursor = conn.cursor()
+
+def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, destination_id, proof_path):
     cursor.execute('''
         INSERT INTO CommissionReceipt.PaymentReceiptEntry
         (ReceiptID, PaymentDate, Amount, Discount, Reference, PaymentDestinationID, isRetail, ProofOfPaymentPath)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ''', (receipt_id, payment_date, amount, discount, reference, destination_id, 0, proof_path))
-    conn.commit()
-    cursor.close()
-    conn.close()
 
-def save_proofOfPayment(proof_of_payments, receipt_id, payment_date):
+
+def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
     saved_file_paths = []
-    for index, file in enumerate(proof_of_payments):
+    for file in proof_of_payments:
         if file:
             formatted_date = payment_date.strftime('%Y-%m-%d')
             new_filename = f"{receipt_id}_{formatted_date}_{index}{os.path.splitext(file.filename)[1]}"
@@ -199,13 +207,16 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date):
             saved_file_paths.append(file_path)
     return saved_file_paths
 
-def set_invoiceBalance(account_id, new_balance):
-    conn = get_db_connection()
-    cursor = conn.cursor()
+def set_invoiceBalance(cursor, account_id, new_balance):
     cursor.execute('''
                    UPDATE CommissionReceipt.DebtAccount
                    SET Balance = %s
                    WHERE AccountID = %s
                    ''', (new_balance, account_id))
-    conn.commit()
-    conn.close()
+    
+def set_DebtPaymentRelation(cursor, account_id, receipt_id):
+    cursor.execute('''
+        INSERT INTO CommissionReceipt.DebtPaymentRelation
+        (DebtAccountID, PaymentReceiptID, isRetail)
+        VALUES (%s, %s, %s)
+    ''', (account_id, int(receipt_id), 0))

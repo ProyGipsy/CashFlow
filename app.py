@@ -10,9 +10,10 @@ from cashflow_db import get_beneficiaries, get_cashflowStores, get_concepts, get
 from cashflow_db import get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id
 from cashflow_db import set_beneficiaries, set_concepts, set_stores, set_operations
 
+from receipt_db import get_db_connection
 from receipt_db import get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules
 from receipt_db import get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer, get_bankAccounts, get_commissions
-from receipt_db import set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoiceBalance
+from receipt_db import set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoiceBalance, set_DebtPaymentRelation
 
 app = Flask(__name__)
 
@@ -216,49 +217,68 @@ def accountsForm(account_ids):
 
 @app.route('/submit_receipt', methods=['POST'])
 def submit_receipt():
-    # Obtención de datos del formulario
-    balance_note = float(request.form['balance_note'])
-    commission_note = float(request.form['commission_note'])
+    #Conexión a la BD. Ejecución como una única transacción
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-    # Inserción de Recibo en BD
-    receipt_id = set_paymentReceipt(balance_note, commission_note)
+    try:
 
-    payment_entries = request.form.getlist('payment_entries[]')
-    payment_entries = [json.loads(entry) for entry in payment_entries] 
-    proof_of_payments = request.files.getlist('proof_of_payment[]')
+        # Obtención de datos del formulario
+        balance_note = float(request.form['balance_note'])
+        commission_note = float(request.form['commission_note'])
 
-    # Importes adeudados de cada factura
-    balance_calculations = []
-    index = 0
-    while f'balance_calculation_{index}' in request.form:
-            balance_calculations.append(float(request.form[f'balance_calculation_{index}']))
-            index += 1
+        # Inserción de Recibo en BD
+        receipt_id = set_paymentReceipt(cursor, balance_note, commission_note)
 
-    for index, entry in enumerate(payment_entries):
-        payment_date = datetime.strptime(entry['date'], '%Y-%m-%d').date()
-        amount = float(entry['amount'])
-        discount = float(entry['discount'])
-        reference = entry['reference']
-        payment_destination_id = entry['payment_destination_id']
+        payment_entries = request.form.getlist('payment_entries[]')
+        payment_entries = [json.loads(entry) for entry in payment_entries] 
+        proof_of_payments = request.files.getlist('proof_of_payment[]')
 
-        if proof_of_payments and index < len(proof_of_payments):
-            file_path = save_proofOfPayment([proof_of_payments[index]], receipt_id, payment_date)
-            file_path = file_path[0] if file_path else ""  # Toma el primer elemento o cadena vacía
-        else:
-            file_path = "" 
+        # Importes adeudados de cada factura
+        balance_calculations = []
+        index = 0
+        while f'balance_calculation_{index}' in request.form:
+                balance_calculations.append(float(request.form[f'balance_calculation_{index}']))
+                index += 1
 
-        set_paymentEntry(receipt_id, payment_date, amount, discount, reference, payment_destination_id, file_path)
+        for index, entry in enumerate(payment_entries):
+            payment_date = datetime.strptime(entry['date'], '%Y-%m-%d').date()
+            amount = float(entry['amount'])
+            discount = float(entry['discount'])
+            reference = entry['reference']
+            payment_destination_id = entry['payment_destination_id']
 
-    # Actualización de Monto Abonado
-    account_ids = [entry['account_id'] for entry in payment_entries if entry.get('account_id')]
-    amount_paid_list = request.form.getlist('amount_paid[]')
-    original_amounts = request.form.getlist('original_amount[]')
-    for index in range(len(original_amounts)):
-        account_id = account_ids[index]
-        amount_paid = float(amount_paid_list[index])
-        set_invoiceBalance(account_id, amount_paid)
+            if proof_of_payments and index < len(proof_of_payments):
+                file_path = save_proofOfPayment([proof_of_payments[index]], receipt_id, payment_date, index)
+                file_path = file_path[0] if file_path else ""  # Toma el primer elemento o cadena vacía
+            else:
+                file_path = "" 
 
-    return redirect(url_for('accountsReceivable'))
+            set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, file_path)
+
+        # Actualización de Monto Abonado
+        account_ids = [entry['account_id'] for entry in payment_entries if entry.get('account_id')]
+        amount_paid_list = request.form.getlist('amount_paid[]')
+        original_amounts = request.form.getlist('original_amount[]')
+        for index in range(len(original_amounts)):
+            account_id = account_ids[index]
+            amount_paid = float(amount_paid_list[index])
+            set_invoiceBalance(cursor, account_id, amount_paid)
+            # Inserción de la Relación Receipt-DebtAccount
+            set_DebtPaymentRelation(cursor, account_id, receipt_id)
+
+        # Confirmación la transacción
+        conn.commit()
+        return redirect(url_for('accountsReceivable'))
+    
+    except Exception as e:
+        conn.rollback()
+        print(f"Error: {e}")
+        return "Error al procesar la solicitud", 500
+    
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # Generación del PDF
