@@ -12,7 +12,7 @@ from cashflow_db import set_beneficiaries, set_concepts, set_stores, set_operati
 
 from receipt_db import get_db_connection
 from receipt_db import get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules
-from receipt_db import get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer, get_bankAccounts, get_commissions
+from receipt_db import get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer, get_bankAccounts, get_commissions, get_customers_with_unvalidated_receipts
 from receipt_db import set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoiceBalance, set_DebtPaymentRelation
 
 app = Flask(__name__)
@@ -153,8 +153,8 @@ def sellerDetails(seller_id):
 @app.route('/receipts')
 def receipts():
     stores = get_receiptStores()
-    customers_by_store = {store[0]: get_customers(store[0]) for store in stores}
-    return render_template('receipt.receipts.html', page='receipts', active_page='receipts', stores=stores, customers_by_store=customers_by_store)
+    customers_with_unvalidated_receipts = {store[0]: get_customers_with_unvalidated_receipts(store[0]) for store in stores}
+    return render_template('receipt.receipts.html', page='receipts', active_page='receipts', stores=stores, customers_with_unvalidated_receipts=customers_with_unvalidated_receipts)
 
 @app.route('/receiptDetails')
 def receiptDetails():

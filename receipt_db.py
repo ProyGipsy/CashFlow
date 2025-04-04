@@ -46,10 +46,22 @@ def get_seller_details(seller_id):
     conn.close()
     return seller
 
+'''
 def get_customers(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT ID, FirstName, LastName FROM Main.Customer WHERE StoreID = %s', (store_id,))
+    sellers = cursor.fetchall()
+    conn.close()
+    return sellers
+'''
+def get_customers(store_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT DISTINCT (C.ID), C.FirstName, C.LastName
+                    FROM Main.Customer C
+                    JOIN CommissionReceipt.DebtAccount D ON C.ID = D.CustomerID
+                    WHERE D.StoreID = %s''', (store_id,))
     sellers = cursor.fetchall()
     conn.close()
     return sellers
@@ -58,12 +70,13 @@ def get_customers_with_unvalidated_receipts(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT C.ID, C.FirstName, C.LastName, COUNT(R.ReceiptID) AS UnvalidatedCount
-        FROM Main.Customer C
-        JOIN CommissionReceipt.PaymentReceipt R ON C.ID = R.CustomerID AND R.IsValidated = 0
-        WHERE C.StoreID = %s
-        GROUP BY C.ID, C.FirstName, C.LastName
-    ''', (store_id,))
+            SELECT DISTINCT (C.ID), C.FirstName, C.LastName, D.StoreID AS DebtAccountStore, C.StoreID AS CuatomerStore
+            FROM Main.Customer C
+            JOIN CommissionReceipt.DebtAccount D ON C.ID = D.CustomerID
+            JOIN CommissionReceipt.DebtPaymentRelation P ON D.AccountID = P.DebtAccountID
+            JOIN CommissionReceipt.PaymentReceipt R ON P.PaymentReceiptID = R.ReceiptID
+            WHERE R.IsValidated = 0 AND D.StoreID = %s
+            ''', (store_id,))
     customers = cursor.fetchall()
     conn.close()
     return customers
