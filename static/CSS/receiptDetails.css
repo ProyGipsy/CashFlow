@@ -73,6 +73,24 @@
     font-size: 1em;
 }
 
+/*.pdf-icon está incrustado en el HTML*/
+.pdf-icon {
+    width: 50px !important;
+    height: auto !important;
+}
+
+.pdf-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    font-weight: normal;
+}
+
+.pdf-filename {
+    vertical-align: middle;
+    color: #4B0082;
+}
+
 #saldo_nota, #dias_transcurridos{
     font-weight: normal;
 }

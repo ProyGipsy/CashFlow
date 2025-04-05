@@ -14,6 +14,7 @@ from receipt_db import (get_db_connection,
     get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules,
     get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer, get_bankAccounts, get_commissions, get_customer_by_id,
     get_customers_with_unvalidated_receipts, get_count_customers_with_unvalidated_receipts, get_unvalidated_receipts_by_customer,
+    get_invoices_by_receipt, get_paymentEntries_by_receipt,
     set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoiceBalance, set_DebtPaymentRelation)
 
 app = Flask(__name__)
@@ -163,27 +164,38 @@ def receipts():
         customers_with_unvalidated_receipts=customers_with_unvalidated_receipts, 
         customer_counts=customer_counts)
 
-@app.route('/receipt_details/<int:customer_id>/<int:store_id>/<int:pagination>')
+@app.route('/receiptDetails/<int:customer_id>/<int:store_id>/<int:pagination>')
 def receiptDetails(customer_id, store_id, pagination=1):
     receipts_per_page = 1
     receipts = get_unvalidated_receipts_by_customer(customer_id)
+    print("receipts", receipts)
     store = get_receiptStore_by_id(store_id)
     customer = get_customer_by_id(customer_id)
 
     # Paginación
     total_receipts = len(receipts)
+    print("total_receipts", total_receipts)
     start = (pagination - 1) * receipts_per_page
     end = start + receipts_per_page
     paginated_receipts = receipts[start:end]
+    print("paginated_receipts", paginated_receipts)
+
+    # Obtención de receipt_id, facturas y formas de pago por página
+    receipt_id = paginated_receipts[0][0]
+    invoices = get_invoices_by_receipt(receipt_id)
+    paymentEntries = get_paymentEntries_by_receipt(receipt_id)
+    print("paymentEntries", paymentEntries)
 
     return render_template('receipt.receiptDetails.html', 
                            page='receiptDetails', 
                            active_page='receipts', 
                            customer_id=customer_id,
                            store_id=store_id,
-                           receipts=paginated_receipts,
+                           receipts=receipts,
                            store=store,
                            customer=customer,
+                           invoices=invoices,
+                           paymentEntries=paymentEntries,
                            pagination=pagination,
                            total_receipts=total_receipts,
                            receipts_per_page=receipts_per_page)

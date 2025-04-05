@@ -183,6 +183,31 @@ def get_unvalidated_receipts_by_customer(customer_id):
     conn.close()
     return receipts
 
+def get_invoices_by_receipt(receipt_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT D.N_CTA, D.Amount, D.DueDate, D.DueDate, D.Balance, D.AccountID, C.Description
+                    FROM CommissionReceipt.DebtAccount D
+                    JOIN CommissionReceipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID
+                    JOIN Main.Currency C ON D.CurrencyID = C.ID
+                    WHERE R.PaymentReceiptID = %s
+                    ''', (receipt_id,))
+    invoices = cursor.fetchall()
+    conn.close()
+    return invoices
+
+def get_paymentEntries_by_receipt(receipt_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT E.PaymentDate, E.PaymentDate, E.Amount, E.Discount, E.Reference, O.BankName, O.Destiny, E.ProofOfPaymentPath
+                    FROM CommissionReceipt.PaymentReceiptEntry E
+                    JOIN CommissionReceipt.PaymentOption O ON E.PaymentDestinationID = O.AccountID
+                    WHERE E.ReceiptID = %s
+                    ''', (receipt_id,))
+    paymentEntries = cursor.fetchall()
+    conn.close()
+    return paymentEntries
+
 
 # Escritura de datos en la BD a través de la Interfaz
 

@@ -40,8 +40,10 @@
 
         {% if not is_pdf %}
         <div class="client-info">
-            <p><strong>Empresa:</strong> {{ store[0] }} | {{ store[1] }}</p>
-            <p><strong>Cliente:</strong> {{ customer[0] }} | {{ customer[1] }}{{ customer[2] }}</p>
+            <p><strong>Empresa:</strong> {{ store[0] }} | {{ store[1] }} </p>
+            <p><strong>Cliente:</strong> {{ customer[0] }} | {{ customer[1] }}{{ customer[2] }} </p>
+            <p><strong>Recibo:</strong> {{ receipts[ pagination - 1 ][0] }} </p>
+            <p><strong>Moneda:</strong> {{ invoices[0][6] }} </p>
         </div>
         {% endif %}
     
@@ -58,13 +60,15 @@
                 <th>Fecha Vencimiento</th>
                 <th>Monto Abonado</th>
             </tr> 
-            <tr> 
-                <td>123456789</td>  
-                <td>5000</td> 
-                <td>2023-01-10</td> 
-                <td>2023-02-10</td> 
-                <td>5000</td> 
-            </tr> 
+            {% for invoice in invoices %}
+            <tr>
+                <td>{{ invoice[0] }}</td>  
+                <td>{{ "%.2f"|format(invoice[1]) }}</td> 
+                <td>{{ invoice[2] }}</td> 
+                <td>{{ invoice[3] }}</td> 
+                <td>{{ "%.2f"|format(invoice[4]) }}</td> 
+            </tr>
+            {% endfor %}
         </table>
     
         <br> 
@@ -79,39 +83,56 @@
                     <th>Referencia</th>
                     <th>Abono Realizado en</th>
                 </tr>
+                {% for paymentEntry in paymentEntries %}
                 <tr class="pago-row">
-                    <td>EFECTIVO Bs</td>
-                    <td>2023-01-15</td>
-                    <td>5000</td>
-                    <td>0</td>
-                    <td>REF123</td>
-                    <td>Cuenta Bancaria</td>
+                    <td>POR CAMPO EN BD</td>
+                    <td>{{ paymentEntry[1] }}</td>
+                    <td>{{ "%.2f"|format(paymentEntry[2]) }}</td>
+                    <td>{{ "%.2f"|format(paymentEntry[3]) }}</td>
+                    <td>{{ paymentEntry[4] }}</td>
+                    <td>{{ paymentEntry[5] }} | {{ paymentEntry[6] }}</td>
                 </tr>
+                {% endfor %}
             </table>
         </div> 
     
         <br><br>
         <div class="inline-label">
             <label for="saldo_nota">Saldo Nota:</label>
-            <span id="saldo_nota" class="small-input">0</span> 
-            
-            <label for="dias_transcurridos">Días Transcurridos:</label>
-            <span id="dias_transcurridos" class="small-input">5</span> 
-        </div>   
+            <span id="saldo_nota" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][1]) }}</span> 
+        </div> 
+
+        <br><br>
+        <div class="inline-label">
+            <label for="saldo_nota">Comisión Total:</label>
+            <span id="saldo_nota" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][2]) }}</span>  
+        </div> 
     
         <br><br>
         <div class="file-upload-container">
-            <label>Comprobante:</label><br><br>
-            <img src="{{ url_for('static', filename='IMG/sample_payment.jpeg') }}" alt="Comprobante" class="input-field paymentImage">
+            <label>Comprobante(s):</label><br><br>
+            {% if paymentEntries %}
+                {% for paymentEntry in paymentEntries %}
+                    {% set file_path = paymentEntry[7] %}
+                    {% set relative_path = file_path.replace('static/', '') %}
+                    {% if file_path.endswith('.jpeg') or file_path.endswith('.jpg') or file_path.endswith('.png') %}
+                        <a href="{{ url_for('static', filename=relative_path) }}" target="_blank">
+                            <img src="{{ url_for('static', filename=relative_path) }}" alt="Comprobante" title="Click para ampliar">
+                        </a>
+                    {% elif file_path.endswith('.pdf') %}
+                        <a class="pdf-link" href="{{ url_for('static', filename=relative_path) }}" target="_blank">
+                            <img class="pdf-icon" src="{{ url_for('static', filename='IMG/pdf_icon.png') }}" alt="PDF" title="Ver PDF">
+                            <span class="pdf-filename">{{ relative_path.split('/')[-1] }}</span>
+                        </a>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <p>No hay comprobantes disponibles.</p>
+            {% endif %}
         </div>
     
-        <br><br>
-        <div class="inline-label">
-            <label for="saldo_nota">Comisión a Recibir:</label>
-            <span id="saldo_nota" class="small-input">1234</span>  
-        </div>   
-    
         {% if not is_pdf %}
+        <br><br><br><br>
         <div class="button-container">
             <button type="submit" class="deny-button" id="denyBtn">Rechazar</button>
             <button type="submit" class="validate-button" id="validateBtn">Validar</button>
