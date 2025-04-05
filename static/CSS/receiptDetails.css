@@ -110,7 +110,10 @@
     transition: background-color 0.3s ease;
 }
 
-.deny-button:hover, .validate-button:hover {
+.deny-button:hover {
+    background-color: #b21554;
+}
+.validate-button:hover {
     background-color: #8b56ed;
 }
 
@@ -237,4 +240,38 @@
     .paymentImage{
         width: 500px !important;
     }
+}
+
+/* Paginado */
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center; 
+}
+
+.add-button {
+    background-color: #d0b8ff;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    color: #421d83;
+    font-size: 16px;
+    margin: 5px;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.add-button:hover {
+    background-color: #c4a6ff;
+}
+
+.disabled-button {
+    background-color: #f0f0f0;
+    color: #ccc;
+    padding: 10px 15px;
+    margin: 5px;
+    display: inline-block;
+    cursor: not-allowed;
 }

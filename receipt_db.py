@@ -25,7 +25,7 @@ def get_receiptStores():
 def get_receiptStore_by_id(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT Name FROM Main.Store WHERE ID = %s', (store_id,))
+    cursor.execute('SELECT ID, Name FROM Main.Store WHERE ID = %s', (store_id,))
     store = cursor.fetchone()
     conn.close()
     return store
@@ -45,6 +45,16 @@ def get_seller_details(seller_id):
     seller = cursor.fetchone()
     conn.close()
     return seller
+
+def get_customer_by_id(customer_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT C.ID, C.FirstName, C.LastName
+                    FROM Main.Customer C
+                    WHERE C.ID = %s''', (customer_id,))
+    sellers = cursor.fetchone()
+    conn.close()
+    return sellers
 
 def get_customers(store_id):
     conn = get_db_connection()
@@ -159,6 +169,19 @@ def get_commissions():
     commissions = cursor.fetchall()
     conn.close()
     return commissions
+
+def get_unvalidated_receipts_by_customer(customer_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT DISTINCT(R.ReceiptID), R.Amount, R.CommissionAmount, R.IsValidated, R.FilePath
+        FROM CommissionReceipt.PaymentReceipt R
+        JOIN CommissionReceipt.DebtPaymentRelation P ON R.ReceiptID = P.PaymentReceiptID
+        JOIN CommissionReceipt.DebtAccount D ON P.DebtAccountID = D.AccountID
+        WHERE R.IsValidated = 0 AND D.CustomerID = %s
+        ''', (customer_id,))
+    receipts = cursor.fetchall()
+    conn.close()
+    return receipts
 
 
 # Escritura de datos en la BD a través de la Interfaz
