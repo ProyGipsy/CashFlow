@@ -107,6 +107,14 @@
     font-size: 15px;
     border-radius: 5px;
     border: 1px solid #421d83;
+    display: flex;
+    justify-content: space-between;
+}
+
+.customer-count {
+    margin-left: auto; /* Empuja el conteo hacia la derecha */
+    font-weight: normal; /* Estilo del texto */
+    color: #555; /* Color del texto */
 }
 
 .company-sellers {

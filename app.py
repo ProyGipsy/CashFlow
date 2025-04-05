@@ -6,14 +6,15 @@ import json
 from datetime import datetime
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response)
 
-from cashflow_db import get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts, get_operations
-from cashflow_db import get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id
-from cashflow_db import set_beneficiaries, set_concepts, set_stores, set_operations
+from cashflow_db import (get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts,
+    get_operations, get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id,
+    set_beneficiaries, set_concepts, set_stores, set_operations)
 
-from receipt_db import get_db_connection
-from receipt_db import get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules
-from receipt_db import get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer, get_bankAccounts, get_commissions, get_customers_with_unvalidated_receipts
-from receipt_db import set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoiceBalance, set_DebtPaymentRelation
+from receipt_db import (get_db_connection, 
+    get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules,
+    get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer, get_bankAccounts, get_commissions,
+    get_customers_with_unvalidated_receipts, get_count_customers_with_unvalidated_receipts,
+    set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoiceBalance, set_DebtPaymentRelation)
 
 app = Flask(__name__)
 
@@ -154,7 +155,13 @@ def sellerDetails(seller_id):
 def receipts():
     stores = get_receiptStores()
     customers_with_unvalidated_receipts = {store[0]: get_customers_with_unvalidated_receipts(store[0]) for store in stores}
-    return render_template('receipt.receipts.html', page='receipts', active_page='receipts', stores=stores, customers_with_unvalidated_receipts=customers_with_unvalidated_receipts)
+    customer_counts = {store[0]: get_count_customers_with_unvalidated_receipts(store[0]) for store in stores}
+    return render_template(
+        'receipt.receipts.html', 
+        page='receipts', active_page='receipts', 
+        stores=stores, 
+        customers_with_unvalidated_receipts=customers_with_unvalidated_receipts, 
+        customer_counts=customer_counts)
 
 @app.route('/receiptDetails')
 def receiptDetails():

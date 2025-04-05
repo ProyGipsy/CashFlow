@@ -31,7 +31,9 @@
                
     <div class="company-container">
         {% for store in stores %}
-        <button class="company-name" onclick="toggleSellers('{{ store[0] }}')">{{ store[0] }} | {{ store[1] }}</button>
+        <button class="company-name" onclick="toggleSellers('{{ store[0] }}')">{{ store[0] }} | {{ store[1] }}
+            <span class="customer-count">{{ customer_counts[store[0]] }} clientes con recibos por validar</span>
+        </button>
         <div class="company-sellers" id="sellers-{{ store[0] }}" style="display: none;">
             {% for customer in customers_with_unvalidated_receipts[store[0]] %}
             <p>{{ customer[0] }} | {{ customer[1] }}{{ customer[2] }}
