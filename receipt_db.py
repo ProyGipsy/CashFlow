@@ -208,6 +208,17 @@ def get_paymentEntries_by_receipt(receipt_id):
     conn.close()
     return paymentEntries
 
+def get_salesRep_isRetail(account_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT SalesRepID, IsRetail 
+                    FROM CommissionReceipt.DebtAccount
+                    WHERE AccountID = %s
+                    ''', (account_id,))
+    salesRep_isRetail = cursor.fetchone()
+    conn.close()
+    return salesRep_isRetail
+
 
 # Escritura de datos en la BD a través de la Interfaz
 
@@ -283,7 +294,21 @@ def set_invoiceBalance(cursor, account_id, new_balance):
     
 def set_DebtPaymentRelation(cursor, account_id, receipt_id):
     cursor.execute('''
-        INSERT INTO CommissionReceipt.DebtPaymentRelation
-        (DebtAccountID, PaymentReceiptID, isRetail)
-        VALUES (%s, %s, %s)
-    ''', (account_id, int(receipt_id), 0))
+                    INSERT INTO CommissionReceipt.DebtPaymentRelation
+                    (DebtAccountID, PaymentReceiptID, isRetail)
+                    VALUES (%s, %s, %s)
+                    ''', (account_id, int(receipt_id), 0))
+
+def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id):
+    print('''
+                    INSERT INTO [CommissionReceipt].[SalesRepCommission] 
+                    (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CommissionAmount, CreatedAt, ReceiptID)
+                    VALUES (%s, %s, %s, %s, %s, %s, GETDATE(), %s)
+                    ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id))
+    """
+    cursor.execute('''
+                    INSERT INTO [CommissionReceipt].[SalesRepCommission] 
+                    (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CommissionAmount, CreatedAt, ReceiptID)
+                    VALUES (%s, %s, %s, %s, %s, %s, GETDATE(), %s)
+                    ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id))
+    """
