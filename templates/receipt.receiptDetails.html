@@ -85,7 +85,7 @@
                 </tr>
                 {% for paymentEntry in paymentEntries %}
                 <tr class="pago-row">
-                    <td>POR CAMPO EN BD</td>
+                    <td>{{ paymentEntry[0] }}</td>
                     <td>{{ paymentEntry[1] }}</td>
                     <td>{{ "%.2f"|format(paymentEntry[2]) }}</td>
                     <td>{{ "%.2f"|format(paymentEntry[3]) }}</td>
@@ -95,20 +95,34 @@
                 {% endfor %}
             </table>
         </div> 
-    
-        <br><br>
         <div class="inline-label">
             <label for="saldo_nota">Saldo Nota:</label>
             <span id="saldo_nota" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][1]) }}</span> 
         </div> 
 
         <br><br>
+        <table class="styled-table"> 
+            <tr> 
+                <th>N_CTA</th>
+                <th>Importe Adeudado</th>
+                <th>Días Transcurridos</th>
+                <th>Comisión</th>
+            </tr> 
+            {% for repComm in salesRepComm %}
+            <tr> 
+                <td>{{ repComm[0] }}</td>
+                <td>{{ "%.2f"|format(repComm[1]) }}</td>
+                <td>{{ repComm[2] }}</td>
+                <td>{{ "%.2f"|format(repComm[3]) }}</td>
+            </tr> 
+            {% endfor %}
+        </table>
         <div class="inline-label">
             <label for="saldo_nota">Comisión Total:</label>
             <span id="saldo_nota" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][2]) }}</span>  
         </div> 
     
-        <br><br>
+        <br><br><br>
         <div class="file-upload-container">
             <label>Comprobante(s):</label><br><br>
             {% if paymentEntries %}

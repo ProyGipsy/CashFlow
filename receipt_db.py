@@ -189,7 +189,7 @@ def get_unvalidated_receipts_by_customer(customer_id):
 def get_invoices_by_receipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT D.N_CTA, D.Amount, D.DueDate, D.DueDate, D.Balance, D.AccountID, C.Description
+    cursor.execute('''SELECT DISTINCT(D.N_CTA), D.Amount, D.DueDate, D.DueDate, D.Balance, D.AccountID, C.Description
                     FROM CommissionReceipt.DebtAccount D
                     JOIN CommissionReceipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID
                     JOIN Main.Currency C ON D.CurrencyID = C.ID
@@ -202,9 +202,10 @@ def get_invoices_by_receipt(receipt_id):
 def get_paymentEntries_by_receipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT E.PaymentDate, E.PaymentDate, E.Amount, E.Discount, E.Reference, O.BankName, O.Destiny, E.ProofOfPaymentPath
+    cursor.execute('''SELECT T.Description, E.PaymentDate, E.Amount, E.Discount, E.Reference, O.BankName, O.Destiny, E.ProofOfPaymentPath
                     FROM CommissionReceipt.PaymentReceiptEntry E
                     JOIN CommissionReceipt.PaymentOption O ON E.PaymentDestinationID = O.AccountID
+                    JOIN Main.Tender T ON E.TenderID = T.ID
                     WHERE E.ReceiptID = %s
                     ''', (receipt_id,))
     paymentEntries = cursor.fetchall()
@@ -221,6 +222,18 @@ def get_salesRep_isRetail(account_id):
     salesRep_isRetail = cursor.fetchone()
     conn.close()
     return salesRep_isRetail
+
+def get_SalesRepCommission(receipt_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT D.N_CTA, C.AmountOwed, C.DaysElapsed, C.CommissionAmount
+                    FROM CommissionReceipt.SalesRepCommission C
+                    JOIN CommissionReceipt.DebtAccount D ON C.AccountID = D.AccountID
+                    WHERE ReceiptID = %s
+                    ''', (receipt_id,))
+    salesRepComm = cursor.fetchall()
+    conn.close()
+    return salesRepComm
 
 
 # Escritura de datos en la BD a través de la Interfaz

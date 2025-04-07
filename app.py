@@ -14,7 +14,7 @@ from receipt_db import (get_db_connection,
     get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules,
     get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer, get_bankAccounts, get_commissions, get_customer_by_id,
     get_customers_with_unvalidated_receipts, get_count_customers_with_unvalidated_receipts, get_unvalidated_receipts_by_customer,
-    get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission,
+    get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission, get_SalesRepCommission,
     set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoiceBalance, set_DebtPaymentRelation)
 
 app = Flask(__name__)
@@ -181,6 +181,8 @@ def receiptDetails(customer_id, store_id, pagination=1):
     receipt_id = paginated_receipts[0][0]
     invoices = get_invoices_by_receipt(receipt_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
+    salesRepComm = get_SalesRepCommission(receipt_id)
+
 
     return render_template('receipt.receiptDetails.html', 
                            page='receiptDetails', 
@@ -192,6 +194,7 @@ def receiptDetails(customer_id, store_id, pagination=1):
                            customer=customer,
                            invoices=invoices,
                            paymentEntries=paymentEntries,
+                           salesRepComm = salesRepComm,
                            pagination=pagination,
                            total_receipts=total_receipts,
                            receipts_per_page=receipts_per_page)
