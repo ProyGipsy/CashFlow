@@ -176,12 +176,9 @@
 <script>
     // Filtro de Cuentas Bancarias
     function updateBankAccounts(select) {
-        const storeId = "{{ receiptStoreCustomer[0] }}"; // StoreID
-        console.log("storeId", storeId);
-        const currencyId = "{{ receiptStoreCustomer[6] }}"; // CurrencyID
-        console.log("currencyId", currencyId);
-        const tenderId = select.value; // TenderID seleccionado
-        console.log("tenderId", tenderId);
+        const storeId = "{{ receiptStoreCustomer[0] }}";
+        const currencyId = "{{ receiptStoreCustomer[6] }}";
+        const tenderId = select.value;
 
         if (tenderId) {
             fetch("/get_bankAccounts", {
@@ -198,11 +195,11 @@
             .then(response => response.json())
             .then(data => {
                 const paymentMadeSelect = select.closest('tr').querySelector('select[name="payment_made"]');
-                paymentMadeSelect.innerHTML = '<option value="" disabled selected>Cuenta Bancaria</option>'; // Resetear opciones
+                paymentMadeSelect.innerHTML = '<option value="" disabled selected>Cuenta Bancaria</option>';
 
                 data.forEach(account => {
                     const option = document.createElement("option");
-                    option.value = account[0]; // BankName
+                    option.value = account[0];
                     option.textContent = `${account[0]} | ${account[1]}`; // BankName | Destiny
                     paymentMadeSelect.appendChild(option);
                 });
@@ -656,6 +653,9 @@
             const paymentDestinationId = row.querySelector('select[name="payment_made"]').value;
             const accountId = accountIds[index] ? accountIds[index].value : null;
 
+            const tenderId = row.querySelector('select[name="forma_pago"]').value;
+            console.log("tenderId", tenderId);
+
             const balanceAmount = parseFloat(document.querySelectorAll('#balance_calculation')[index].textContent);
             const commissionAmount = parseFloat(document.querySelectorAll('#commission_received')[index].textContent);
             const daysPassed = parseInt(document.querySelectorAll('#days_passed')[index].textContent)
@@ -669,7 +669,8 @@
                 account_id: accountId,
                 balance_amount: balanceAmount, 
                 commission_amount: commissionAmount,
-                days_passed: daysPassed
+                days_passed: daysPassed,
+                tender_id: tenderId
             }));
         });
 

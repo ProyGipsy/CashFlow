@@ -269,12 +269,12 @@ def set_paymentReceipt(cursor, balance_note, commission_note):
     return receipt_id
 
 
-def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, destination_id, proof_path):
+def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, proof_path):
     cursor.execute('''
         INSERT INTO CommissionReceipt.PaymentReceiptEntry
-        (ReceiptID, PaymentDate, Amount, Discount, Reference, PaymentDestinationID, isRetail, ProofOfPaymentPath)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (receipt_id, payment_date, amount, discount, reference, destination_id, 0, proof_path))
+        (ReceiptID, PaymentDate, Amount, Discount, Reference, PaymentDestinationID, TenderID, isRetail, ProofOfPaymentPath)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, 0, proof_path))
 
 
 def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
@@ -308,10 +308,8 @@ def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_
                     (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CommissionAmount, CreatedAt, ReceiptID)
                     VALUES (%s, %s, %s, %s, %s, %s, GETDATE(), %s)
                     ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id))
-    """
     cursor.execute('''
                     INSERT INTO [CommissionReceipt].[SalesRepCommission] 
                     (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CommissionAmount, CreatedAt, ReceiptID)
                     VALUES (%s, %s, %s, %s, %s, %s, GETDATE(), %s)
                     ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id))
-    """

@@ -266,6 +266,7 @@ def get_bank_accounts():
     bank_accounts = get_bankAccounts(store_id, currency_id, tender_id)
     return jsonify(bank_accounts)
 
+
 @app.route('/submit_receipt', methods=['POST'])
 def submit_receipt():
     #Conexión a la BD. Ejecución como una única transacción
@@ -291,6 +292,8 @@ def submit_receipt():
         while f'balance_calculation_{index}' in request.form:
                 balance_calculations.append(float(request.form[f'balance_calculation_{index}']))
                 index += 1
+                
+        account_ids = [entry['account_id'] for entry in payment_entries if entry.get('account_id')]
 
         for index, entry in enumerate(payment_entries):
             payment_date = datetime.strptime(entry['date'], '%Y-%m-%d').date()
@@ -300,12 +303,16 @@ def submit_receipt():
             payment_destination_id = entry['payment_destination_id']
 
             # Obtención de balance, comisión y días
+            account_id = account_ids[index]
+            print("account_id", account_id)
             balance_amount = entry['balance_amount']
             print("balance_amount", balance_amount)
             commission_amount = entry['commission_amount']
             print("commisison_amount", commission_amount)
             days_passed = entry['days_passed']
             print("days_passed", days_passed)
+            tender_id = entry['tender_id']
+            print("tender_id", tender_id)
 
             if proof_of_payments and index < len(proof_of_payments):
                 file_path = save_proofOfPayment([proof_of_payments[index]], receipt_id, payment_date, index)
@@ -313,18 +320,8 @@ def submit_receipt():
             else:
                 file_path = "" 
 
-            set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, file_path)
+            set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
 
-        # Actualización de Monto Abonado
-        account_ids = [entry['account_id'] for entry in payment_entries if entry.get('account_id')]
-        amount_paid_list = request.form.getlist('amount_paid[]')
-        original_amounts = request.form.getlist('original_amount[]')
-        for index in range(len(original_amounts)):
-            account_id = account_ids[index]
-            amount_paid = float(amount_paid_list[index])
-            set_invoiceBalance(cursor, account_id, amount_paid)
-            # Inserción de la Relación Receipt-DebtAccount
-            set_DebtPaymentRelation(cursor, account_id, receipt_id)
             # Obtención de SalesRepID e isRetail
             debt_account = get_salesRep_isRetail(account_id)
             sales_rep_id = debt_account[0]
@@ -333,6 +330,16 @@ def submit_receipt():
             print("is_retail", is_retail)
             # Inserción en SalesRepCommission
             set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id)
+
+        # Actualización de Monto Abonado
+        amount_paid_list = request.form.getlist('amount_paid[]')
+        original_amounts = request.form.getlist('original_amount[]')
+        for index in range(len(original_amounts)):
+            account_id = account_ids[index]
+            amount_paid = float(amount_paid_list[index])
+            set_invoiceBalance(cursor, account_id, amount_paid)
+            # Inserción de la Relación Receipt-DebtAccount
+            set_DebtPaymentRelation(cursor, account_id, receipt_id)
             
         # Confirmación la transacción
         conn.commit()
