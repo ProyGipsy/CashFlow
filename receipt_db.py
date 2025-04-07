@@ -97,10 +97,10 @@ def get_count_customers_with_unvalidated_receipts(store_id):
     conn.close()
     return customer_count
 
-def get_tender():
+def get_tender(currency_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT ID, Description FROM Main.Tender')
+    cursor.execute('SELECT ID, Description FROM Main.Tender WHERE CurrencyID=%s', (currency_id))
     stores = cursor.fetchall()
     conn.close()
     return stores
@@ -116,10 +116,10 @@ def get_commissionsRules():
 def get_invoices_by_customer(customer_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT D.AccountID, D.N_CTA, D.Amount, D.Balance, C.Description
+    cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.Balance, C.Description
                    FROM CommissionReceipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = %s
+                   WHERE CustomerID = %s AND D.Amount-D.Balance > 0
                    ORDER BY D.N_CTA''',
                    (customer_id,))
     invoices = cursor.fetchall()
@@ -130,7 +130,7 @@ def get_receiptsStoreCustomer(account_ids):
     account_ids_tuple = tuple(account_ids)
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT TOP (1) S.ID, S.Name, C.ID, C.FirstName, C.LastName, Y.Description
+    cursor.execute('''SELECT TOP (1) S.ID, S.Name, C.ID, C.FirstName, C.LastName, Y.Description, Y.ID
                    FROM CommissionReceipt.DebtAccount D
                    JOIN Main.Store S ON D.StoreID = S.ID
                    JOIN Main.Customer C ON D.CustomerID = C.ID
@@ -154,10 +154,13 @@ def get_receiptsInfo(account_ids):
     conn.close()
     return receipts
 
-def get_bankAccounts():
+def get_bankAccounts(store_id, currency_id, tender_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT AccountID, BankName, Destiny FROM CommissionReceipt.PaymentOption')
+    cursor.execute('''SELECT AccountID, BankName, Destiny
+                   FROM CommissionReceipt.PaymentOption
+                   WHERE StoreID = %s AND CurrencyID = %s AND TenderID = %s
+                   ''', (store_id, currency_id, tender_id))
     bankAccounts = cursor.fetchall()
     conn.close()
     return bankAccounts

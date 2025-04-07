@@ -62,8 +62,8 @@
             </tr>
             <tr class="payment-row">
                 <td>
-                    <select name="forma_pago" class="input-field"> 
-                        <option value="">Forma de Pago</option> 
+                    <select name="forma_pago" class="input-field" onchange="updateBankAccounts(this)"> 
+                        <option value="" disabled selected>Forma de Pago</option>
                         {% for t in tender | sort(attribute=1)  %}
                             <option value="{{ t[0] }}">{{t[1] }}</option>
                         {% endfor %}
@@ -74,7 +74,7 @@
                 <td><input type="number" name="discount" step="0.01" class="input-field" value="0.00"></td>
                 <td><input type="text" name="reference" class="input-field"></td>
                 <td><select name="payment_made" class="input-field">
-                    <option value="">Cuenta Bancaria</option> 
+                    <option value="" disabled selected>Cuenta Bancaria</option> 
                     {% for b in bankAccounts | sort(attribute=1)  %}
                         <option value="{{ b[0] }}">{{b[1]}} | {{b[2]}}</option>
                     {% endfor %}
@@ -174,6 +174,43 @@
 
 {% block extra_js %}
 <script>
+    // Filtro de Cuentas Bancarias
+    function updateBankAccounts(select) {
+        const storeId = "{{ receiptStoreCustomer[0] }}"; // StoreID
+        console.log("storeId", storeId);
+        const currencyId = "{{ receiptStoreCustomer[6] }}"; // CurrencyID
+        console.log("currencyId", currencyId);
+        const tenderId = select.value; // TenderID seleccionado
+        console.log("tenderId", tenderId);
+
+        if (tenderId) {
+            fetch("/get_bankAccounts", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    store_id: storeId,
+                    currency_id: currencyId,
+                    tender_id: tenderId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const paymentMadeSelect = select.closest('tr').querySelector('select[name="payment_made"]');
+                paymentMadeSelect.innerHTML = '<option value="" disabled selected>Cuenta Bancaria</option>'; // Resetear opciones
+
+                data.forEach(account => {
+                    const option = document.createElement("option");
+                    option.value = account[0]; // BankName
+                    option.textContent = `${account[0]} | ${account[1]}`; // BankName | Destiny
+                    paymentMadeSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    }
+
     // Actualización de Saldo con la escritura
     function addInputListeners() {
         const amountInputs = document.querySelectorAll('input[name="payment_amount"]');

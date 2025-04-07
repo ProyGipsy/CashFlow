@@ -240,10 +240,11 @@ def get_invoices(customer_id):
 @app.route('/accountsForm/<string:account_ids>')
 def accountsForm(account_ids):
     account_ids_list = account_ids.split('-')
-    tender = get_tender()
     receiptStoreCustomer = get_receiptsStoreCustomer(account_ids_list)
+    currencyID = receiptStoreCustomer[6]
+    tender = get_tender(currencyID)
     receiptsInfo = get_receiptsInfo(account_ids_list)
-    bankAccounts = get_bankAccounts()
+    bankAccounts = []
     commissions = get_commissions()
     return render_template(
         'receipt.accountsForm.html',
@@ -255,6 +256,15 @@ def accountsForm(account_ids):
         bankAccounts=bankAccounts,
         commissions=commissions
     )
+
+# Obtención de cuentas bancarias
+@app.route('/get_bankAccounts', methods=['POST'])
+def get_bank_accounts():
+    store_id = request.json['store_id']
+    currency_id = request.json['currency_id']
+    tender_id = request.json['tender_id']
+    bank_accounts = get_bankAccounts(store_id, currency_id, tender_id)
+    return jsonify(bank_accounts)
 
 @app.route('/submit_receipt', methods=['POST'])
 def submit_receipt():
