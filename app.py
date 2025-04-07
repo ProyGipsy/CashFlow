@@ -168,23 +168,19 @@ def receipts():
 def receiptDetails(customer_id, store_id, pagination=1):
     receipts_per_page = 1
     receipts = get_unvalidated_receipts_by_customer(customer_id)
-    print("receipts", receipts)
     store = get_receiptStore_by_id(store_id)
     customer = get_customer_by_id(customer_id)
 
     # Paginación
     total_receipts = len(receipts)
-    print("total_receipts", total_receipts)
     start = (pagination - 1) * receipts_per_page
     end = start + receipts_per_page
     paginated_receipts = receipts[start:end]
-    print("paginated_receipts", paginated_receipts)
 
     # Obtención de receipt_id, facturas y formas de pago por página
     receipt_id = paginated_receipts[0][0]
     invoices = get_invoices_by_receipt(receipt_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
-    print("paymentEntries", paymentEntries)
 
     return render_template('receipt.receiptDetails.html', 
                            page='receiptDetails', 
@@ -292,7 +288,7 @@ def submit_receipt():
         while f'balance_calculation_{index}' in request.form:
                 balance_calculations.append(float(request.form[f'balance_calculation_{index}']))
                 index += 1
-                
+
         account_ids = [entry['account_id'] for entry in payment_entries if entry.get('account_id')]
 
         for index, entry in enumerate(payment_entries):
@@ -304,15 +300,10 @@ def submit_receipt():
 
             # Obtención de balance, comisión y días
             account_id = account_ids[index]
-            print("account_id", account_id)
             balance_amount = entry['balance_amount']
-            print("balance_amount", balance_amount)
             commission_amount = entry['commission_amount']
-            print("commisison_amount", commission_amount)
             days_passed = entry['days_passed']
-            print("days_passed", days_passed)
             tender_id = entry['tender_id']
-            print("tender_id", tender_id)
 
             if proof_of_payments and index < len(proof_of_payments):
                 file_path = save_proofOfPayment([proof_of_payments[index]], receipt_id, payment_date, index)
@@ -325,9 +316,7 @@ def submit_receipt():
             # Obtención de SalesRepID e isRetail
             debt_account = get_salesRep_isRetail(account_id)
             sales_rep_id = debt_account[0]
-            print("sales_rep_id", sales_rep_id)
             is_retail = debt_account[1]
-            print("is_retail", is_retail)
             # Inserción en SalesRepCommission
             set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id)
 
