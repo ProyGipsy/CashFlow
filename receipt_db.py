@@ -289,7 +289,7 @@ def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, referen
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, 0, proof_path))
 
-
+"""
 def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
     saved_file_paths = []
     for file in proof_of_payments:
@@ -300,6 +300,37 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
             file.save(file_path)
             saved_file_paths.append(file_path)
     return saved_file_paths
+"""
+def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index, access_token):
+    # Carpeta en OneDrive donde se guardarán los archivos
+    folder_path = "Recibos de Cobranza/Comprobantes de Pago"
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/octet-stream'
+    }
+    saved_file_urls = []
+
+    for file in proof_of_payments:
+        if file:
+            formatted_date = payment_date.strftime('%Y-%m-%d')
+            new_filename = f"{receipt_id}_{formatted_date}_{index}{os.path.splitext(file.filename)[1]}"
+            one_drive_path = f"/{folder_path}/{new_filename}"
+            upload_url = f"https://graph.microsoft.com/v1.0/me/drive/root:{one_drive_path}:/content"
+
+            # Solicitud PUT
+            response = requests.put(
+                upload_url,
+                headers=headers,
+                data=file.read()
+            )
+
+            if response.status_code == 201:
+                saved_file_urls.append(response.json().get('webUrl'))
+            else:
+                print(f"Error al subir el archivo {new_filename}: {response.text}")
+
+    return saved_file_urls
+
 
 def set_invoiceBalance(cursor, account_id, new_balance):
     cursor.execute('''
@@ -308,12 +339,14 @@ def set_invoiceBalance(cursor, account_id, new_balance):
                    WHERE AccountID = %s
                    ''', (new_balance, account_id))
     
+
 def set_DebtPaymentRelation(cursor, account_id, receipt_id):
     cursor.execute('''
                     INSERT INTO CommissionReceipt.DebtPaymentRelation
                     (DebtAccountID, PaymentReceiptID, isRetail)
                     VALUES (%s, %s, %s)
                     ''', (account_id, int(receipt_id), 0))
+
 
 def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id):
     cursor.execute('''

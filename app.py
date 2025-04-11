@@ -5,6 +5,7 @@ import json
 #from weasyprint import HTML
 from datetime import datetime
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response)
+from flask_mail import Mail, Message
 
 from cashflow_db import (get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts,
     get_operations, get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id,
@@ -19,26 +20,17 @@ from receipt_db import (get_db_connection,
 
 app = Flask(__name__)
 
-from flask import Flask
-from flask_mail import Mail, Message
 # Configuración del servidor SMTP
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')
 app.config['MAIL_PORT'] = os.environ.get('MAIL_PORT')
 app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_2')
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_1')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 mail = Mail(app)
 
+
 @app.route('/')
 def index():
-    """
-    msg = Message(subject='Testing Flask Mail',
-                  sender=app.config['MAIL_USERNAME'],
-                  recipients=['proyectogipsy@gmail.com', 'yarimacontreras.ucv@gmail.com'])
-    msg.body = "Prueba de envío de correo desde Aplicación de Recibo"
-    mail.send(msg)
-    return "Message sent!"
-    """
     return render_template('index.html')
 
 
@@ -388,6 +380,69 @@ def generate_pdf():
     response.headers['Content-Disposition'] = f'attachment; filename={filename}'
 
     return response
+
+# Rechazo de Recibo de Pago
+@app.route('/send_email', methods=['POST'])
+def send_email():
+    rejection_reason = request.form.get('rejection_reason', '')
+    rejection_reason_html = "<br>".join(line.strip() for line in rejection_reason.split('\n') if line.strip())
+    store = request.form.get('store', '')
+    customer = request.form.get('customer', '')
+    currency = request.form.get('currency', '')
+
+    msg = Message(subject='Rechazo de Recibo de Cobranza',
+                  sender=app.config['MAIL_USERNAME'],
+                  recipients=['proyectogipsy@gmail.com', 'yarimacontreras.ucv@gmail.com'])
+
+    # Crear el cuerpo del mensaje en HTML
+    html_body = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <p>El recibo de cobranza para:</p>
+
+            <ul style="list-style-type: disc; margin-left: 5px; padding-left: 5px;">
+                <li><strong>Empresa:</strong> {store}</li>
+                <li><strong>Cliente:</strong> {customer}</li>
+                <li><strong>Moneda:</strong> {currency}</li>
+            </ul>
+            
+            <p>ha sido rechazado por el siguiente motivo:</p>
+            
+            <blockquote style="border-left: 5px solid #ccc; margin: 1.5em 0; padding: 0.5em 1em;">
+                {rejection_reason_html}
+            </blockquote>
+            
+            <p>Se solicita verificar y volver a realizar el registro de la cobranza.</p>
+            
+            <p>Atentamente,</p>
+            
+            <p style="color: #666; font-style: italic;">
+                GIPSY<br>
+                Avenida Francisco de Miranda, Centro Lido, Torre A, Piso 9, Oficina 93<br>
+                Zona industrial Guayaba, Av. Pual. Guayabal, galpón 45, Guarenas<br>
+                One Turnberry Place, 19495 Biscayne Blvd. #609 Aventura FL 33180 United States of America
+            </p>
+            
+            <img src="cid:Gipsy_imagotipo_color.png" alt="Gipsy Logo" style="max-width: 200px;">
+        </body>
+    </html>
+    """
+    
+    msg.html = html_body
+    
+    # Adjuntar la imagen como parte del contenido (no como adjunto)
+    with app.open_resource('static/IMG/Gipsy_imagotipo_color.png') as logo:
+        msg.attach(
+            filename='Gipsy_imagotipo_color.png',
+            content_type='image/png',
+            data=logo.read(),
+            disposition='inline',
+            headers={'Content-ID': '<Gipsy_imagotipo_color.png>'}
+        )
+
+    mail.send(msg)
+
+    return jsonify({'success': True})
 
 
 if __name__ == '__main__':

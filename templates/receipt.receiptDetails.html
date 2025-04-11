@@ -148,8 +148,8 @@
         {% if not is_pdf %}
         <br><br><br><br>
         <div class="button-container">
-            <button type="submit" class="deny-button" id="denyBtn">Rechazar</button>
-            <button type="submit" class="validate-button" id="validateBtn">Validar</button>
+            <button type="button" class="validate-button" id="validateBtn" onclick="openConfirmationValidationModal()">Validar</button>
+            <button type="button" class="deny-button" id="denyBtn" onclick="openConfirmationRejectionModal()">Rechazar</button>
         </div>
         {% endif %}
         
@@ -172,10 +172,111 @@
     
 </div>
 
+<!-- Modal de confirmación -->
+<div id="confirmationValidationModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeConfirmationValidationModal()">&times;</span>
+        <h2>¿Está seguro de Validar este Recibo de Cobranza?</h2>
+        <button class="validate-button" onclick="sendReceipt()">Sí</button>
+        <button class="deny-button" onclick="closeConfirmationValidationModal()">No</button>
+    </div>
+</div>
+<div id="confirmationRejectionModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeConfirmationRejectionModal()">&times;</span>
+        <h2>¿Está seguro de Rechazar este Recibo de Cobranza?</h2>
+        <button class="validate-button" onclick="openRejectionReasonModal()">Sí</button>
+        <button class="deny-button" onclick="closeConfirmationRejectionModal()">No</button>
+    </div>
+</div>
+
+<!-- Modal de Validando/ Rechazando -->
+<div id="loadingValidationModal" class="loading-modal">
+    <div class="loading-content">
+        <p>Validando Recibo de Cobranza...</p>
+    </div>
+</div>
+<div id="loadingRejectionModal" class="loading-modal">
+    <div class="loading-content">
+        <p>Rechazando Recibo de Cobranza...</p>
+    </div>
+</div>
+
+<!-- Modal de Éxito -->
+<div id="finalValidationModal" class="modal">
+    <div class="modal-content">
+        <h2>El recibo ha sido validado exitosamente</h2>
+        <button class="validate-button" onclick="window.location.href='{{ url_for("receipts") }}'">Aceptar</button>
+    </div>
+</div>
+<div id="finalRejectionModal" class="modal">
+    <div class="modal-content">
+        <h2>El recibo ha sido rechazado exitosamente</h2>
+        <button class="validate-button" onclick="window.location.href='{{ url_for("receipts") }}'">Aceptar</button>
+    </div>
+</div>
+
+<!-- Modal de Motivo de Rechazo -->
+<div id="rejectionReasonModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeRejectionReasonModal()">&times;</span>
+        <h2>Motivo del Rechazo</h2>
+        <textarea id="rejectionReason" placeholder="Ingrese el motivo del rechazo"></textarea>
+        <button class="validate-button" onclick="sendRejectionWithReason()">Enviar</button>
+        <button class="deny-button" onclick="closeRejectionReasonModal()">Cancelar</button>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    // Modales de Confirmación:
+    function openConfirmationValidationModal() {
+        document.getElementById("confirmationValidationModal").style.display = "block";
+    }
+    function openConfirmationRejectionModal() {
+        document.getElementById("confirmationRejectionModal").style.display = "block";
+    }
+    function closeConfirmationValidationModal() {
+        document.getElementById("confirmationValidationModal").style.display = "none";
+    }
+    function closeConfirmationRejectionModal() {
+        document.getElementById("confirmationRejectionModal").style.display = "none";
+    }
+
+    // Modales de Validando/ Rechazando:
+    function openLoadingValidationModal() {
+        document.getElementById("loadingValidationModal").style.display = "flex";
+    }
+    function openLoadingRejectionModal() {
+        document.getElementById("loadingRejectionModal").style.display = "flex";
+    }
+    function closeLoadingValidationModal() {
+        document.getElementById("loadingValidationModal").style.display = "none";
+    }
+    function closeLoadingRejectionModal() {
+        document.getElementById("loadingRejectionModal").style.display = "none";
+    }
+
+    // Modales de Éxito:
+    function openFinalValidationModal() {
+        document.getElementById("finalValidationModal").style.display = "block";
+    }
+    function openFinalRejectionModal() {
+        document.getElementById("finalRejectionModal").style.display = "block";
+    }
+
+    // Modal de Motivo
+    function openRejectionReasonModal() {
+        closeConfirmationRejectionModal()
+        document.getElementById("rejectionReasonModal").style.display = "block";
+    }
+    function closeRejectionReasonModal() {
+        document.getElementById("rejectionReasonModal").style.display = "none";
+    }
+
+
     // Acción al Validar (generar pdf)
     document.getElementById('pdfForm').addEventListener('submit', function(event) {
         event.preventDefault();
@@ -214,18 +315,36 @@
     });
 
 
-    // Acción al Rechazar
-    document.getElementById('denyBtn').addEventListener('click', function() {
-        const formData = new FormData(document.getElementById('pdfForm'));
+    // Acción al Rechazar (enviar correo explicando el motivo)
+    function sendRejectionWithReason() {
+        closeRejectionReasonModal();
+        openLoadingRejectionModal();
 
-        fetch('/enviar_correo', {  // Ruta para enviar el correo
+        const reason = document.getElementById("rejectionReason").value;
+        const store = "{{ store[1] }}";
+        const customer = "{{ customer[1] }}" + " " + "{{ customer[2] }}";
+        const currency = "{{ invoices[0][6] }}";
+
+        if (!reason.trim()) {
+            alert("Por favor, ingrese un motivo para el rechazo.");
+            return;
+        }
+
+        const formData = new FormData(document.getElementById('pdfForm'));
+        formData.append('rejection_reason', reason);
+        formData.append('store', store);
+        formData.append('customer', customer);
+        formData.append('currency', currency);
+
+        fetch('/send_email', {
             method: 'POST',
             body: formData,
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Correo enviado correctamente.');
+                closeLoadingRejectionModal();
+                openFinalRejectionModal()
             } else {
                 alert('Error al enviar el correo.');
             }
@@ -233,6 +352,7 @@
         .catch(error => {
             console.error('Error:', error);
         });
-    });
+    }
+
 </script>
 {% endblock %}
