@@ -170,8 +170,39 @@
     }
 
     function saveChanges() {
-        document.getElementById('loadingModal').style.display = 'flex';
+        // Verificación de campos en blanco
         const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
+        let hasEmptyStore = false;
+        let emptyStore = [];
+        
+        for (let row of table.rows) {
+            const nameInput = row.cells[1].querySelector('input');
+            let storeName = '';
+            
+            if (nameInput) {
+                storeName = nameInput.value.trim();
+            } else {
+                storeName = row.cells[1].textContent.trim();
+            }
+            
+            if (storeName === '') {
+                hasEmptyStore = true;
+                const storeID = row.cells[0].textContent.trim();
+                emptyStore.push(storeID);
+                row.style.backgroundColor = '#ffdddd';
+            } else {
+                row.style.backgroundColor = ''; // Quitar resaltado si estaba
+            }
+        }
+        
+        if (hasEmptyStore) {
+            document.getElementById('loadingModal').style.display = 'none';
+            alert("Hay compañías con nombre en blanco. Por favor, complete todos los nombres antes de guardar.");
+            return;
+        }
+
+        // Proceso de guardado
+        document.getElementById('loadingModal').style.display = 'flex';
         const stores = [];
         
         
