@@ -289,7 +289,7 @@ def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, referen
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, 0, proof_path))
 
-"""
+
 def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
     saved_file_paths = []
     for file in proof_of_payments:
@@ -300,7 +300,10 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
             file.save(file_path)
             saved_file_paths.append(file_path)
     return saved_file_paths
+
 """
+# Intento de guardar en OneDrive -- Aún probando 
+
 def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index, access_token):
     # Carpeta en OneDrive donde se guardarán los archivos
     folder_path = "Recibos de Cobranza/Comprobantes de Pago"
@@ -330,7 +333,7 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index, acce
                 print(f"Error al subir el archivo {new_filename}: {response.text}")
 
     return saved_file_urls
-
+"""
 
 def set_invoicePaidAmount(cursor, account_id, new_paidAmount):
     cursor.execute('''

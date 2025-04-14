@@ -200,7 +200,7 @@
                 data.forEach(account => {
                     const option = document.createElement("option");
                     option.value = account[0];
-                    option.textContent = `${account[0]} | ${account[1]}`; // BankName | Destiny
+                    option.textContent = `${account[1]} | ${account[2]}`; // BankName | Destiny
                     paymentMadeSelect.appendChild(option);
                 });
             })
