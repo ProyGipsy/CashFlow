@@ -20,7 +20,7 @@
         <p><strong>{{ customerName }}</strong></p>
     </div>
     <div class="logo-right">
-        <img src="{{ url_for('static', filename='IMG/logo_store.png') }}" alt="Logo Store">
+        <img src="{{ url_for('static', filename=store[2]) }}" alt="Logo Store">
     </div>
     {% endif %}
 </div>
@@ -73,7 +73,7 @@
     
         <br> 
         <div id="formas-de-pago"> 
-            <h3>Formas de Pagos</h3> 
+            <h3>Formas de Pago</h3> 
             <table class="styled-table" id="pago-table">
                 <tr>
                     <th>Forma de Pago</th>
@@ -96,11 +96,12 @@
             </table>
         </div> 
         <div class="inline-label">
-            <label for="saldo_nota">Saldo Nota:</label>
+            <label for="saldo_nota">Monto total del Recibo:</label>
             <span id="saldo_nota" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][1]) }}</span> 
         </div> 
 
         <br><br>
+        <h3>Cálculo de Comisión</h3>
         <table class="styled-table"> 
             <tr> 
                 <th>N_CTA</th>
@@ -155,6 +156,7 @@
         
     </form>
 
+    {% if not is_pdf %}
     <br><br>
         <div class="pagination" style="text-align: right;">
         {% if pagination > 1 %}
@@ -169,15 +171,17 @@
             <span class="disabled-button">Siguiente</span>
         {% endif %}
     </div>
+    {% endif %}
     
 </div>
 
+{% if not is_pdf %}
 <!-- Modal de confirmación -->
 <div id="confirmationValidationModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeConfirmationValidationModal()">&times;</span>
         <h2>¿Está seguro de Validar este Recibo de Cobranza?</h2>
-        <button class="validate-button" onclick="sendReceipt()">Sí</button>
+        <button class="validate-button" onclick="validateReceipt()">Sí</button>
         <button class="deny-button" onclick="closeConfirmationValidationModal()">No</button>
     </div>
 </div>
@@ -226,9 +230,10 @@
         <button class="deny-button" onclick="closeRejectionReasonModal()">Cancelar</button>
     </div>
 </div>
-
+{% endif %}
 {% endblock %}
 
+{% if not is_pdf %}
 {% block extra_js %}
 <script>
     // Modales de Confirmación:
@@ -276,8 +281,41 @@
         document.getElementById("rejectionReasonModal").style.display = "none";
     }
 
+    // Acción al Validar
+    function validateReceipt() {
+        closeConfirmationValidationModal();
+        openLoadingValidationModal();
 
-    // Acción al Validar (generar pdf)
+        const formData = new FormData(document.getElementById('pdfForm'));
+        const store_id = "{{ store[0] }}";
+        const customer_id = "{{ customer[0] }}";
+        //const receipt = "{{ receipts[ pagination - 1 ][0] }}";
+        formData.append('store_id', store_id);
+        formData.append('customer_id', customer_id);
+        //formData.append('receipt', receipt);
+        
+        // Enviar el HTML
+        fetch('/send_validateReceipt_email', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                closeLoadingValidationModal();
+                openFinalValidationModal();
+            } else {
+                alert('Error al enviar el correo de validación.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+
+        // Envía el formulario para generar el PDF
+        //document.getElementById('pdfForm').submit();
+    }
+
     document.getElementById('pdfForm').addEventListener('submit', function(event) {
         event.preventDefault();
 
@@ -336,7 +374,7 @@
         formData.append('customer', customer);
         formData.append('currency', currency);
 
-        fetch('/send_email', {
+        fetch('/send_rejectionReceipt_email', {
             method: 'POST',
             body: formData,
         })
@@ -346,7 +384,7 @@
                 closeLoadingRejectionModal();
                 openFinalRejectionModal()
             } else {
-                alert('Error al enviar el correo.');
+                alert('Error al enviar el correo de rechazo.');
             }
         })
         .catch(error => {
@@ -356,3 +394,4 @@
 
 </script>
 {% endblock %}
+{% endif %}

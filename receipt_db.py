@@ -25,7 +25,7 @@ def get_receiptStores():
 def get_receiptStore_by_id(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT ID, Name FROM Main.Store WHERE ID = %s', (store_id,))
+    cursor.execute('SELECT ID, Name, LogoPath FROM Main.Store WHERE ID = %s', (store_id,))
     store = cursor.fetchone()
     conn.close()
     return store
@@ -116,10 +116,10 @@ def get_commissionsRules():
 def get_invoices_by_customer(customer_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.Balance, C.Description
+    cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.PaidAmount, C.Description
                    FROM CommissionReceipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = %s AND D.Amount-D.Balance > 0
+                   WHERE CustomerID = %s AND D.Amount-D.PaidAmount > 0
                    ORDER BY D.N_CTA''',
                    (customer_id,))
     invoices = cursor.fetchall()
@@ -145,7 +145,7 @@ def get_receiptsInfo(account_ids):
     account_ids_tuple = tuple(account_ids)
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT D.N_CTA, D.Amount, D.DueDate, D.DueDate, D.Balance, D.AccountID
+    cursor.execute('''SELECT D.N_CTA, D.Amount, D.DueDate, D.DueDate, D.PaidAmount, D.AccountID
                    FROM CommissionReceipt.DebtAccount D
                    WHERE AccountID IN %s
                    ORDER BY D.DueDate''',
@@ -189,7 +189,7 @@ def get_unvalidated_receipts_by_customer(customer_id):
 def get_invoices_by_receipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(D.N_CTA), D.Amount, D.DueDate, D.DueDate, D.Balance, D.AccountID, C.Description
+    cursor.execute('''SELECT DISTINCT(D.N_CTA), D.Amount, D.DueDate, D.DueDate, D.PaidAmount, D.AccountID, C.Description
                     FROM CommissionReceipt.DebtAccount D
                     JOIN CommissionReceipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID
                     JOIN Main.Currency C ON D.CurrencyID = C.ID
@@ -268,12 +268,12 @@ def set_commissionsRules(rules):
     conn.close()
 
 
-def set_paymentReceipt(cursor, balance_note, commission_note):
+def set_paymentReceipt(cursor, total_receipt_amount, commission_note):
     cursor.execute('''
                    INSERT INTO CommissionReceipt.PaymentReceipt
                    (Amount, CommissionAmount, IsValidated, FilePath, isRetail)
                    VALUES (%s, %s, %s, %s, %s)
-                   ''', (balance_note, commission_note, 0, '', 0))
+                   ''', (total_receipt_amount, commission_note, 0, '', 0))
 
     #Obtención del ReceiptID generado
     cursor.execute("SELECT SCOPE_IDENTITY()")
@@ -332,12 +332,12 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index, acce
     return saved_file_urls
 
 
-def set_invoiceBalance(cursor, account_id, new_balance):
+def set_invoicePaidAmount(cursor, account_id, new_paidAmount):
     cursor.execute('''
                    UPDATE CommissionReceipt.DebtAccount
-                   SET Balance = %s
+                   SET PaidAmount = %s
                    WHERE AccountID = %s
-                   ''', (new_balance, account_id))
+                   ''', (new_paidAmount, account_id))
     
 
 def set_DebtPaymentRelation(cursor, account_id, receipt_id):
