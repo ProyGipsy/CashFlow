@@ -34,7 +34,7 @@
         <div class="company-sellers" id="sellers-{{ store[0] }}" style="display: none;">
             {% for customer in customers_by_store[store[0]] %}
             <p>{{ customer[0] }} | {{ customer[1] }}{{ customer[2] }}
-                <a href="javascript:void(0)" onclick="openModal('{{ customer[0] }}', '{{ customer[1]}}', '{{ customer[2]}}', '{{ store[1] }}')">Registrar Cobranza</a>
+                <a href="javascript:void(0)" onclick="openModal('{{ customer[0] }}', '{{ customer[1]}}', '{{ customer[2]}}', '{{ store[0] }}', '{{ store[1] }}')">Registrar Cobranza</a>
             </p>
             {% endfor %}
         </div>
@@ -112,7 +112,7 @@
      });
 
     /*Listado de Facturas*/
-    function openModal(customerId, customerName, customerLastName, storeName) {
+    function openModal(customerId, customerName, customerLastName, storeId, storeName) {
 
         const modal = document.getElementById("modal");
         modal.style.display = "block";
@@ -140,7 +140,7 @@
         const tableBody = table.querySelector("tbody");
         tableBody.innerHTML = "";
 
-        fetch(`/get_invoices/${customerId}`)
+        fetch(`/get_invoices/${customerId}/${storeId}`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error("Error al obtener las facturas");

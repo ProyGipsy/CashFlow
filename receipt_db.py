@@ -113,15 +113,15 @@ def get_commissionsRules():
     conn.close()
     return rules
 
-def get_invoices_by_customer(customer_id):
+def get_invoices_by_customer(customer_id, store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.PaidAmount, C.Description
                    FROM CommissionReceipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = %s AND D.Amount-D.PaidAmount > 0
+                   WHERE CustomerID = %s AND StoreID = %s AND D.Amount-D.PaidAmount > 0
                    ORDER BY D.N_CTA''',
-                   (customer_id,))
+                   (customer_id, store_id))
     invoices = cursor.fetchall()
     conn.close()
     return invoices

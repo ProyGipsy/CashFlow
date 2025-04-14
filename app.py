@@ -231,9 +231,9 @@ def accountsReceivable():
     customers_by_store = {store[0]: get_customers(store[0]) for store in stores}
     return render_template('receipt.accountsReceivable.html', page='accountsReceivable', active_page='accountsReceivable', stores=stores, customers_by_store=customers_by_store)
 
-@app.route('/get_invoices/<customer_id>')
-def get_invoices(customer_id):
-    invoices = get_invoices_by_customer(customer_id)
+@app.route('/get_invoices/<customer_id>/<store_id>')
+def get_invoices(customer_id, store_id):
+    invoices = get_invoices_by_customer(customer_id, store_id)
     # Formatear datos para JSON
     formatted_invoices = [
         {
