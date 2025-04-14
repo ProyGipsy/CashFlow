@@ -8,24 +8,6 @@
 
 {% block content %}
 
-<div class="header">
-    {% if is_pdf %}
-    <!-- Membrete solo para PDF -->
-    <div class="logo-left">
-        <img src="{{ url_for('static', filename='IMG/Gipsy_isotipo_color.png') }}" alt="Logo Cobranza">
-    </div>
-    <div class="header-text">
-        <h1>Reporte de Cobranza Gipsy Corp</h1>
-        <p><strong>{{ storeName }}</strong></p>
-        <p><strong>{{ customerName }}</strong></p>
-    </div>
-    <div class="logo-right">
-        <img src="{{ url_for('static', filename=store[2]) }}" alt="Logo Store">
-    </div>
-    {% endif %}
-</div>
-
-
 <div class="content">
     {% if not is_pdf %}
     <div class="title-container">
@@ -123,28 +105,30 @@
             <span id="saldo_nota" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][2]) }}</span>  
         </div> 
     
+        {% if not is_pdf %}
         <br><br><br>
         <div class="file-upload-container">
             <label>Comprobante(s):</label><br><br>
-            {% if paymentEntries %}
-                {% for paymentEntry in paymentEntries %}
-                    {% set file_path = paymentEntry[7] %}
-                    {% set relative_path = file_path.replace('static/', '') %}
-                    {% if file_path.endswith('.jpeg') or file_path.endswith('.jpg') or file_path.endswith('.png') %}
-                        <a href="{{ url_for('static', filename=relative_path) }}" target="_blank">
-                            <img src="{{ url_for('static', filename=relative_path) }}" alt="Comprobante" title="Click para ampliar">
-                        </a>
-                    {% elif file_path.endswith('.pdf') %}
-                        <a class="pdf-link" href="{{ url_for('static', filename=relative_path) }}" target="_blank">
-                            <img class="pdf-icon" src="{{ url_for('static', filename='IMG/pdf_icon.png') }}" alt="PDF" title="Ver PDF">
-                            <span class="pdf-filename">{{ relative_path.split('/')[-1] }}</span>
-                        </a>
-                    {% endif %}
-                {% endfor %}
-            {% else %}
-                <p>No hay comprobantes disponibles.</p>
-            {% endif %}
+                {% if paymentEntries %}
+                    {% for paymentEntry in paymentEntries %}
+                        {% set file_path = paymentEntry[7] %}
+                        {% set relative_path = file_path.replace('static/', '') %}
+                        {% if file_path.endswith('.jpeg') or file_path.endswith('.jpg') or file_path.endswith('.png') %}
+                            <a href="{{ url_for('static', filename=relative_path) }}" target="_blank">
+                                <img src="{{ url_for('static', filename=relative_path) }}" alt="Comprobante" title="Click para ampliar">
+                            </a>
+                        {% elif file_path.endswith('.pdf') %}
+                            <a class="pdf-link" href="{{ url_for('static', filename=relative_path) }}" target="_blank">
+                                <img class="pdf-icon" src="{{ url_for('static', filename='IMG/pdf_icon.png') }}" alt="PDF" title="Ver PDF">
+                                <span class="pdf-filename">{{ relative_path.split('/')[-1] }}</span>
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <p>No hay comprobantes disponibles.</p>
+                {% endif %}
         </div>
+        {% endif %}
     
         {% if not is_pdf %}
         <br><br><br><br>

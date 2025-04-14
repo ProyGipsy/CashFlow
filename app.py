@@ -18,7 +18,8 @@ from receipt_db import (get_db_connection,
     get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer, get_bankAccounts, get_commissions, get_customer_by_id,
     get_customers_with_unvalidated_receipts, get_count_customers_with_unvalidated_receipts, get_unvalidated_receipts_by_customer,
     get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission, get_SalesRepCommission,
-    set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoicePaidAmount, set_DebtPaymentRelation)
+    set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoicePaidAmount, set_DebtPaymentRelation,
+    set_isValidatedReceipt)
 
 app = Flask(__name__)
 
@@ -26,7 +27,7 @@ app = Flask(__name__)
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')
 app.config['MAIL_PORT'] = os.environ.get('MAIL_PORT')
 app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_2')
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_1')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 mail = Mail(app)
 
@@ -472,37 +473,33 @@ def send_rejectionEmail():
 
 @app.route('/send_validateReceipt_email', methods=['POST'])
 def send_validationEmail():
+
+    # Datos iniciales para la interfaz
     store_id = request.form.get('store_id', '')
     customer_id = request.form.get('customer_id', '')
-    print("customer_id: ", customer_id)
-    print("store_id: ", store_id)
-
-    # Obtén los datos necesarios
     receipts_per_page = 1
     receipts = get_unvalidated_receipts_by_customer(customer_id)
     store = get_receiptStore_by_id(store_id)
     customer = get_customer_by_id(customer_id)
-
-    # Paginación
+    store_name = store[1] if store else ''
+    customer_name = f"{customer[1]} {customer[2]}" if customer else ''
     total_receipts = len(receipts)
-    print("total__receipts: ", total_receipts)
     paginated_receipts = receipts[:receipts_per_page]
-    print("paginated_receipt: ", paginated_receipts)
-
-    # Obtención de receipt_id, facturas y formas de pago
-    print("paginated_receipts[0][0]: ", paginated_receipts[0][0])
     receipt_id = paginated_receipts[0][0]
-
     invoices = get_invoices_by_receipt(receipt_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
     salesRepComm = get_SalesRepCommission(receipt_id)
 
+    # Validar Recibo de Pago
+    set_isValidatedReceipt(receipt_id)
+    
+    # Logo Store (dinámico desde store[2])
+    logo_store_path = store[2] if store and len(store) > 2 else None
+    logo_store_cid = 'logo_store' if logo_store_path else None 
+
     # Renderizar el HTML
     html_content = render_template('receipt.receiptDetails.html',
                                  is_pdf=True,   # Tomar sólo la info destinada al pdf
-                                 #images=images_base64,
-                                 #logo_color=logo_color_base64,
-                                 #store_logo=store_logo_base64,
                                  page='receiptDetails',
                                  active_page='receipts',
                                  customer_id=customer_id,
@@ -532,11 +529,12 @@ def send_validationEmail():
 
                     .header {{
                         display: flex;
-                        justify-content: space-between;
+                        justify-content: center;
                         align-items: center;
                         margin-bottom: 20px;
                         border-bottom: 2px solid black;
                         padding-bottom: 10px;
+                        position: relative;
                     }}
 
                     .header img {{
@@ -544,8 +542,25 @@ def send_validationEmail():
                         filter: grayscale(100%);
                     }}
 
+                    .logo-left {{
+                        position: absolute;
+                        left: 0;
+                    }}
+
+                    .logo-right {{
+                        position: absolute;
+                        right: 0;
+                    }}
+
+                    .logo-right img {{
+                        max-height: 100px;
+                        filter: grayscale(100%);
+                    }}
+
                     .header-text {{
                         text-align: center;
+                        margin: 0 auto;
+                        max-width: 60%;
                     }}
 
                     .header-text h1, h3 {{
@@ -618,7 +633,29 @@ def send_validationEmail():
                 </style>
             </head>
             <body>
-            {html_content}
+                <div class="header">
+                    <div class="logo-left">
+                        <img src="cid:Gipsy_isotipo_color.png" alt="Logo Cobranza">
+                    </div>
+                    <div class="header-text">
+                        <h1>Reporte de Cobranza Gipsy Corp</h1>
+                        <p><strong>{store_name}</strong></p>
+                        <p><strong>{customer_name}</strong></p>
+                    </div>
+                    <div class="logo-right">
+                        {f'<img src="cid:logo_store" alt="Logo Store">' if logo_store_path else ''}
+                    </div>
+                </div>
+                {html_content}
+                <br>
+                <p>Se anexan los comprobantes de pago del recibo.</p>
+                <p>Atentamente,</p>
+                <p style="color: #666; font-style: italic;">
+                    GIPSY<br>
+                    Avenida Francisco de Miranda, Centro Lido, Torre A, Piso 9, Oficina 93<br>
+                    Zona industrial Guayaba, Av. Pual. Guayabal, galpón 45, Guarenas<br>
+                    One Turnberry Place, 19495 Biscayne Blvd. #609 Aventura FL 33180 United States of America
+                </p>
             </body>
             </html>
             """
@@ -629,11 +666,51 @@ def send_validationEmail():
                   recipients=['proyectogipsy@gmail.com'])
     
     msg.html = html_body
-    print("msg.html: \n", msg.html)
-    
-    mail.send(msg)
 
-    return jsonify({'success': True})
+    # Adjuntar logo Gipsy (fijo)
+    with app.open_resource('static/IMG/Gipsy_isotipo_color.png') as logo:
+        msg.attach(
+            filename='Gipsy_isotipo_color.png',
+            content_type='image/png',
+            data=logo.read(),
+            disposition='inline',
+            headers={'Content-ID': '<Gipsy_isotipo_color.png>'}
+        )
+
+    # Adjuntar logo Store (dinámico)
+    if logo_store_path:
+        logo_store_full_path = f'static/{logo_store_path}'
+
+        with app.open_resource(logo_store_full_path) as store_logo:
+            msg.attach(
+                filename=logo_store_path.split('/')[-1], 
+                content_type='image/png',
+                data=store_logo.read(),
+                disposition='inline',
+                headers={'Content-ID': '<logo_store>'}
+            )
+
+    # Adjuntar comprobantes de pago
+    for paymentEntry in paymentEntries:
+        if len(paymentEntry) > 7: 
+            file_path = paymentEntry[7]
+            relative_path = file_path.replace('static/', '')
+            full_path = os.path.join(app.static_folder, relative_path)
+                
+            if os.path.exists(full_path):
+                filename = os.path.basename(full_path)
+                mime_type = "application/pdf" if filename.lower().endswith('.pdf') else "image/jpeg"
+                    
+                with open(full_path, 'rb') as f:
+                    msg.attach(filename, mime_type, f.read())
+
+    # Envío del correo
+    try:
+        mail.send(msg)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error enviando correo: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 
 

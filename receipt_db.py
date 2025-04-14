@@ -357,3 +357,14 @@ def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_
                     (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CommissionAmount, CreatedAt, ReceiptID)
                     VALUES (%s, %s, %s, %s, %s, %s, GETDATE(), %s)
                     ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id))
+    
+def set_isValidatedReceipt(receipt_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+                   UPDATE CommissionReceipt.PaymentReceipt
+                   SET IsValidated = 1
+                   WHERE ReceiptID = %s
+                   ''', (receipt_id))
+    conn.commit()
+    conn.close()

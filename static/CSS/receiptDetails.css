@@ -73,17 +73,20 @@
     font-size: 1em;
 }
 
-/*.pdf-icon está incrustado en el HTML*/
-.pdf-icon {
-    width: 50px !important;
-    height: auto !important;
-}
-
 .pdf-link {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     text-decoration: none;
     font-weight: normal;
+    align-content: center;
+    justify-content: center;
+    flex-wrap: nowrap;
+    flex-direction: column;
+}
+
+.pdf-icon {
+    width: 80px !important;
+    height: auto !important;
 }
 
 .pdf-filename {
