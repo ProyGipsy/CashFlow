@@ -273,10 +273,14 @@
         const formData = new FormData(document.getElementById('pdfForm'));
         const store_id = "{{ store[0] }}";
         const customer_id = "{{ customer[0] }}";
-        //const receipt = "{{ receipts[ pagination - 1 ][0] }}";
+        const pagination = "{{ pagination }}"
+        const receipt_id = "{{ receipts[ pagination - 1 ][0] }} "
         formData.append('store_id', store_id);
         formData.append('customer_id', customer_id);
-        //formData.append('receipt', receipt);
+        formData.append('pagination', pagination);
+        formData.append('receipt_id', receipt_id);
+        console.log("pagination: ", pagination);
+        console.log("receipt_id", receipt_id);
         
         // Enviar el HTML
         fetch('/send_validateReceipt_email', {

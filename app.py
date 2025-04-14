@@ -191,6 +191,7 @@ def receiptDetails(customer_id, store_id, pagination=1):
     paginated_receipts = receipts[start:end]
 
     # Obtención de receipt_id, facturas y formas de pago por página
+    print("en receiptDetailespaginated_receipts[0][0]", paginated_receipts[0][0])
     receipt_id = paginated_receipts[0][0]
     invoices = get_invoices_by_receipt(receipt_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
@@ -477,6 +478,9 @@ def send_validationEmail():
     # Datos iniciales para la interfaz
     store_id = request.form.get('store_id', '')
     customer_id = request.form.get('customer_id', '')
+    pagination = int(request.form.get('pagination', ''))
+    receipt_id = int(request.form.get('receipt_id', ''))
+
     receipts_per_page = 1
     receipts = get_unvalidated_receipts_by_customer(customer_id)
     store = get_receiptStore_by_id(store_id)
@@ -484,8 +488,6 @@ def send_validationEmail():
     store_name = store[1] if store else ''
     customer_name = f"{customer[1]} {customer[2]}" if customer else ''
     total_receipts = len(receipts)
-    paginated_receipts = receipts[:receipts_per_page]
-    receipt_id = paginated_receipts[0][0]
     invoices = get_invoices_by_receipt(receipt_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
     salesRepComm = get_SalesRepCommission(receipt_id)
@@ -510,7 +512,7 @@ def send_validationEmail():
                                  invoices=invoices,
                                  paymentEntries=paymentEntries,
                                  salesRepComm=salesRepComm,
-                                 pagination=1,  # Siempre 1 = Sólo el recibo en cuestión
+                                 pagination=pagination,
                                  total_receipts=total_receipts,
                                  receipts_per_page=receipts_per_page)
     
