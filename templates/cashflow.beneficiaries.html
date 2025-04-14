@@ -180,8 +180,40 @@
     }
 
     function saveChanges() {
-        document.getElementById('loadingModal').style.display = 'flex';
+
+        // Verificación de campos en blanco
         const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
+        let hasEmptyBeneficiary = false;
+        let emptyBeneficiaries = [];
+        
+        for (let row of table.rows) {
+            const nameInput = row.cells[1].querySelector('input');
+            let beneficiaryName = '';
+            
+            if (nameInput) {
+                beneficiaryName = nameInput.value.trim();
+            } else {
+                beneficiaryName = row.cells[1].textContent.trim();
+            }
+            
+            if (beneficiaryName === '') {
+                hasEmptyBeneficiary = true;
+                const beneficiaryId = row.cells[0].textContent.trim();
+                emptyBeneficiaries.push(beneficiaryId);
+                row.style.backgroundColor = '#ffdddd';
+            } else {
+                row.style.backgroundColor = ''; // Quitar resaltado si estaba
+            }
+        }
+        
+        if (hasEmptyBeneficiary) {
+            document.getElementById('loadingModal').style.display = 'none';
+            alert("Hay beneficiarios con nombre en blanco. Por favor, complete todos los nombres antes de guardar.");
+            return;
+        }
+
+        // Proceso de guardado
+        document.getElementById('loadingModal').style.display = 'flex';
         const beneficiaries = [];
         
         

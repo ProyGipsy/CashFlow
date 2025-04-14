@@ -120,8 +120,8 @@ def get_operations():
     balance = 0
     operations_with_balance = []
     for operation in operations:
-        credit = operation[6]
-        debit = operation[7]
+        credit = operation[6] if operation[6] is not None else 0
+        debit = operation[7] if operation[7] is not None else 0
         balance += credit - debit
 
         formattedCredit = "{:,.2f}".format(credit).replace(".", "X").replace(",", ".").replace("X", ",")

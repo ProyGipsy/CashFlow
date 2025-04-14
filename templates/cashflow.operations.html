@@ -101,13 +101,13 @@
                         </td>
                         <td>
                             <select id="concept" name="concept" class="input-field"> 
-                                <option value="">Concepto</option> 
+                                <option value="" disabled selected>Concepto</option> 
                                 <!-- Los conceptos cargarán según el Movimiento seleccionado -->
                             </select>
                         </td>
                         <td>
                             <select id="store" name="store" class="input-field"> 
-                                <option value="">Compañía</option> 
+                                <option value="" disabled selected>Compañía</option> 
                                 {% for store in stores | sort(attribute=1)  %}
                                 <option value="{{ store[0] }}">{{ store[1] }}</option>
                                 {% endfor %}
@@ -115,7 +115,7 @@
                         </td>
                         <td>
                             <select id="beneficiary" name="beneficiary" class="input-field"> 
-                                <option value="">Beneficiario</option> 
+                                <option value="" disabled selected>Beneficiario</option> 
                                 {% for beneficiary in beneficiaries | sort(attribute=1)  %}
                                 <option value="{{ beneficiary[0] }}">{{ beneficiary[1] }}</option>
                                 {% endfor %}
@@ -213,7 +213,7 @@
         const conceptSelect = document.getElementById("concept");
         const tableHeader = document.getElementById("tableHeader");
 
-        conceptSelect.innerHTML = '<option value="">Concepto</option>';
+        conceptSelect.innerHTML = '<option value="" disabled selected>Concepto</option>';
 
         const conceptsToShow = motionType === "1" ? creditConcepts : debitConcepts;
 
@@ -268,8 +268,22 @@
         });
     }
 
+    function validateAmount() {
+        const amountField = document.getElementById("amount");
+        const amountValue = amountField.value;
+        if (!amountValue) {
+            alert("No se puede ingresar un monto vacío.");
+            amountField.focus();
+            event.preventDefault();
+            return false;
+        }
+        return true;
+    }
+
     function openConfirmationModal() {
-        document.getElementById("confirmationModal").style.display = "block";
+        if(validateAmount()){
+            document.getElementById("confirmationModal").style.display = "block";
+        }
     }
 
     function closeConfirmationModal() {
