@@ -62,7 +62,7 @@
             </tr>
             <tr class="payment-row">
                 <td>
-                    <select name="forma_pago" class="input-field" onchange="updateBankAccounts(this)"> 
+                    <select name="payment_method" class="input-field" onchange="updateBankAccounts(this)"> 
                         <option value="" disabled selected>Forma de Pago</option>
                         {% for t in tender | sort(attribute=1)  %}
                             <option value="{{ t[0] }}">{{t[1] }}</option>
@@ -620,8 +620,91 @@
 
     // Envío de Datos
 
+    function validatePaymentForms(){
+
+        //Limpieza de estilos previos
+        document.querySelectorAll('.error').forEach(el => {
+            el.classList.remove('error');
+        });
+        document.querySelectorAll('.payment-row').forEach(row => {
+            row.style.backgroundColor = '';
+        });
+        const uploadArea = document.querySelector('.upload-area');
+        if (uploadArea) {
+            uploadArea.style.border = '';
+            uploadArea.style.boxShadow = '';
+        }
+
+        // Validación
+        const paymentRows = document.querySelectorAll('.payment-row');
+        const proofOfPaymentInput = document.getElementById('proof_of_payment');
+        let isValid = true;
+        let emptyRows = [];
+        
+        paymentRows.forEach((row, index) => {
+            let rowHasError = false;
+            row.style.backgroundColor = '';
+
+            const paymentMethod = row.querySelector('select[name="payment_method"]');
+            if (!paymentMethod || !paymentMethod.value){
+                //alert(`Por favor seleccione una forma de pago en la fila ${index + 1}`);
+                rowHasError = true;
+                paymentMethod.classList.add('error');
+            }
+
+            const paymentDate = row.querySelector('input[name="date_operation"]');
+            if (!paymentDate || !paymentDate.value){
+                //alert(`Por favor seleccione una fecha de pago en la fila ${index + 1}`);
+                rowHasError = true;
+                paymentDate.classList.add('error');
+            }
+
+            const paymentAmount = row.querySelector('input[name="payment_amount"]');
+            if (!paymentAmount || parseFloat(paymentAmount.value) <= 0.00){
+                //alert(`Por favor ingrese un monto válido (mayor a 0) en la fila ${index + 1}`);
+                rowHasError = true;
+                paymentAmount.classList.add('error');
+            }
+
+            const paymentMade = row.querySelector('select[name="payment_made"]');
+            if (!paymentMade || !paymentMade.value){
+                //alert(`Por favor seleccione una cuenta bancaria en la fila ${index + 1}`);
+                rowHasError = true;
+                paymentMade.classList.add('error');
+            }
+
+            if (rowHasError) {
+                isValid = false;
+                emptyRows.push(index + 1); // Guardar número de fila (1-based)
+                row.style.backgroundColor = '#ffdddd'; // Resaltar fila completa
+            }
+        });
+
+        if (!proofOfPaymentInput || proofOfPaymentInput.files.length === 0){
+            isValid = false;
+        }
+
+        if (!isValid) {
+            let errorMessage = 'Por favor complete los siguientes campos:';
+            
+            if (emptyRows.length > 0) {
+                errorMessage += `\n- Fila(s) ${emptyRows.join(', ')}: Campos incompletos`;
+            }
+            
+            if (!proofOfPaymentInput || proofOfPaymentInput.files.length === 0) {
+                errorMessage += '\n- Comprobante(s) de pago: Debe cargar al menos uno';
+            }
+
+            alert(errorMessage);
+        }
+
+        return isValid;
+    }
+
     function openConfirmationModal() {
-        document.getElementById("confirmationModal").style.display = "block";
+        if(validatePaymentForms()){
+            document.getElementById("confirmationModal").style.display = "block";
+        }
     }
 
     function closeConfirmationModal() {
@@ -653,7 +736,7 @@
             const paymentDestinationId = row.querySelector('select[name="payment_made"]').value;
             const accountId = accountIds[index] ? accountIds[index].value : null;
 
-            const tenderId = row.querySelector('select[name="forma_pago"]').value;
+            const tenderId = row.querySelector('select[name="payment_method"]').value;
 
             const balanceAmount = parseFloat(document.querySelectorAll('#balance_calculation')[index].textContent);
             const commissionAmount = parseFloat(document.querySelectorAll('#commission_received')[index].textContent);

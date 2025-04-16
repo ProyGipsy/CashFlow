@@ -1,7 +1,6 @@
 import os
 import urllib.parse
 import json
-import base64
 
 from weasyprint import HTML
 from datetime import datetime
@@ -191,7 +190,6 @@ def receiptDetails(customer_id, store_id, pagination=1):
     paginated_receipts = receipts[start:end]
 
     # Obtención de receipt_id, facturas y formas de pago por página
-    print("en receiptDetailespaginated_receipts[0][0]", paginated_receipts[0][0])
     receipt_id = paginated_receipts[0][0]
     invoices = get_invoices_by_receipt(receipt_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)

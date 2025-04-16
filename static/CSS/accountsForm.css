@@ -307,3 +307,8 @@ input[type="submit"]:hover {
     border-radius: 5px;
     text-align: center;
 }
+
+.error {
+    border: 1px solid #ff0000 !important;
+    box-shadow: 0 0 3px rgba(255, 0, 0, 0.5);
+}
