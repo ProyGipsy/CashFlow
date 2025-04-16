@@ -1,7 +1,5 @@
 import os
-import requests
 from msal import ConfidentialClientApplication
-import json
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -41,20 +39,3 @@ def get_onedrive_headers():
         print(f"Token error: {result['error']}")
         print("Error details:", result.get("error_description", "No additional details"))
         raise Exception("No se pudo obtener el token de acceso")
-    
-    print("access_token:", access_token)
-
-
-"""
-headers = {
-    "Authorization": f"Bearer {access_token}",
-    "Content-Type": "application/json",
-}
-
-response = requests.get(
-    url = "https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/root:/Recibos de Cobranza:/children",
-    headers=headers,
-)
-
-print(json.dumps(response.json(), indent=4))
-"""
