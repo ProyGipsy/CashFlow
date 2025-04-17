@@ -2,7 +2,7 @@ import os
 import urllib.parse
 import json
 
-from weasyprint import HTML
+#from weasyprint import HTML
 from datetime import datetime
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response)
 from flask_mail import Mail, Message
@@ -18,7 +18,7 @@ from receipt_db import (get_db_connection,
     get_customers_with_unvalidated_receipts, get_count_customers_with_unvalidated_receipts, get_unvalidated_receipts_by_customer,
     get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission, get_SalesRepCommission,
     set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoicePaidAmount, set_DebtPaymentRelation,
-    set_isValidatedReceipt)
+    set_isValidatedReceipt, get_onedriveFiles)
 
 app = Flask(__name__)
 
@@ -193,8 +193,12 @@ def receiptDetails(customer_id, store_id, pagination=1):
     receipt_id = paginated_receipts[0][0]
     invoices = get_invoices_by_receipt(receipt_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
+    print("paymentEntries: ", paymentEntries)
     salesRepComm = get_SalesRepCommission(receipt_id)
 
+    # Obtención de comprobantes de pago desde OneDrive, actualización de paymentEntries
+    paymentEntries = get_onedriveFiles(paymentEntries)
+    print("paymentEntries: ", paymentEntries)
 
     return render_template('receipt.receiptDetails.html', 
                            page='receiptDetails', 

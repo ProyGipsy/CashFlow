@@ -1,7 +1,7 @@
 import os
 import pymssql
 from datetime import datetime
-#from werkzeug.utils import secure_filename
+from werkzeug.utils import secure_filename
 from onedrive import get_onedrive_headers
 import requests
 
@@ -236,6 +236,70 @@ def get_SalesRepCommission(receipt_id):
     salesRepComm = cursor.fetchall()
     conn.close()
     return salesRepComm
+
+"""
+def get_onedriveFiles(paymentEntries):
+    headers = get_onedrive_headers()
+    folder_path = "/Recibos de Cobranza/Comprobantes de Pago"
+    updated_entries = []
+    
+    for entry in paymentEntries:
+        if entry[7]:
+            filename = entry[7].split('/')[-1]
+            file_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/root:{folder_path}/{filename}"
+            print("file_url: ", file_url)
+
+            try:
+                response = requests.get(file_url, headers=headers)
+                if response.status_code == 200:
+                    file_data = response.json()
+                    updated_entry = list(entry)
+                    updated_entry[7] = file_data.get('webUrl')
+                    updated_entries.append(tuple(updated_entry))
+                else:
+                    print(f"Archivo no encontrado en OneDrive: {filename}")
+                    updated_entries.append(entry)
+            except Exception as e:
+                print(f"Error al obtener archivo {filename}: {str(e)}")
+                updated_entries.append(entry)
+    
+    return updated_entries
+"""
+def get_onedriveFiles(paymentEntries):
+    headers = get_onedrive_headers()
+    folder_path = "/Recibos de Cobranza/Comprobantes de Pago"
+    updated_entries = []
+    
+    for entry in paymentEntries:
+        if entry[7]:
+            filename = entry[7].split('/')[-1]
+            file_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/root:{folder_path}/{filename}"
+            print("file_url: ", file_url)
+
+            try:
+                response = requests.get(file_url, headers=headers)
+                if response.status_code == 200:
+                    file_data = response.json()
+                    updated_entry = list(entry)
+                    
+                    # Primero verificar si es imagen para usar embed URL
+                    if filename.lower().endswith(('.jpeg', '.jpg', '.png')):
+                        updated_entry[7] = f"https://onedrive.live.com/embed?resid={file_data['id']}"
+                        print("image url: ", updated_entry[7])
+                    else:
+                        # Para otros archivos usar webUrl
+                        updated_entry[7] = file_data.get('webUrl')
+                        print("pdf url: ", updated_entry[7])
+                    
+                    updated_entries.append(tuple(updated_entry))
+                else:
+                    print(f"Archivo no encontrado en OneDrive: {filename}")
+                    updated_entries.append(entry)
+            except Exception as e:
+                print(f"Error al obtener archivo {filename}: {str(e)}")
+                updated_entries.append(entry)
+    
+    return updated_entries
 
 
 # Escritura de datos en la BD a través de la Interfaz

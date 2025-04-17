@@ -161,7 +161,88 @@ function undoChanges() {
     }
 }
 
+function validateRules() {
+    const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
+    let hasEmptyFields = false;
+    let invalidRows = [];
+    
+    // Primero, resetear todos los estilos de error
+    for (let row of table.rows) {
+        row.style.backgroundColor = '';
+        for (let i = 0; i < 3; i++) { // Solo las primeras 3 celdas (nombre, días, %)
+            const cell = row.cells[i];
+            if (cell.querySelector('input')) {
+                cell.querySelector('input').classList.remove('error');
+            }
+        }
+    }
+    
+    // Luego validar cada fila
+    for (let row of table.rows) {
+        let rowHasError = false;
+        const rowId = row.getAttribute('data-id');
+        
+        // Validar nombre
+        const nameCell = row.cells[0];
+        let nameValue = '';
+        if (nameCell.querySelector('input')) {
+            nameValue = nameCell.querySelector('input').value.trim();
+            if (nameValue === '') {
+                nameCell.querySelector('input').classList.add('error');
+                rowHasError = true;
+            }
+        } else {
+            nameValue = nameCell.textContent.trim();
+        }
+        
+        // Validar días
+        const daysCell = row.cells[1];
+        let daysValue = '';
+        if (daysCell.querySelector('input')) {
+            daysValue = daysCell.querySelector('input').value.trim();
+            if (daysValue === '' || isNaN(daysValue)) {
+                daysCell.querySelector('input').classList.add('error');
+                rowHasError = true;
+            }
+        } else {
+            daysValue = daysCell.textContent.trim();
+        }
+        
+        // Validar porcentaje
+        const percentageCell = row.cells[2];
+        let percentageValue = '';
+        if (percentageCell.querySelector('input')) {
+            percentageValue = percentageCell.querySelector('input').value.trim();
+            if (percentageValue === '' || isNaN(percentageValue)) {
+                percentageCell.querySelector('input').classList.add('error');
+                rowHasError = true;
+            }
+        } else {
+            percentageValue = percentageCell.textContent.trim();
+        }
+        
+        if (rowHasError) {
+            hasEmptyFields = true;
+            invalidRows.push(rowId);
+            row.style.backgroundColor = '#ffdddd';
+        }
+    }
+    
+    if (hasEmptyFields) {
+        let errorMessage = 'Hay reglas de negocio con campos en blanco. Por favor, complete todos los campos antes de guardar.';
+        alert(errorMessage);
+        return false;
+    }
+    
+    return true;
+}
+
 function saveChanges() {
+
+    if (!validateRules()) {
+        return; // Detener si hay errores de validación
+    }
+
     document.getElementById('loadingModal').style.display = 'flex';
     const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
     const rules = [];

@@ -109,24 +109,24 @@
         <br><br><br>
         <div class="file-upload-container">
             <label>Comprobante(s):</label><br><br>
-                {% if paymentEntries %}
-                    {% for paymentEntry in paymentEntries %}
-                        {% set file_path = paymentEntry[7] %}
-                        {% set relative_path = file_path.replace('static/', '') %}
-                        {% if file_path.endswith('.jpeg') or file_path.endswith('.jpg') or file_path.endswith('.png') %}
-                            <a href="{{ url_for('static', filename=relative_path) }}" target="_blank">
-                                <img src="{{ url_for('static', filename=relative_path) }}" alt="Comprobante" title="Click para ampliar">
+            {% if paymentEntries %}
+                {% for paymentEntry in paymentEntries %}
+                    {% if paymentEntry[7] %}
+                        {% set file_url = paymentEntry[7] %}
+                        {% set filename = file_url.split('/')[-1] %}
+                        {% if filename.lower().endswith(('.jpeg', '.jpg', '.png')) %}
+                            <a href="{{ file_url }}" target="_blank">
+                                <img src="{{ file_url }}" alt="Comprobante" title="Click para ampliar">
                             </a>
-                        {% elif file_path.endswith('.pdf') %}
-                            <a class="pdf-link" href="{{ url_for('static', filename=relative_path) }}" target="_blank">
+                        {% elif filename.lower().endswith('.pdf') %}
+                            <a class="pdf-link" href="{{ file_url }}" target="_blank">
                                 <img class="pdf-icon" src="{{ url_for('static', filename='IMG/pdf_icon.png') }}" alt="PDF" title="Ver PDF">
-                                <span class="pdf-filename">{{ relative_path.split('/')[-1] }}</span>
+                                <span class="pdf-filename">{{ filename }}</span>
                             </a>
                         {% endif %}
-                    {% endfor %}
-                {% else %}
-                    <p>No hay comprobantes disponibles.</p>
-                {% endif %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
         </div>
         {% endif %}
     
@@ -279,8 +279,6 @@
         formData.append('customer_id', customer_id);
         formData.append('pagination', pagination);
         formData.append('receipt_id', receipt_id);
-        console.log("pagination: ", pagination);
-        console.log("receipt_id", receipt_id);
         
         // Enviar el HTML
         fetch('/send_validateReceipt_email', {
