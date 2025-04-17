@@ -660,14 +660,11 @@ def send_validationEmail():
 
     # Adjuntar comprobantes de pago (dinámico desde OneDrive)
     headers = get_onedrive_headers()
-    print("paymentEntries: ", paymentEntries)
     for paymentEntry in paymentEntries:
         file_info = paymentEntry[7]
         if file_info:
             file_url = file_info.get('url', '')
-            print("file_url: ", file_url)
             filename = file_info.get('name', '')
-            print("filename: ", filename)
             mime_type = "application/pdf" if filename.lower().endswith('.pdf') else "image/jpeg"
 
             try:
