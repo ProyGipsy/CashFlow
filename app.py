@@ -193,12 +193,10 @@ def receiptDetails(customer_id, store_id, pagination=1):
     receipt_id = paginated_receipts[0][0]
     invoices = get_invoices_by_receipt(receipt_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
-    print("paymentEntries: ", paymentEntries)
     salesRepComm = get_SalesRepCommission(receipt_id)
 
     # Obtención de comprobantes de pago desde OneDrive, actualización de paymentEntries
     paymentEntries = get_onedriveFiles(paymentEntries)
-    print("paymentEntries: ", paymentEntries)
 
     return render_template('receipt.receiptDetails.html', 
                            page='receiptDetails', 
