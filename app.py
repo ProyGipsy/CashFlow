@@ -1,6 +1,9 @@
 import os
 import urllib.parse
 import json
+from io import BytesIO
+import mimetypes
+import requests
 
 #from weasyprint import HTML
 from datetime import datetime
@@ -18,7 +21,9 @@ from receipt_db import (get_db_connection,
     get_customers_with_unvalidated_receipts, get_count_customers_with_unvalidated_receipts, get_unvalidated_receipts_by_customer,
     get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission, get_SalesRepCommission,
     set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoicePaidAmount, set_DebtPaymentRelation,
-    set_isValidatedReceipt, get_onedriveFiles)
+    set_isValidatedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo)
+
+from onedrive import get_onedrive_headers
 
 app = Flask(__name__)
 
@@ -196,7 +201,7 @@ def receiptDetails(customer_id, store_id, pagination=1):
     salesRepComm = get_SalesRepCommission(receipt_id)
 
     # Obtención de comprobantes de pago desde OneDrive, actualización de paymentEntries
-    paymentEntries = get_onedriveFiles(paymentEntries)
+    paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
 
     return render_template('receipt.receiptDetails.html', 
                            page='receiptDetails', 
@@ -361,53 +366,6 @@ def submit_receipt():
         conn.close()
 
 
-@app.route('/generate_pdf', methods=['POST'])
-def generate_pdf():
-    # Obtén los valores necesarios del formulario
-    customer_id = request.form.get('customer_id')
-    store_id = request.form.get('store_id')
-    pagination = int(request.form.get('pagination', 1))  # Usar 1 como valor predeterminado
-
-    # Obtener todos los recibos del cliente
-    receipts = get_unvalidated_receipts_by_customer(customer_id)
-
-    # Lógica para obtener el recibo actual
-    if not receipts:
-        return "No hay recibos disponibles para generar el PDF.", 400
-
-    # Asumiendo que hay al menos un recibo
-    receipt_id = receipts[pagination - 1][0]  # Obtener el recibo correspondiente a la paginación
-    invoices = get_invoices_by_receipt(receipt_id)
-    paymentEntries = get_paymentEntries_by_receipt(receipt_id)
-    salesRepComm = get_SalesRepCommission(receipt_id)
-
-    store = get_receiptStore_by_id(store_id)
-    customer = get_customer_by_id(customer_id)
-
-    # Renderiza el template HTML con los datos de la solicitud
-    rendered = render_template('receipt.receiptDetails.html', 
-                                is_pdf=True,
-                                storeName=store[1],
-                                customerName=customer[1],
-                                receipts=receipts,
-                                store=store,
-                                customer=customer,
-                                invoices=invoices,
-                                paymentEntries=paymentEntries,
-                                salesRepComm=salesRepComm,
-                                pagination=pagination)
-
-    # Convierte el HTML renderizado a PDF con WeasyPrint
-    pdf = HTML(string=rendered, base_url=request.host_url).write_pdf()
-
-    # Prepara la respuesta con el PDF generado
-    response = make_response(pdf)
-    response.headers['Content-Type'] = 'application/pdf'
-    filename = f'Cobranza_{store[1]}_{customer[1]}.pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
-
-    return response
-
 # Rechazo de Recibo de Pago
 @app.route('/send_rejectionReceipt_email', methods=['POST'])
 def send_rejectionEmail():
@@ -421,7 +379,6 @@ def send_rejectionEmail():
                   sender=app.config['MAIL_USERNAME'],
                   recipients=['proyectogipsy@gmail.com'])
 
-    # Crear el cuerpo del mensaje en HTML
     html_body = f"""
     <html>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -454,10 +411,8 @@ def send_rejectionEmail():
         </body>
     </html>
     """
-    
     msg.html = html_body
     
-    # Adjuntar la imagen como parte del contenido (no como adjunto)
     with app.open_resource('static/IMG/Gipsy_imagotipo_color.png') as logo:
         msg.attach(
             filename='Gipsy_imagotipo_color.png',
@@ -490,6 +445,7 @@ def send_validationEmail():
     total_receipts = len(receipts)
     invoices = get_invoices_by_receipt(receipt_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
+    paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
     salesRepComm = get_SalesRepCommission(receipt_id)
 
     # Validar Recibo de Pago
@@ -679,32 +635,51 @@ def send_validationEmail():
             headers={'Content-ID': '<Gipsy_isotipo_color.png>'}
         )
 
-    # Adjuntar logo Store (dinámico)
+    # Adjuntar logo Store (dinámico desde OneDrive)
     if logo_store_path:
-        logo_store_full_path = f'static/{logo_store_path}'
-
-        with app.open_resource(logo_store_full_path) as store_logo:
+        logo_content = get_onedriveStoreLogo(logo_store_path)
+        
+        if logo_content:
+            # Determinar el tipo MIME basado en la extensión del archivo
+            if logo_store_path.lower().endswith('.png'):
+                mime_type = 'image/png'
+            elif logo_store_path.lower().endswith('.jpg') or logo_store_path.lower().endswith('.jpeg'):
+                mime_type = 'image/jpeg'
+            else:
+                mime_type = 'application/octet-stream'  # Tipo genérico si no se reconoce
+                
             msg.attach(
-                filename=logo_store_path.split('/')[-1], 
-                content_type='image/png',
-                data=store_logo.read(),
+                filename=logo_store_path,
+                content_type=mime_type,
+                data=logo_content,
                 disposition='inline',
                 headers={'Content-ID': '<logo_store>'}
             )
+        else:
+            print(f"No se pudo obtener el logo {logo_store_path} desde OneDrive")
 
-    # Adjuntar comprobantes de pago
+    # Adjuntar comprobantes de pago (dinámico desde OneDrive)
+    headers = get_onedrive_headers()
+    print("paymentEntries: ", paymentEntries)
     for paymentEntry in paymentEntries:
-        if len(paymentEntry) > 7: 
-            file_path = paymentEntry[7]
-            relative_path = file_path.replace('static/', '')
-            full_path = os.path.join(app.static_folder, relative_path)
-                
-            if os.path.exists(full_path):
-                filename = os.path.basename(full_path)
-                mime_type = "application/pdf" if filename.lower().endswith('.pdf') else "image/jpeg"
+        file_info = paymentEntry[7]
+        if file_info:
+            file_url = file_info.get('url', '')
+            print("file_url: ", file_url)
+            filename = file_info.get('name', '')
+            print("filename: ", filename)
+            mime_type = "application/pdf" if filename.lower().endswith('.pdf') else "image/jpeg"
+
+            try:
+                response = requests.get(file_url, headers=headers)
+                if response.status_code == 200:
+                    file_content = response.content
                     
-                with open(full_path, 'rb') as f:
-                    msg.attach(filename, mime_type, f.read())
+                    msg.attach(filename, mime_type, file_content)
+                else:
+                    print(f"Error al descargar el archivo desde OneDrive: {response.status_code} - {response.text}")
+            except Exception as e:
+                print(f"Excepción al intentar descargar el archivo: {e}")
 
     # Envío del correo
     try:
@@ -713,6 +688,54 @@ def send_validationEmail():
     except Exception as e:
         print(f"Error enviando correo: {e}")
         return jsonify({'success': False, 'error': str(e)})
+    
+
+@app.route('/generate_pdf', methods=['POST'])
+def generate_pdf():
+    # Obtén los valores necesarios del formulario
+    customer_id = request.form.get('customer_id')
+    store_id = request.form.get('store_id')
+    pagination = int(request.form.get('pagination', 1))  # Usar 1 como valor predeterminado
+
+    # Obtener todos los recibos del cliente
+    receipts = get_unvalidated_receipts_by_customer(customer_id)
+
+    # Lógica para obtener el recibo actual
+    if not receipts:
+        return "No hay recibos disponibles para generar el PDF.", 400
+
+    # Asumiendo que hay al menos un recibo
+    receipt_id = receipts[pagination - 1][0]  # Obtener el recibo correspondiente a la paginación
+    invoices = get_invoices_by_receipt(receipt_id)
+    paymentEntries = get_paymentEntries_by_receipt(receipt_id)
+    salesRepComm = get_SalesRepCommission(receipt_id)
+
+    store = get_receiptStore_by_id(store_id)
+    customer = get_customer_by_id(customer_id)
+
+    # Renderiza el template HTML con los datos de la solicitud
+    rendered = render_template('receipt.receiptDetails.html', 
+                                is_pdf=True,
+                                storeName=store[1],
+                                customerName=customer[1],
+                                receipts=receipts,
+                                store=store,
+                                customer=customer,
+                                invoices=invoices,
+                                paymentEntries=paymentEntries,
+                                salesRepComm=salesRepComm,
+                                pagination=pagination)
+
+    # Convierte el HTML renderizado a PDF con WeasyPrint
+    pdf = HTML(string=rendered, base_url=request.host_url).write_pdf()
+
+    # Prepara la respuesta con el PDF generado
+    response = make_response(pdf)
+    response.headers['Content-Type'] = 'application/pdf'
+    filename = f'Cobranza_{store[1]}_{customer[1]}.pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+
+    return response
 
 
 

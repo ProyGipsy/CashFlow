@@ -4,6 +4,7 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 from onedrive import get_onedrive_headers
 import requests
+import tempfile
 
 def get_db_connection():
     server = os.environ.get('DB_SERVER')
@@ -238,7 +239,7 @@ def get_SalesRepCommission(receipt_id):
     return salesRepComm
 
 
-def get_onedriveFiles(paymentEntries):
+def get_onedriveProofsOfPayments(paymentEntries):
     headers = get_onedrive_headers()
     folder_path = "/Recibos de Cobranza/Comprobantes de Pago"
     updated_entries = []
@@ -264,12 +265,41 @@ def get_onedriveFiles(paymentEntries):
                     }
                     
                     updated_entries.append(tuple(updated_entry))
+                
                 else:
                     updated_entries.append(entry)
+            
             except Exception as e:
                 updated_entries.append(entry)
     
     return updated_entries
+
+
+def get_onedriveStoreLogo(logo_name):
+    headers = get_onedrive_headers()
+    folder_path = "/Recibos de Cobranza/Logos Stores"
+    file_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/root:{folder_path}/{logo_name}"
+
+    try:
+        # Verificar si el archivo existe y obtener metadata
+        response = requests.get(file_url, headers=headers)
+        if response.status_code == 200:
+            file_data = response.json()
+            file_id = file_data['id']
+            
+            download_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
+            response = requests.get(download_url, headers=headers, stream=True)
+            response.raise_for_status()
+            
+            return response.content
+        
+        else:
+            print(f"Logo no encontrado en OneDrive: {logo_name}")
+            return None
+    
+    except Exception as e:
+        print(f"Error al obtener logo {logo_name}: {str(e)}")
+        return None
 
 
 
