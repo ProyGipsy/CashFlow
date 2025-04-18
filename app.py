@@ -21,7 +21,7 @@ from receipt_db import (get_db_connection,
     get_customers_with_unvalidated_receipts, get_count_customers_with_unvalidated_receipts, get_unvalidated_receipts_by_customer,
     get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission, get_SalesRepCommission,
     set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoicePaidAmount, set_DebtPaymentRelation,
-    set_isValidatedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo)
+    set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo)
 
 from onedrive import get_onedrive_headers
 
@@ -369,11 +369,17 @@ def submit_receipt():
 # Rechazo de Recibo de Pago
 @app.route('/send_rejectionReceipt_email', methods=['POST'])
 def send_rejectionEmail():
+
+    receipt_id = int(request.form.get('receipt_id', ''))
+    set_isReviewedReceipt(receipt_id)
+
     rejection_reason = request.form.get('rejection_reason', '')
     rejection_reason_html = "<br>".join(line.strip() for line in rejection_reason.split('\n') if line.strip())
     store = request.form.get('store', '')
     customer = request.form.get('customer', '')
     currency = request.form.get('currency', '')
+    totalPaid = request.form.get('total_paid', '')
+    totalCommission = request.form.get('total_commission', '')
 
     msg = Message(subject='Rechazo de Recibo de Cobranza',
                   sender=app.config['MAIL_USERNAME'],
@@ -382,13 +388,15 @@ def send_rejectionEmail():
     html_body = f"""
     <html>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <p>El recibo de cobranza para:</p>
+            <p>El recibo de cobranza con los siguientes datos:</p>
 
             <ul style="list-style-type: disc; margin-left: 5px; padding-left: 5px;">
                 <li><strong>Empresa:</strong> {store}</li>
                 <li><strong>Cliente:</strong> {customer}</li>
                 <li><strong>Moneda:</strong> {currency}</li>
-            </ul>
+                <li><strong>Monto total:</strong> {totalPaid} {currency}</li>
+                <li><strong>Comisión a recibir:</strong> {totalCommission} {currency}</li>
+            </ul>          
             
             <p>ha sido rechazado por el siguiente motivo:</p>
             
@@ -449,7 +457,8 @@ def send_validationEmail():
     salesRepComm = get_SalesRepCommission(receipt_id)
 
     # Validar Recibo de Pago
-    set_isValidatedReceipt(receipt_id)
+    set_isReviewedReceipt(receipt_id)
+    set_isApprovedReceipt(receipt_id)
     
     # Logo Store (dinámico desde store[2])
     logo_store_path = store[2] if store and len(store) > 2 else None

@@ -78,8 +78,8 @@
             </table>
         </div> 
         <div class="inline-label">
-            <label for="saldo_nota">Monto total del Recibo:</label>
-            <span id="saldo_nota" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][1]) }}</span> 
+            <label for="total_paid">Monto total del Recibo:</label>
+            <span id="total_paid" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][1]) }}</span> 
         </div> 
 
         <br><br>
@@ -101,8 +101,8 @@
             {% endfor %}
         </table>
         <div class="inline-label">
-            <label for="saldo_nota">Comisión Total:</label>
-            <span id="saldo_nota" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][2]) }}</span>  
+            <label for="total_comm">Comisión Total:</label>
+            <span id="total_comm" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][2]) }}</span>  
         </div> 
     
         {% if not is_pdf %}
@@ -347,10 +347,13 @@
         closeRejectionReasonModal();
         openLoadingRejectionModal();
 
+        const receipt_id = "{{ receipts[ pagination - 1 ][0] }} "
         const reason = document.getElementById("rejectionReason").value;
         const store = "{{ store[1] }}";
         const customer = "{{ customer[1] }}" + " " + "{{ customer[2] }}";
         const currency = "{{ invoices[0][6] }}";
+        const totalPaid = '{{ "%.2f"|format(receipts[ pagination - 1 ][1]) }}';
+        const totalCommission = '{{ "%.2f"|format(receipts[ pagination - 1 ][2]) }}';
 
         if (!reason.trim()) {
             alert("Por favor, ingrese un motivo para el rechazo.");
@@ -358,10 +361,13 @@
         }
 
         const formData = new FormData(document.getElementById('pdfForm'));
+        formData.append('receipt_id', receipt_id);
         formData.append('rejection_reason', reason);
         formData.append('store', store);
         formData.append('customer', customer);
         formData.append('currency', currency);
+        formData.append('total_paid', totalPaid);
+        formData.append('total_commission', totalCommission);
 
         fetch('/send_rejectionReceipt_email', {
             method: 'POST',

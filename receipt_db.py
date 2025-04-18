@@ -79,7 +79,7 @@ def get_customers_with_unvalidated_receipts(store_id):
             JOIN CommissionReceipt.DebtAccount D ON C.ID = D.CustomerID
             JOIN CommissionReceipt.DebtPaymentRelation P ON D.AccountID = P.DebtAccountID
             JOIN CommissionReceipt.PaymentReceipt R ON P.PaymentReceiptID = R.ReceiptID
-            WHERE R.IsValidated = 0 AND D.StoreID = %s
+            WHERE R.IsReviewed = 0 AND D.StoreID = %s
             ''', (store_id,))
     customers = cursor.fetchall()
     conn.close()
@@ -94,7 +94,7 @@ def get_count_customers_with_unvalidated_receipts(store_id):
         JOIN CommissionReceipt.DebtAccount D ON C.ID = D.CustomerID
         JOIN CommissionReceipt.DebtPaymentRelation P ON D.AccountID = P.DebtAccountID
         JOIN CommissionReceipt.PaymentReceipt R ON P.PaymentReceiptID = R.ReceiptID
-        WHERE R.IsValidated = 0 AND D.StoreID = %s
+        WHERE R.IsReviewed = 0 AND D.StoreID = %s
     ''', (store_id,))
     customer_count = cursor.fetchone()[0]
     conn.close()
@@ -179,11 +179,11 @@ def get_commissions():
 def get_unvalidated_receipts_by_customer(customer_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(R.ReceiptID), R.Amount, R.CommissionAmount, R.IsValidated, R.FilePath
+    cursor.execute('''SELECT DISTINCT(R.ReceiptID), R.Amount, R.CommissionAmount, R.IsReviewed, R.FilePath
         FROM CommissionReceipt.PaymentReceipt R
         JOIN CommissionReceipt.DebtPaymentRelation P ON R.ReceiptID = P.PaymentReceiptID
         JOIN CommissionReceipt.DebtAccount D ON P.DebtAccountID = D.AccountID
-        WHERE R.IsValidated = 0 AND D.CustomerID = %s
+        WHERE R.IsReviewed = 0 AND D.CustomerID = %s
         ''', (customer_id,))
     receipts = cursor.fetchall()
     conn.close()
@@ -338,9 +338,9 @@ def set_commissionsRules(rules):
 def set_paymentReceipt(cursor, total_receipt_amount, commission_note):
     cursor.execute('''
                    INSERT INTO CommissionReceipt.PaymentReceipt
-                   (Amount, CommissionAmount, IsValidated, FilePath, isRetail)
+                   (Amount, CommissionAmount, IsReviewed, FilePath, isRetail, IsApproved)
                    VALUES (%s, %s, %s, %s, %s)
-                   ''', (total_receipt_amount, commission_note, 0, '', 0))
+                   ''', (total_receipt_amount, commission_note, 0, '', 0, 0))
 
     #Obtención del ReceiptID generado
     cursor.execute("SELECT SCOPE_IDENTITY()")
@@ -422,12 +422,24 @@ def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_
                     VALUES (%s, %s, %s, %s, %s, %s, GETDATE(), %s)
                     ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id))
     
-def set_isValidatedReceipt(receipt_id):
+
+def set_isReviewedReceipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
                    UPDATE CommissionReceipt.PaymentReceipt
-                   SET IsValidated = 1
+                   SET IsReviewed = 1
+                   WHERE ReceiptID = %s
+                   ''', (receipt_id))
+    conn.commit()
+    conn.close()
+
+def set_isApprovedReceipt(receipt_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+                   UPDATE CommissionReceipt.PaymentReceipt
+                   SET IsApproved = 1
                    WHERE ReceiptID = %s
                    ''', (receipt_id))
     conn.commit()
