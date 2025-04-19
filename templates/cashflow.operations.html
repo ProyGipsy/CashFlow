@@ -28,7 +28,7 @@
     </form>
     <br> 
 
-    <button class="add-operation" onclick="openModal_NewOperation()">Agregar operación</button>
+    <button class="add-operation" onclick="openModal_Operation()">Agregar operación</button>
     <br>
 
     <table class="styled-table" id="rules-table">
@@ -79,9 +79,9 @@
     <br>
 </div>
 
-<div id="modal-NewOperation" class="modal">
+<div id="modalOperation" class="modal">
     <div class="modal-content">
-        <span class="close" onclick="closeModal_NewOperation()">&times;</span>
+        <span class="close" onclick="closeModal_Operation()">&times;</span>
         <h2>Nueva Operación</h2>
         <form id="operationForm" action="{{ url_for('operations') }}" method="POST">
             <table class="modal-table">
@@ -132,84 +132,18 @@
                     </tr>
                 </tbody>
             </table>
-            <button class="save-button" type="submit" onclick="openconfirmationModal_NewOp()">Agregar Operación</button>
-        </form>
-    </div>
-</div>
-
-<div id="modal-EditOperation" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeModal_EditOperation()">&times;</span>
-        <h2>Editar Operación</h2>
-        <form id="operationForm" action="{{ url_for('operations') }}" method="POST">
-            <table class="modal-table">
-                <thead id="tableHeader">
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Movimiento</th>
-                        <th>Concepto</th>
-                        <th>Compañía</th>
-                        <th>Beneficiario</th>
-                        <th>Observación</th>
-                        <th>Monto</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><input type="date" id="date_operation" name="date_operation" class="input-field"></td>
-                        <td>
-                            <select id="motionType" class="input-field" onchange="filterConcepts()">
-                                <option value="1">Ingreso</option>
-                                <option value="2">Egreso</option>
-                            </select>
-                        </td>
-                        <td>
-                            <select id="concept" name="concept" class="input-field"> 
-                                <option value="" disabled selected>Concepto</option> 
-                                <!-- Los conceptos cargarán según el Movimiento seleccionado -->
-                            </select>
-                        </td>
-                        <td>
-                            <select id="store" name="store" class="input-field"> 
-                                <option value="" disabled selected>Compañía</option> 
-                                {% for store in stores | sort(attribute=1)  %}
-                                <option value="{{ store[0] }}">{{ store[1] }}</option>
-                                {% endfor %}
-                            </select>
-                        </td>
-                        <td>
-                            <select id="beneficiary" name="beneficiary" class="input-field"> 
-                                <option value="" disabled selected>Beneficiario</option> 
-                                {% for beneficiary in beneficiaries | sort(attribute=1)  %}
-                                <option value="{{ beneficiary[0] }}">{{ beneficiary[1] }}</option>
-                                {% endfor %}
-                            </select>
-                        </td>
-                        <td><input id="observation" name="observation" type="text" class="input-field" placeholder="Observación" /></td>
-                        <td><input type="number" id="amount" name="amount" step="0.01" class="input-field amount-field"></td>
-                    </tr>
-                </tbody>
-            </table>
-            <button class="save-button" type="submit" onclick="openconfirmationModal_EditOp()">Editar Operación</button>
+            <button class="save-button" type="submit" onclick="openconfirmationModal()">Agregar Operación</button>
         </form>
     </div>
 </div>
 
 <!-- Modal de confirmación -->
-<div id="confirmationModal_NewOp" class="modal">
+<div id="confirmationModal" class="modal">
     <div class="modal-content">
-        <span class="close" onclick="closeconfirmationModal_NewOp()">&times;</span>
+        <span class="close" onclick="closeconfirmationModal()">&times;</span>
         <h2>¿Está seguro de agregar esta operación?</h2>
         <button class="save-button" onclick="saveChanges()">Aceptar</button>
-        <button class="cancel-button" onclick="closeconfirmationModal_NewOp()">Cancelar</button>
-    </div>
-</div>
-<div id="confirmationModal_EditOp" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeconfirmationModal_NewOp()">&times;</span>
-        <h2>¿Está seguro de editar esta operación?</h2>
-        <button class="save-button" onclick="saveChanges()">Aceptar</button>
-        <button class="cancel-button" onclick="closeconfirmationModal_EditOp()">Cancelar</button>
+        <button class="cancel-button" onclick="closeconfirmationModal()">Cancelar</button>
     </div>
 </div>
 
@@ -249,16 +183,16 @@
         }
     }
 
-    function openModal_NewOperation() {
+    function openModal_Operation() {
         // Limpieza de posibles errores previos
         document.querySelectorAll('.error').forEach(el => {
             el.classList.remove('error');
         });
-        document.getElementById("modal-NewOperation").style.display = "block";
+        document.getElementById("modalOperation").style.display = "block";
     }
 
-    function closeModal_NewOperation() {
-        document.getElementById("modal-NewOperation").style.display = "none";
+    function closeModal_Operation() {
+        document.getElementById("modalOperation").style.display = "none";
     }
 
     // Función para no permitir operaciones futuras
@@ -314,7 +248,7 @@
     });
 
     function saveChanges() {
-        closeconfirmationModal_NewOp();
+        closeconfirmationModal();
         closeconfirmationModal_EditOp();
         document.getElementById('loadingModal').style.display = 'flex';
         const formData = new FormData(document.getElementById('operationForm'));
@@ -417,38 +351,20 @@
         return isValid;
     }
 
-    function openconfirmationModal_NewOp() {
+    function openconfirmationModal() {
         if(validateOperationForm()){
-            document.getElementById("confirmationModal_NewOp").style.display = "block";
+            document.getElementById("confirmationModal").style.display = "block";
         }
     }
 
-    function closeconfirmationModal_NewOp() {
-        document.getElementById("confirmationModal_NewOp").style.display = "none";
+    function closeconfirmationModal() {
+        document.getElementById("confirmationModal").style.display = "none";
     }
 
     // Edición de Operaciones
 
-    function openModal_EditOperation() {
-        document.getElementById("modal-EditOperation").style.display = "block";
-    }
-
-    function closeModal_EditOperation() {
-        document.getElementById("modal-EditOperation").style.display = "none";
-    }
-
-    function openconfirmationModal_EditOp() {
-        if(validateOperationForm()){
-            document.getElementById("confirmationModal_NewOp").style.display = "block";
-        }
-    }
-
-    function closeconfirmationModal_EditOp() {
-        document.getElementById("confirmationModal_NewOp").style.display = "none";
-    }
-
     function editRow() {
-        openModal_EditOperation();
+        openModal_Operation();
     }
 
 
