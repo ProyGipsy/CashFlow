@@ -118,13 +118,21 @@
     align-items: center;
 }
 
+.no-border {
+    border: none !important;
+}
+
+.styled-table td.no-border {
+    border: none !important;
+}
+
 /* Clases dinámicas */
 .header-ingreso {
-    background-color: #01CC00 !important; /* Verde para Ingreso */
+    background-color: #26dd26 !important;
 }
 
 .header-egreso {
-    background-color: #fc7b90 !important; /* Rojo para Egreso */
+    background-color: #fc7b90 !important;
 }
 
 .styled-table th, .styled-table td, .modal-table th, .modal-table td {
@@ -297,4 +305,9 @@
     padding: 20px;
     border-radius: 5px;
     text-align: center;
+}
+
+.error {
+    border: 1px solid #ff0000 !important;
+    box-shadow: 0 0 3px rgba(255, 0, 0, 0.5);
 }

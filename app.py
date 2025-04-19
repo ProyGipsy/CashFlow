@@ -5,6 +5,7 @@ from io import BytesIO
 import mimetypes
 import requests
 import base64
+from datetime import datetime
 
 #from weasyprint import HTML
 from werkzeug.utils import secure_filename
@@ -93,6 +94,13 @@ def operations():
     debitConcepts = get_debitConcepts()
     beneficiaries = get_beneficiaries()
 
+    current_yearMonth = datetime.now().strftime("%Y-%m")
+    processedOperations = []
+    for operation in operations:
+        operation_date = operation[1]
+        operation_yearMonth = operation_date.strftime("%Y-%m")
+        processedOperations.append(operation + (operation_yearMonth,))
+
     if request.method == 'POST':
         date_operation = request.form['date_operation']
         concept_id = request.form['concept']
@@ -108,12 +116,13 @@ def operations():
         'cashflow.operations.html',
         page='operations',
         active_page='operations',
-        operations=operations,
+        operations=processedOperations,
         concepts=concepts,
         creditConcepts=creditConcepts,
         debitConcepts=debitConcepts,
         stores=stores,
-        beneficiaries=beneficiaries
+        beneficiaries=beneficiaries,
+        current_yearMonth=current_yearMonth
     )
 
 @app.route('/beneficiaries', methods=['GET', 'POST'])

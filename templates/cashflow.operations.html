@@ -28,7 +28,7 @@
     </form>
     <br> 
 
-    <button class="add-operation" onclick="openModal()">Agregar operación</button>
+    <button class="add-operation" onclick="openModal_NewOperation()">Agregar operación</button>
     <br>
 
     <table class="styled-table" id="rules-table">
@@ -65,6 +65,12 @@
                     {% endif %}
                 </td>
                 <td>{{ operation[8] }}</td>
+                {% if operation[9] == current_yearMonth %}
+                <td class="no-border">
+                    <span class="edit-icon" onclick="editRow()">
+                    <img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar">
+                </td>
+                {% endif %}
             </tr>
             {% endfor %}
         </tbody> 
@@ -73,9 +79,9 @@
     <br>
 </div>
 
-<div id="modal" class="modal">
+<div id="modal-NewOperation" class="modal">
     <div class="modal-content">
-        <span class="close" onclick="closeModal()">&times;</span>
+        <span class="close" onclick="closeModal_NewOperation()">&times;</span>
         <h2>Nueva Operación</h2>
         <form id="operationForm" action="{{ url_for('operations') }}" method="POST">
             <table class="modal-table">
@@ -126,18 +132,84 @@
                     </tr>
                 </tbody>
             </table>
-            <button class="save-button" type="submit" onclick="openConfirmationModal()">Agregar Operación</button>
+            <button class="save-button" type="submit" onclick="openconfirmationModal_NewOp()">Agregar Operación</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-EditOperation" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal_EditOperation()">&times;</span>
+        <h2>Editar Operación</h2>
+        <form id="operationForm" action="{{ url_for('operations') }}" method="POST">
+            <table class="modal-table">
+                <thead id="tableHeader">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Movimiento</th>
+                        <th>Concepto</th>
+                        <th>Compañía</th>
+                        <th>Beneficiario</th>
+                        <th>Observación</th>
+                        <th>Monto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><input type="date" id="date_operation" name="date_operation" class="input-field"></td>
+                        <td>
+                            <select id="motionType" class="input-field" onchange="filterConcepts()">
+                                <option value="1">Ingreso</option>
+                                <option value="2">Egreso</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select id="concept" name="concept" class="input-field"> 
+                                <option value="" disabled selected>Concepto</option> 
+                                <!-- Los conceptos cargarán según el Movimiento seleccionado -->
+                            </select>
+                        </td>
+                        <td>
+                            <select id="store" name="store" class="input-field"> 
+                                <option value="" disabled selected>Compañía</option> 
+                                {% for store in stores | sort(attribute=1)  %}
+                                <option value="{{ store[0] }}">{{ store[1] }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td>
+                            <select id="beneficiary" name="beneficiary" class="input-field"> 
+                                <option value="" disabled selected>Beneficiario</option> 
+                                {% for beneficiary in beneficiaries | sort(attribute=1)  %}
+                                <option value="{{ beneficiary[0] }}">{{ beneficiary[1] }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input id="observation" name="observation" type="text" class="input-field" placeholder="Observación" /></td>
+                        <td><input type="number" id="amount" name="amount" step="0.01" class="input-field amount-field"></td>
+                    </tr>
+                </tbody>
+            </table>
+            <button class="save-button" type="submit" onclick="openconfirmationModal_EditOp()">Editar Operación</button>
         </form>
     </div>
 </div>
 
 <!-- Modal de confirmación -->
-<div id="confirmationModal" class="modal">
+<div id="confirmationModal_NewOp" class="modal">
     <div class="modal-content">
-        <span class="close" onclick="closeConfirmationModal()">&times;</span>
+        <span class="close" onclick="closeconfirmationModal_NewOp()">&times;</span>
         <h2>¿Está seguro de agregar esta operación?</h2>
         <button class="save-button" onclick="saveChanges()">Aceptar</button>
-        <button class="cancel-button" onclick="closeConfirmationModal()">Cancelar</button>
+        <button class="cancel-button" onclick="closeconfirmationModal_NewOp()">Cancelar</button>
+    </div>
+</div>
+<div id="confirmationModal_EditOp" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeconfirmationModal_NewOp()">&times;</span>
+        <h2>¿Está seguro de editar esta operación?</h2>
+        <button class="save-button" onclick="saveChanges()">Aceptar</button>
+        <button class="cancel-button" onclick="closeconfirmationModal_EditOp()">Cancelar</button>
     </div>
 </div>
 
@@ -177,12 +249,16 @@
         }
     }
 
-    function openModal() {
-        document.getElementById("modal").style.display = "block";
+    function openModal_NewOperation() {
+        // Limpieza de posibles errores previos
+        document.querySelectorAll('.error').forEach(el => {
+            el.classList.remove('error');
+        });
+        document.getElementById("modal-NewOperation").style.display = "block";
     }
 
-    function closeModal() {
-        document.getElementById("modal").style.display = "none";
+    function closeModal_NewOperation() {
+        document.getElementById("modal-NewOperation").style.display = "none";
     }
 
     // Función para no permitir operaciones futuras
@@ -226,9 +302,9 @@
 
         tableHeader.classList.remove("header-ingreso", "header-egreso");
         if (motionType === "1") {
-            tableHeader.classList.add("header-ingreso"); // Verde para Ingreso
+            tableHeader.classList.add("header-ingreso"); // Verde claro para Ingreso
         } else {
-            tableHeader.classList.add("header-egreso"); // Rojo para Egreso
+            tableHeader.classList.add("header-egreso"); // Rojo claro para Egreso
         }
     }
 
@@ -238,7 +314,8 @@
     });
 
     function saveChanges() {
-        closeConfirmationModal();
+        closeconfirmationModal_NewOp();
+        closeconfirmationModal_EditOp();
         document.getElementById('loadingModal').style.display = 'flex';
         const formData = new FormData(document.getElementById('operationForm'));
         const saveButton = document.querySelector('.save-button');
@@ -268,27 +345,113 @@
         });
     }
 
-    function validateAmount() {
+    function validateOperationForm() {
+        // Limpieza de errores previos
+        document.querySelectorAll('.error').forEach(el => {
+            el.classList.remove('error');
+        });
+
+        let isValid = true;
+        const errorFields = [];
+
+        const dateField = document.getElementById("date_operation");
+        if (!dateField.value) {
+            errorFields.push("Fecha de operación");
+            dateField.classList.add('error');
+            isValid = false;
+        }
+
+        const motionTypeField = document.getElementById("motionType");
+        if (!motionTypeField.value) {
+            errorFields.push("Tipo de movimiento");
+            motionTypeField.classList.add('error');
+            isValid = false;
+        }
+
+        const conceptField = document.getElementById("concept");
+        if (!conceptField.value || conceptField.value === "") {
+            errorFields.push("Concepto");
+            conceptField.classList.add('error');
+            isValid = false;
+        }
+
+        const storeField = document.getElementById("store");
+        if (!storeField.value || storeField.value === "") {
+            errorFields.push("Compañía");
+            storeField.classList.add('error');
+            isValid = false;
+        }
+
+        const beneficiaryField = document.getElementById("beneficiary");
+        if (!beneficiaryField.value || beneficiaryField.value === "") {
+            errorFields.push("Beneficiario");
+            beneficiaryField.classList.add('error');
+            isValid = false;
+        }
+
         const amountField = document.getElementById("amount");
-        const amountValue = amountField.value;
-        if (!amountValue) {
-            alert("No se puede ingresar un monto vacío.");
-            amountField.focus();
+        if (!amountField.value) {
+            errorFields.push("Monto");
+            amountField.classList.add('error');
+            isValid = false;
+        } else if (parseFloat(amountField.value) <= 0) {
+            errorFields.push("Monto (debe ser mayor a 0)");
+            amountField.classList.add('error');
+            isValid = false;
+        }
+
+        if (!isValid) {
+            let errorMessage = "Por favor complete los siguientes campos correctamente:";
+            errorMessage += "\n\n- " + errorFields.join("\n- ");
+            
+            alert(errorMessage);
+            
+            const firstErrorField = document.querySelector('.error');
+            if (firstErrorField) {
+                firstErrorField.focus();
+            }
+            
             event.preventDefault();
-            return false;
         }
-        return true;
+
+        return isValid;
     }
 
-    function openConfirmationModal() {
-        if(validateAmount()){
-            document.getElementById("confirmationModal").style.display = "block";
+    function openconfirmationModal_NewOp() {
+        if(validateOperationForm()){
+            document.getElementById("confirmationModal_NewOp").style.display = "block";
         }
     }
 
-    function closeConfirmationModal() {
-        document.getElementById("confirmationModal").style.display = "none";
+    function closeconfirmationModal_NewOp() {
+        document.getElementById("confirmationModal_NewOp").style.display = "none";
     }
+
+    // Edición de Operaciones
+
+    function openModal_EditOperation() {
+        document.getElementById("modal-EditOperation").style.display = "block";
+    }
+
+    function closeModal_EditOperation() {
+        document.getElementById("modal-EditOperation").style.display = "none";
+    }
+
+    function openconfirmationModal_EditOp() {
+        if(validateOperationForm()){
+            document.getElementById("confirmationModal_NewOp").style.display = "block";
+        }
+    }
+
+    function closeconfirmationModal_EditOp() {
+        document.getElementById("confirmationModal_NewOp").style.display = "none";
+    }
+
+    function editRow() {
+        openModal_EditOperation();
+    }
+
+
 
 </script>
 {% endblock %}
