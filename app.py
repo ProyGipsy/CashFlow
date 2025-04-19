@@ -6,7 +6,7 @@ import mimetypes
 import requests
 import base64
 
-from weasyprint import HTML
+#from weasyprint import HTML
 from werkzeug.utils import secure_filename
 
 from datetime import datetime
@@ -465,8 +465,8 @@ def send_validationEmail():
     Si se valida el recibo aquí, al renderizar la interfaz para el PDF, no tendrá acceso a los campos.
     Al implementar el pdf en producción, realizar la validación luego de este último renderizado.
     """
-    #set_isReviewedReceipt(receipt_id)
-    #set_isApprovedReceipt(receipt_id)
+    set_isReviewedReceipt(receipt_id)
+    set_isApprovedReceipt(receipt_id)
     
     # Logo Store (dinámico desde store[2])
     logo_store_path = store[2] if store and len(store) > 2 else None

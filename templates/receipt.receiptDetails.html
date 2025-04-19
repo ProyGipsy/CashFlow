@@ -292,6 +292,7 @@
         .then(data => {
             if (data.success) {
                 // Formulario temporal para generate_pdf
+                /*
                 const pdfForm = document.createElement('form');
                 pdfForm.method = 'POST';
                 pdfForm.action = '/generate_pdf';
@@ -316,6 +317,7 @@
                 document.body.appendChild(pdfForm);
                 pdfForm.submit();
                 document.body.removeChild(pdfForm);
+                */
 
                 closeLoadingValidationModal();
                 openFinalValidationModal();
