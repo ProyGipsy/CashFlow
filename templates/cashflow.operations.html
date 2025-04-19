@@ -50,25 +50,26 @@
             <tr>
                 <td>{{ operation[0] }}</td>
                 <td>{{ operation[1] }}</td>
-                <td>{{ operation[2] }}</td>
                 <td>{{ operation[3] }}</td>
-                <td>{{ operation[4] }}</td>
                 <td>{{ operation[5] }}</td>
-                <td>
-                    {% if operation[6] != '0,00' %}
-                        {{ operation[6] }}
-                    {% endif %}
-                </td>
-                <td>
-                    {% if operation[7] != '0,00' %}
-                        {{ operation[7] }}
-                    {% endif %}
-                </td>
+                <td>{{ operation[7] }}</td>
                 <td>{{ operation[8] }}</td>
-                {% if operation[9] == current_yearMonth %}
+                <td>
+                    {% if operation[9] != '0,00' %}
+                        {{ operation[9] }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if operation[10] != '0,00' %}
+                        {{ operation[10] }}
+                    {% endif %}
+                </td>
+                <td>{{ operation[11] }}</td>
+                {% if operation[12] == current_yearMonth %}
                 <td class="no-border">
-                    <span class="edit-icon" onclick="editRow()">
-                    <img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar">
+                    <span class="edit-icon" onclick="openModal_Operation({{ operation[0] }}, '{{ operation[1] }}', '{{ operation[2] }}', '{{ operation[4] }}', '{{ operation[6] }}', '{{ operation[8] }}', {{ operation[9] | replace(',', '.') }}, {{ operation[10] | replace(',', '.') }})">
+                        <img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar">
+                    </span>
                 </td>
                 {% endif %}
             </tr>
@@ -84,6 +85,7 @@
         <span class="close" onclick="closeModal_Operation()">&times;</span>
         <h2>Nueva Operación</h2>
         <form id="operationForm" action="{{ url_for('operations') }}" method="POST">
+            <input type="hidden" id="operation_id" name="operation_id">
             <table class="modal-table">
                 <thead id="tableHeader">
                     <tr>
@@ -141,7 +143,7 @@
 <div id="confirmationModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeconfirmationModal()">&times;</span>
-        <h2>¿Está seguro de agregar esta operación?</h2>
+        <h2>¿Está seguro de guardar esta operación?</h2>
         <button class="save-button" onclick="saveChanges()">Aceptar</button>
         <button class="cancel-button" onclick="closeconfirmationModal()">Cancelar</button>
     </div>
@@ -183,12 +185,39 @@
         }
     }
 
-    function openModal_Operation() {
+    function openModal_Operation(operationID, operationDate='', storeName='', concept='', beneficiary='', observation='', credit, debit) {
         // Limpieza de posibles errores previos
         document.querySelectorAll('.error').forEach(el => {
             el.classList.remove('error');
         });
         document.getElementById("modalOperation").style.display = "block";
+
+        // Cambiar el título y el texto del botón
+        const modalTitle = document.querySelector('.modal-content h2');
+        const saveButton = document.querySelector('.save-button');
+
+        if (operationID) { // Edición de Operación
+            modalTitle.textContent = `Editar Operación ${operationID}`;
+            saveButton.textContent = "Guardar Cambios";
+            document.getElementById("operation_id").value = operationID;
+        } else { // Agregación de Operación
+            modalTitle.textContent = "Nueva Operación";
+            saveButton.textContent = "Agregar Operación";
+            document.getElementById("operation_id").value = '';
+        }
+
+        // Detección del tipo de movimiento
+        const motionType = credit > 0 ? "1" : "2";
+        document.getElementById("motionType").value = motionType;
+        filterConcepts();
+
+        // Llenado de campos del formulario según operación registrada
+        document.getElementById("date_operation").value = operationDate;
+        document.getElementById("store").value = storeName;
+        document.getElementById("concept").value = concept;
+        document.getElementById("beneficiary").value = beneficiary;
+        document.getElementById("observation").value = observation;
+        document.getElementById("amount").value = credit || debit;
     }
 
     function closeModal_Operation() {
@@ -249,7 +278,6 @@
 
     function saveChanges() {
         closeconfirmationModal();
-        closeconfirmationModal_EditOp();
         document.getElementById('loadingModal').style.display = 'flex';
         const formData = new FormData(document.getElementById('operationForm'));
         const saveButton = document.querySelector('.save-button');

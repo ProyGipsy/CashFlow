@@ -108,8 +108,9 @@ def operations():
         beneficiary_id = request.form['beneficiary']
         observation = request.form['observation']
         amount = float(request.form['amount'])
+        operation_id = request.form.get('operation_id')
 
-        set_operations(store_id, beneficiary_id, concept_id, observation, date_operation, amount)
+        set_operations(store_id, beneficiary_id, concept_id, observation, date_operation, amount, operation_id)
         return redirect(url_for('operations'))
 
     return render_template(

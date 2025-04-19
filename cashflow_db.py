@@ -95,8 +95,11 @@ def get_operations():
         SELECT 
             O.OperationID, 
             O.OperationDate, 
+            S.StoreID, 
             S.StoreName, 
+            C.ConceptID,
             C.ConceptName, 
+            B.BeneficiaryID,
             B.BeneficiaryName, 
             Observation, 
             CASE 
@@ -120,8 +123,8 @@ def get_operations():
     balance = 0
     operations_with_balance = []
     for operation in operations:
-        credit = operation[6] if operation[6] is not None else 0
-        debit = operation[7] if operation[7] is not None else 0
+        credit = operation[9] if operation[9] is not None else 0
+        debit = operation[10] if operation[10] is not None else 0
         balance += credit - debit
 
         formattedCredit = "{:,.2f}".format(credit).replace(".", "X").replace(",", ".").replace("X", ",")
@@ -129,8 +132,8 @@ def get_operations():
         formattedBalance = "{:,.2f}".format(balance).replace(".", "X").replace(",", ".").replace("X", ",")
         
         operation_list = list(operation)
-        operation_list[6] = formattedCredit
-        operation_list[7] = formattedDebit
+        operation_list[9] = formattedCredit
+        operation_list[10] = formattedDebit
         operation_list.append(formattedBalance)
         operations_with_balance.append(tuple(operation_list))
 
@@ -202,12 +205,22 @@ def set_concepts(concepts):
     conn.commit()
     conn.close()
 
-def set_operations(store_id, beneficiary_id, concept_id, observation, date_operation, amount):
+
+def set_operations(store_id, beneficiary_id, concept_id, observation, date_operation, amount, operation_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
-                INSERT INTO cashflow.Operation (StoreID, BeneficiaryID, ConceptID, Observation, OperationDate, OperationAmount)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            ''', (store_id, beneficiary_id, concept_id, observation, date_operation, amount))
+
+    if operation_id:
+        cursor.execute('''
+            UPDATE cashflow.Operation
+            SET StoreID = %s, BeneficiaryID = %s, ConceptID = %s, Observation = %s, OperationDate = %s, OperationAmount = %s
+            WHERE OperationID = %s
+        ''', (store_id, beneficiary_id, concept_id, observation, date_operation, amount, operation_id))
+    else:
+        cursor.execute('''
+            INSERT INTO cashflow.Operation (StoreID, BeneficiaryID, ConceptID, Observation, OperationDate, OperationAmount)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', (store_id, beneficiary_id, concept_id, observation, date_operation, amount))
+
     conn.commit()
     conn.close()
