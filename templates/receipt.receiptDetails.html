@@ -291,14 +291,42 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                // Formulario temporal para generate_pdf
+                const pdfForm = document.createElement('form');
+                pdfForm.method = 'POST';
+                pdfForm.action = '/generate_pdf';
+                pdfForm.target = '_blank';
+                pdfForm.style.display = 'none';
+                
+                const fields = {
+                    'store_id': store_id,
+                    'customer_id': customer_id,
+                    'receipt_id': receipt_id,
+                    'pagination': pagination
+                };
+                
+                for (const [name, value] of Object.entries(fields)) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = name;
+                    input.value = value;
+                    pdfForm.appendChild(input);
+                }
+                
+                document.body.appendChild(pdfForm);
+                pdfForm.submit();
+                document.body.removeChild(pdfForm);
+
                 closeLoadingValidationModal();
                 openFinalValidationModal();
             } else {
                 alert('Error al enviar el correo de validación.');
+                closeLoadingValidationModal();
             }
         })
         .catch(error => {
             console.error('Error:', error);
+            closeLoadingValidationModal();
         });
 
         // Envía el formulario para generar el PDF

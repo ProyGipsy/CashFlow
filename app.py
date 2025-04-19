@@ -4,10 +4,13 @@ import json
 from io import BytesIO
 import mimetypes
 import requests
+import base64
 
-#from weasyprint import HTML
+from weasyprint import HTML
+from werkzeug.utils import secure_filename
+
 from datetime import datetime
-from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response)
+from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response, current_app)
 from flask_mail import Mail, Message
 
 from cashflow_db import (get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts,
@@ -456,9 +459,14 @@ def send_validationEmail():
     paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
     salesRepComm = get_SalesRepCommission(receipt_id)
 
-    # Validar Recibo de Pago
-    set_isReviewedReceipt(receipt_id)
-    set_isApprovedReceipt(receipt_id)
+    # Validación de Recibo de Pago
+    """
+    OJO: El JS primero llama a la función de enviar el correo y luego la del PDF.
+    Si se valida el recibo aquí, al renderizar la interfaz para el PDF, no tendrá acceso a los campos.
+    Al implementar el pdf en producción, realizar la validación luego de este último renderizado.
+    """
+    #set_isReviewedReceipt(receipt_id)
+    #set_isApprovedReceipt(receipt_id)
     
     # Logo Store (dinámico desde store[2])
     logo_store_path = store[2] if store and len(store) > 2 else None
@@ -698,49 +706,198 @@ def send_validationEmail():
 
 @app.route('/generate_pdf', methods=['POST'])
 def generate_pdf():
-    # Obtén los valores necesarios del formulario
-    customer_id = request.form.get('customer_id')
-    store_id = request.form.get('store_id')
-    pagination = int(request.form.get('pagination', 1))  # Usar 1 como valor predeterminado
+    # Datos iniciales para la interfaz
+    store_id = request.form.get('store_id', '')
+    customer_id = request.form.get('customer_id', '')
+    pagination = int(request.form.get('pagination', ''))
+    receipt_id = int(request.form.get('receipt_id', ''))
 
-    # Obtener todos los recibos del cliente
+    receipts_per_page = 1
     receipts = get_unvalidated_receipts_by_customer(customer_id)
-
-    # Lógica para obtener el recibo actual
-    if not receipts:
-        return "No hay recibos disponibles para generar el PDF.", 400
-
-    # Asumiendo que hay al menos un recibo
-    receipt_id = receipts[pagination - 1][0]  # Obtener el recibo correspondiente a la paginación
-    invoices = get_invoices_by_receipt(receipt_id)
-    paymentEntries = get_paymentEntries_by_receipt(receipt_id)
-    salesRepComm = get_SalesRepCommission(receipt_id)
-
     store = get_receiptStore_by_id(store_id)
     customer = get_customer_by_id(customer_id)
+    store_name = store[1] if store else ''
+    customer_name = f"{customer[1]} {customer[2]}" if customer else ''
+    total_receipts = len(receipts)
+    invoices = get_invoices_by_receipt(receipt_id)
+    paymentEntries = get_paymentEntries_by_receipt(receipt_id)
+    paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
+    salesRepComm = get_SalesRepCommission(receipt_id)
+    
+    # Logo Store (dinámico desde store[2])
+    logo_store_path = store[2] if store and len(store) > 2 else None
+    logo_content = get_onedriveStoreLogo(logo_store_path)
+    logo_store_64 = base64.b64encode(logo_content).decode('utf-8')
+    logo_right_img = f'<img src="data:image/png;base64,{logo_store_64}" alt="Logo Store" />' if logo_store_64 else ''
 
-    # Renderiza el template HTML con los datos de la solicitud
-    rendered = render_template('receipt.receiptDetails.html', 
-                                is_pdf=True,
-                                storeName=store[1],
-                                customerName=customer[1],
-                                receipts=receipts,
-                                store=store,
-                                customer=customer,
-                                invoices=invoices,
-                                paymentEntries=paymentEntries,
-                                salesRepComm=salesRepComm,
-                                pagination=pagination)
+    # Logo Gipsy (fijo)
+    logo_gipsy_path = current_app.static_folder + f'/IMG/Gipsy_isotipo_color.png'
+    with open(logo_gipsy_path, "rb") as image_file:
+        logo_gipsy_64 = base64.b64encode(image_file.read()).decode('utf-8')
+    logo_left_img = f'<img src="data:image/png;base64,{logo_gipsy_64}" alt="Logo Gipsy">' if logo_gipsy_64 else ''
 
-    # Convierte el HTML renderizado a PDF con WeasyPrint
-    pdf = HTML(string=rendered, base_url=request.host_url).write_pdf()
+    # Validación de Recibo de Pago
+    set_isReviewedReceipt(receipt_id)
+    set_isApprovedReceipt(receipt_id)
 
-    # Prepara la respuesta con el PDF generado
-    response = make_response(pdf)
+    # Renderización del HTML
+    html_content = render_template('receipt.receiptDetails.html',
+                                 is_pdf=True,
+                                 page='receiptDetails',
+                                 active_page='receipts',
+                                 customer_id=customer_id,
+                                 store_id=store_id,
+                                 receipts=receipts,
+                                 store=store,
+                                 customer=customer,
+                                 invoices=invoices,
+                                 paymentEntries=paymentEntries,
+                                 salesRepComm=salesRepComm,
+                                 pagination=pagination,
+                                 total_receipts=total_receipts,
+                                 receipts_per_page=receipts_per_page)
+    
+    html_body = f"""
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8"/>
+                <style>
+                    body {{
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                        color: black !important;
+                        background: white !important;
+                    }}
+
+                    .header {{
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 20px;
+                        border-bottom: 2px solid black;
+                        padding-bottom: 10px;
+                    }}
+
+                    .logo-left, .logo-right {{
+                        flex: 1;
+                        display: flex;
+                        justify-content: center;
+                    }}
+
+                    .header img {{
+                        max-height: 60px;
+                        filter: grayscale(100%);
+                    }}
+
+                    .header-text {{
+                        flex: 2;
+                        text-align: center;
+                        margin: 0;
+                    }}
+
+                    .header-text h1, h3 {{
+                        font-size: 14px !important;
+                        margin: 0;
+                        color: black !important;
+                    }}
+
+                    .header-text p {{
+                        color: black !important;
+                        font-size: 14px !important;
+                    }}
+
+                    .title-container, .button-container, .back {{
+                        display: none;
+                    }}
+
+                    table {{
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 0;
+                        font-size: 10px !important;
+                    }}
+
+                    table, th, td {{
+                        border: 1px solid black !important;
+                    }}
+
+                    th, td {{
+                        padding: 4px !important;
+                        text-align: left;
+                        color: black !important;
+                    }}
+
+                    th {{
+                        background-color: #f0f0f0 !important;
+                    }}
+
+                    img {{
+                        max-width: 100%;
+                        height: auto;
+                        filter: grayscale(100%);
+                    }}
+
+                    .client-info, .styled-table, .inline-label, .file-upload-container {{
+                        color: black !important;
+                    }}
+
+                    .styled-table {{
+                        font-size: 12px !important;
+                    }}
+
+                    .styled-table th {{
+                        background-color: #f0f0f0 !important;
+                        color: black !important;
+                    }}
+
+                    .styled-table td {{
+                        color: black !important;
+                    }}
+
+                    .file-upload-container {{
+                        margin: 20px 0;
+                    }}
+
+                    .file-upload-container img {{
+                        max-width: 500px;
+                        height: auto;
+                        display: block;
+                    }}
+
+                    .paymentImage {{
+                        width: 500px !important;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="logo-left">
+                        {logo_left_img}
+                    </div>
+                    <div class="header-text">
+                        <h1>Reporte de Cobranza Gipsy Corp</h1>
+                        <p><strong>{store_name}</strong></p>
+                        <p><strong>{customer_name}</strong></p>
+                    </div>
+                    <div class="logo-right">
+                        {logo_right_img}
+                    </div>
+                </div>
+                {html_content}
+            </body>
+            </html>
+            """
+
+    # Generar el PDF
+    pdf_bytes = HTML(string=html_body).write_pdf()
+
+    # Crear respuesta
+    response = make_response(pdf_bytes)
     response.headers['Content-Type'] = 'application/pdf'
-    filename = f'Cobranza_{store[1]}_{customer[1]}.pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
-
+    filename = f'Cobranza_{receipt_id}_{store_id}_{customer_id}.pdf'
+    safe_filename = secure_filename(filename)
+    response.headers['Content-Disposition'] = f'inline; filename="{safe_filename}"'
     return response
 
 
