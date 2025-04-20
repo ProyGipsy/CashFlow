@@ -5,7 +5,7 @@ from io import BytesIO
 import mimetypes
 import requests
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 
 #from weasyprint import HTML
 from werkzeug.utils import secure_filename
@@ -94,7 +94,10 @@ def operations():
     debitConcepts = get_debitConcepts()
     beneficiaries = get_beneficiaries()
 
-    current_yearMonth = datetime.now().strftime("%Y-%m")
+    current_date = datetime.now()
+    current_yearMonth = current_date.strftime("%Y-%m")
+    previous_month_date = current_date - timedelta(days=current_date.day)
+    previous_yearMonth = previous_month_date.strftime("%Y-%m")
     processedOperations = []
     for operation in operations:
         operation_date = operation[1]
@@ -123,7 +126,8 @@ def operations():
         debitConcepts=debitConcepts,
         stores=stores,
         beneficiaries=beneficiaries,
-        current_yearMonth=current_yearMonth
+        current_yearMonth=current_yearMonth,
+        previous_yearMonth=previous_yearMonth
     )
 
 @app.route('/beneficiaries', methods=['GET', 'POST'])
