@@ -17,10 +17,37 @@ def get_db_connection():
 
 # Obtención de Data en la Interfaz
 
-def get_receiptStores():
+def get_receiptStores_Sellers():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT ID, Name FROM Main.Store')
+    cursor.execute('''SELECT DISTINCT(S.ID), S.Name
+                    FROM Main.Store S
+                    JOIN Main.SalesRep R ON S.ID = StoreID
+                    WHERE S.ID != 0''')
+    stores = cursor.fetchall()
+    conn.close()
+    return stores
+
+def get_receiptStores_DebtAccount():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(''' SELECT DISTINCT(S.ID), S.Name
+                    FROM Main.Store S
+                    JOIN CommissionReceipt.DebtAccount D ON S.ID = D.StoreID
+                    WHERE S.ID != 0 ''')
+    stores = cursor.fetchall()
+    conn.close()
+    return stores
+
+def get_receiptStores_Receipts():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT DISTINCT(S.ID), S.Name
+                    FROM Main.Store S
+                    JOIN CommissionReceipt.DebtAccount D ON S.ID = D.StoreID
+                    JOIN CommissionReceipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID
+                    JOIN CommissionReceipt.PaymentReceipt P ON R.PaymentReceiptID = P.ReceiptID
+                    WHERE P.IsReviewed = 0''')
     stores = cursor.fetchall()
     conn.close()
     return stores

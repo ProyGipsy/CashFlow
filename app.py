@@ -19,8 +19,8 @@ from cashflow_db import (get_beneficiaries, get_cashflowStores, get_concepts, ge
     set_beneficiaries, set_concepts, set_stores, set_operations)
 
 # OJO: Variables balance corresponden a PaidAmount
-from receipt_db import (get_db_connection, 
-    get_receiptStores, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules,
+from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_receiptStores_Receipts,
+    get_receiptStores_Sellers, get_receiptStore_by_id, get_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules,
     get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer, get_bankAccounts, get_commissions, get_customer_by_id,
     get_customers_with_unvalidated_receipts, get_count_customers_with_unvalidated_receipts, get_unvalidated_receipts_by_customer,
     get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission, get_SalesRepCommission,
@@ -173,7 +173,7 @@ def homeAdmin():
 
 @app.route('/sellers')
 def sellers():
-    stores = get_receiptStores()
+    stores = get_receiptStores_Sellers()
     sellers_by_store = {store[0]: get_sellers(store[0]) for store in stores}
     return render_template('receipt.sellers.html', page='sellers', active_page='sellers', stores=stores, sellers_by_store=sellers_by_store)
 
@@ -188,7 +188,7 @@ def sellerDetails(seller_id):
 
 @app.route('/receipts')
 def receipts():
-    stores = get_receiptStores()
+    stores = get_receiptStores_Receipts()
     customers_with_unvalidated_receipts = {store[0]: get_customers_with_unvalidated_receipts(store[0]) for store in stores}
     customer_counts = {store[0]: get_count_customers_with_unvalidated_receipts(store[0]) for store in stores}
     return render_template(
@@ -251,7 +251,7 @@ def homeSeller():
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
-    stores = get_receiptStores()
+    stores = get_receiptStores_DebtAccount()
     customers_by_store = {store[0]: get_customers(store[0]) for store in stores}
     return render_template('receipt.accountsReceivable.html', page='accountsReceivable', active_page='accountsReceivable', stores=stores, customers_by_store=customers_by_store)
 
