@@ -107,6 +107,14 @@
     font-size: 15px;
     border-radius: 5px;
     border: 1px solid #324bab;
+    display: flex;
+    justify-content: space-between;
+}
+
+.customer-count {
+    margin-left: auto;
+    font-weight: normal;
+    color: #555;
 }
 
 .company-sellers {

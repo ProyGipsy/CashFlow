@@ -112,9 +112,9 @@
 }
 
 .customer-count {
-    margin-left: auto; /* Empuja el conteo hacia la derecha */
-    font-weight: normal; /* Estilo del texto */
-    color: #555; /* Color del texto */
+    margin-left: auto;
+    font-weight: normal;
+    color: #555;
 }
 
 .company-sellers {

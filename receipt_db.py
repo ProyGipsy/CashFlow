@@ -34,7 +34,7 @@ def get_receiptStores_DebtAccount():
     cursor.execute(''' SELECT DISTINCT(S.ID), S.Name
                     FROM Main.Store S
                     JOIN CommissionReceipt.DebtAccount D ON S.ID = D.StoreID
-                    WHERE S.ID != 0 ''')
+                    WHERE S.ID != 0 AND (Amount-PaidAmount) > 0 ''')
     stores = cursor.fetchall()
     conn.close()
     return stores
@@ -68,6 +68,14 @@ def get_sellers(store_id):
     conn.close()
     return sellers
 
+def get_count_sellers(store_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(ID) FROM Main.SalesRep WHERE StoreID = %s', (store_id,))
+    sellers = cursor.fetchone()[0]
+    conn.close()
+    return sellers
+
 def get_seller_details(seller_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -92,8 +100,19 @@ def get_customers(store_id):
     cursor.execute('''SELECT DISTINCT (C.ID), C.FirstName, C.LastName
                     FROM Main.Customer C
                     JOIN CommissionReceipt.DebtAccount D ON C.ID = D.CustomerID
-                    WHERE D.StoreID = %s''', (store_id,))
+                    WHERE (Amount-PaidAmount) > 0 AND D.StoreID = %s''', (store_id,))
     sellers = cursor.fetchall()
+    conn.close()
+    return sellers
+
+def get_count_customers_with_accountsReceivable(store_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT COUNT(DISTINCT(C.ID)) AS CountCustomers
+                    FROM Main.Customer C
+                    JOIN CommissionReceipt.DebtAccount D ON C.ID = D.CustomerID
+                    WHERE (Amount-PaidAmount) > 0 AND D.StoreID = %s''', (store_id,))
+    sellers = cursor.fetchone()[0]
     conn.close()
     return sellers
 
