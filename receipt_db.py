@@ -385,7 +385,7 @@ def set_paymentReceipt(cursor, total_receipt_amount, commission_note):
     cursor.execute('''
                    INSERT INTO CommissionReceipt.PaymentReceipt
                    (Amount, CommissionAmount, IsReviewed, FilePath, isRetail, IsApproved)
-                   VALUES (%s, %s, %s, %s, %s)
+                   VALUES (%s, %s, %s, %s, %s, %s)
                    ''', (total_receipt_amount, commission_note, 0, '', 0, 0))
 
     #Obtención del ReceiptID generado
