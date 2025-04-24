@@ -68,7 +68,7 @@
                 <!--{% if operation[12] == current_yearMonth or operation[12] == previous_yearMonth %} {% endif %}-->
                 {% if operation[12] == current_year %}
                 <td class="no-border">
-                    <span class="edit-icon" onclick="openModal_Operation({{ operation[0] }}, '{{ operation[1] | replace("'", "\\'") }}', '{{ operation[2] }}', '{{ operation[4] | replace("'", "\\'") }}', '{{ operation[6] | replace("'", "\\'") }}', '{{ operation[8] | replace("'", "\\'") }}', {{ operation[9] | replace(',', '.') }}, {{ operation[10] | replace(',', '.') }})">
+                    <span class="edit-icon" onclick="openModal_Operation({{ operation[0] }}, '{{ operation[1] }}', '{{ operation[2] }}', '{{ operation[4] }}', '{{ operation[6] }}', '{{ operation[8] }}', '{{ operation[9] }}', '{{ operation[10] }}')">
                         <img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar">
                     </span>
                 </td>
@@ -196,6 +196,9 @@
         // Cambiar el título y el texto del botón
         const modalTitle = document.querySelector('.modal-content h2');
         const saveButton = document.querySelector('.save-button');
+
+        credit = typeof credit === 'string' ? parseFloat(credit.replace(/\./g, '').replace(/,/g, '.')) : credit;
+        debit = typeof debit === 'string' ? parseFloat(debit.replace(/\./g, '').replace(/,/g, '.')) : debit;
 
         if (operationID) { // Edición de Operación
             modalTitle.textContent = `Editar Operación ${operationID}`;
