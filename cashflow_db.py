@@ -114,7 +114,8 @@ def get_operations():
             cashflow.Operation O 
             JOIN cashflow.Store S ON O.StoreID = S.StoreID 
             JOIN cashflow.Concept C ON O.ConceptID = C.ConceptID 
-            JOIN cashflow.Beneficiary B ON O.BeneficiaryID = B.BeneficiaryID 
+            JOIN cashflow.Beneficiary B ON O.BeneficiaryID = B.BeneficiaryID
+        ORDER BY O.OperationDate 
     ''')
     operations = cursor.fetchall()
     conn.close()

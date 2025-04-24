@@ -96,13 +96,16 @@ def operations():
     beneficiaries = get_beneficiaries()
 
     current_date = datetime.now()
-    current_yearMonth = current_date.strftime("%Y-%m")
-    previous_month_date = current_date - timedelta(days=current_date.day)
-    previous_yearMonth = previous_month_date.strftime("%Y-%m")
+    current_year = current_date.strftime("%Y")
+    # Variables para permitir editar el mes actual y el anterior
+    #current_yearMonth = current_date.strftime("%Y-%m")
+    #previous_month_date = current_date - timedelta(days=current_date.day)
+    #previous_yearMonth = previous_month_date.strftime("%Y-%m")
     processedOperations = []
     for operation in operations:
         operation_date = operation[1]
-        operation_yearMonth = operation_date.strftime("%Y-%m")
+        operation_yearMonth = operation_date.strftime("%Y")
+        #operation_yearMonth = operation_date.strftime("%Y-%m")
         processedOperations.append(operation + (operation_yearMonth,))
 
     if request.method == 'POST':
@@ -127,8 +130,9 @@ def operations():
         debitConcepts=debitConcepts,
         stores=stores,
         beneficiaries=beneficiaries,
-        current_yearMonth=current_yearMonth,
-        previous_yearMonth=previous_yearMonth
+        current_year=current_year
+        #current_yearMonth=current_yearMonth,
+        #previous_yearMonth=previous_yearMonth
     )
 
 @app.route('/beneficiaries', methods=['GET', 'POST'])

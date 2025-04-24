@@ -65,7 +65,8 @@
                     {% endif %}
                 </td>
                 <td>{{ operation[11] }}</td>
-                {% if operation[12] == current_yearMonth or operation[12] == previous_yearMonth %}
+                <!--{% if operation[12] == current_yearMonth or operation[12] == previous_yearMonth %} {% endif %}-->
+                {% if operation[12] == current_year %}
                 <td class="no-border">
                     <span class="edit-icon" onclick="openModal_Operation({{ operation[0] }}, '{{ operation[1] | replace("'", "\\'") }}', '{{ operation[2] }}', '{{ operation[4] | replace("'", "\\'") }}', '{{ operation[6] | replace("'", "\\'") }}', '{{ operation[8] | replace("'", "\\'") }}', {{ operation[9] | replace(',', '.') }}, {{ operation[10] | replace(',', '.') }})">
                         <img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar">
