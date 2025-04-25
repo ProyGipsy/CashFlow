@@ -217,11 +217,16 @@ def set_operations(store_id, beneficiary_id, concept_id, observation, date_opera
             SET StoreID = %s, BeneficiaryID = %s, ConceptID = %s, Observation = %s, OperationDate = %s, OperationAmount = %s
             WHERE OperationID = %s
         ''', (store_id, beneficiary_id, concept_id, observation, date_operation, amount, operation_id))
+        conn.commit()
+        conn.close()
+        return operation_id
     else:
         cursor.execute('''
             INSERT INTO cashflow.Operation (StoreID, BeneficiaryID, ConceptID, Observation, OperationDate, OperationAmount)
             VALUES (%s, %s, %s, %s, %s, %s)
         ''', (store_id, beneficiary_id, concept_id, observation, date_operation, amount))
-
-    conn.commit()
-    conn.close()
+        cursor.execute("SELECT SCOPE_IDENTITY() AS new_id")
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return new_id

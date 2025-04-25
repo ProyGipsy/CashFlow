@@ -87,6 +87,11 @@
         <h2>Nueva Operación</h2>
         <form id="operationForm" action="{{ url_for('operations') }}" method="POST">
             <input type="hidden" id="operation_id" name="operation_id">
+            <input type="hidden" id="store_name" name="store_name">
+            <input type="hidden" id="concept_name" name="concept_name">
+            <input type="hidden" id="beneficiary_name" name="beneficiary_name">
+            <input type="hidden" id="motionTypeHidden" name="motionType">
+            
             <table class="modal-table">
                 <thead id="tableHeader">
                     <tr>
@@ -118,7 +123,7 @@
                             <select id="store" name="store" class="input-field"> 
                                 <option value="" disabled selected>Compañía</option> 
                                 {% for store in stores | sort(attribute=1)  %}
-                                <option value="{{ store[0] }}">{{ store[1] }}</option>
+                                <option value="{{ store[0] }}" data-name="{{ store[1] }}">{{ store[1] }}</option>
                                 {% endfor %}
                             </select>
                         </td>
@@ -126,7 +131,7 @@
                             <select id="beneficiary" name="beneficiary" class="input-field"> 
                                 <option value="" disabled selected>Beneficiario</option> 
                                 {% for beneficiary in beneficiaries | sort(attribute=1)  %}
-                                <option value="{{ beneficiary[0] }}">{{ beneficiary[1] }}</option>
+                                <option value="{{ beneficiary[0] }}" data-name="{{ beneficiary[1] }}">{{ beneficiary[1] }}</option>
                                 {% endfor %}
                             </select>
                         </td>
@@ -222,6 +227,12 @@
         document.getElementById("beneficiary").value = beneficiary;
         document.getElementById("observation").value = observation;
         document.getElementById("amount").value = credit || debit;
+
+        // Actualización de campos ocultos
+        updateStoreName();
+        updateConceptName();
+        updateBeneficiaryName();
+        updateMotionType();
     }
 
     function closeModal_Operation() {
@@ -264,6 +275,7 @@
             const option = document.createElement("option");
             option.value = concept.id;
             option.textContent = concept.name;
+            option.setAttribute('data-name', concept.name);
             conceptSelect.appendChild(option);
         });
 
@@ -280,7 +292,72 @@
         filterConcepts(); // Aplicar el filtro inicial
     });
 
+    // Agregar event listeners para actualizar los campos ocultos cuando cambian las selecciones
+    document.addEventListener("DOMContentLoaded", function() {
+        // Inicializar el filtro de conceptos
+        filterConcepts();
+        
+        // Agregar event listeners para actualizar los campos ocultos
+        document.getElementById("store").addEventListener("change", updateStoreName);
+        document.getElementById("concept").addEventListener("change", updateConceptName);
+        document.getElementById("beneficiary").addEventListener("change", updateBeneficiaryName);
+        document.getElementById("motionType").addEventListener("change", updateMotionType);
+        
+        // También actualizar al abrir el modal para edición
+        document.getElementById("modalOperation").addEventListener("shown", function() {
+            updateStoreName();
+            updateConceptName();
+            updateBeneficiaryName();
+            updateMotionType();
+        });
+    });
+
+    // Modificar las funciones de actualización para asegurar que se ejecuten correctamente
+    function updateStoreName() {
+        const storeSelect = document.getElementById("store");
+        const selectedOption = storeSelect.options[storeSelect.selectedIndex];
+        const storeNameInput = document.getElementById("store_name");
+        if (selectedOption && selectedOption.getAttribute('data-name')) {
+            storeNameInput.value = selectedOption.getAttribute('data-name');
+        } else {
+            storeNameInput.value = '';
+        }
+    }
+
+    function updateConceptName() {
+        const conceptSelect = document.getElementById("concept");
+        const selectedOption = conceptSelect.options[conceptSelect.selectedIndex];
+        const conceptNameInput = document.getElementById("concept_name");
+        if (selectedOption && selectedOption.getAttribute('data-name')) {
+            conceptNameInput.value = selectedOption.getAttribute('data-name');
+        } else {
+            conceptNameInput.value = '';
+        }
+    }
+
+    function updateBeneficiaryName() {
+        const beneficiarySelect = document.getElementById("beneficiary");
+        const selectedOption = beneficiarySelect.options[beneficiarySelect.selectedIndex];
+        const beneficiaryNameInput = document.getElementById("beneficiary_name");
+        if (selectedOption && selectedOption.getAttribute('data-name')) {
+            beneficiaryNameInput.value = selectedOption.getAttribute('data-name');
+        } else {
+            beneficiaryNameInput.value = '';
+        }
+    }
+
+    function updateMotionType() {
+        const motionTypeSelect = document.getElementById("motionType");
+        const motionTypeHidden = document.getElementById("motionTypeHidden");
+        motionTypeHidden.value = motionTypeSelect.value;
+    }
+
     function saveChanges() {
+        updateStoreName();
+        updateConceptName();
+        updateBeneficiaryName();
+        updateMotionType();
+
         closeconfirmationModal();
         document.getElementById('loadingModal').style.display = 'flex';
         const formData = new FormData(document.getElementById('operationForm'));
@@ -297,14 +374,23 @@
             body: formData
         })
         .then(response => {
-            if (response.ok) {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
                 window.location.reload();
             } else {
-                alert('Error al guardar la operación');
+                throw new Error(data.message || 'Error al guardar la operación');
             }
         })
         .catch(error => {
             console.error('Error:', error);
+            alert(error.message);
+            document.getElementById('loadingModal').style.display = 'none';
         })
         .finally(() => {
             saveButton.disabled = false;

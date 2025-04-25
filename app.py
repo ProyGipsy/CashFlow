@@ -109,16 +109,152 @@ def operations():
         processedOperations.append(operation + (operation_yearMonth,))
 
     if request.method == 'POST':
+
+        # Inserción
         date_operation = request.form['date_operation']
         concept_id = request.form['concept']
         store_id = request.form['store']
         beneficiary_id = request.form['beneficiary']
         observation = request.form['observation']
         amount = float(request.form['amount'])
-        operation_id = request.form.get('operation_id')
+        operation_id = set_operations(store_id, beneficiary_id, concept_id, observation, date_operation, amount, request.form.get('operation_id'))
 
-        set_operations(store_id, beneficiary_id, concept_id, observation, date_operation, amount, operation_id)
+        # Email
+        store_name = request.form.get('store_name')
+        concept_name = request.form.get('concept_name')
+        beneficiary_name = request.form.get('beneficiary_name')
+        motion_type = request.form['motionType']
+
+        # Crear el contenido HTML
+        html_content = f"""
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8"/>
+                    <style>
+                        body {{
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                            color: black !important;
+                            background: white !important;
+                        }}
+
+                        .header {{
+                            display: flex;
+                            align-items: center;
+                            margin-bottom: 20px;
+                            position: relative;
+                        }}
+                        
+                        .logo-left {{
+                            margin-right: 20px;
+                            height: 60px;
+                            display: flex;
+                            align-items: center;
+                        }}
+                        
+                        .logo-left img {{
+                            height: 100%;
+                            width: auto;
+                            max-height: 60px;
+                        }}
+                        
+                        .header h2 {{
+                            position: absolute;
+                            left: 50%; /* Centrado horizontal */
+                            transform: translateX(-50%);
+                            margin: 0;
+                            width: 100%;
+                            text-align: center;
+                            line-height: 60px;
+                            pointer-events: none;
+                        }}
+
+                        table {{
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin: 0;
+                        }}
+
+                        table, th, td {{
+                            border: 1px solid black !important;
+                        }}
+
+                        th, td {{
+                            padding: 6px !important;
+                            text-align: left;
+                            color: black !important;
+                        }}
+
+                        th {{
+                            background-color: #f0f0f0 !important;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="logo-left">
+                            <img src="cid:Gipsy_isotipo_color.png" alt="Logo Cobranza">
+                        </div>
+                        <h2>Reporte de Operación Gipsy Corp</h2>
+                    </div>
+                    <table border="1" cellpadding="5" cellspacing="0">
+                        <tr>
+                            <th>ID</th>
+                            <th>Movimiento</th>
+                            <th>Fecha</th>
+                            <th>Compañía</th>
+                            <th>Concepto</th>
+                            <th>Beneficiario</th>
+                            <th>Observación</th>
+                            <th>Monto</th>
+                        </tr>
+                        <tr>
+                            <td>{operation_id}</td>
+                            <td>{"Ingreso" if motion_type == "1" else "Egreso"}</td>
+                            <td>{date_operation}</td>
+                            <td>{store_name}</td>
+                            <td>{concept_name}</td>
+                            <td>{beneficiary_name}</td>
+                            <td>{observation}</td>
+                            <td>{amount:.2f}</td>
+                        </tr>
+                    </table>
+                    <p style="color: #666; font-style: italic;">
+                        Flujo de Caja GIPSY<br>
+                        Avenida Francisco de Miranda, Centro Lido, Torre A, Piso 9, Oficina 93<br>
+                        Zona industrial Guayaba, Av. Pual. Guayabal, galpón 45, Guarenas<br>
+                        One Turnberry Place, 19495 Biscayne Blvd. #609 Aventura FL 33180 United States of America
+                    </p>
+                </body>
+                </html>
+                """
+
+        subject = 'Nuevo Ingreso Agregado' if motion_type == "1" else 'Nuevo Egreso Agregado'
+
+        msg = Message(subject=subject,
+                    sender=app.config['MAIL_USERNAME'],
+                    recipients=['proyectogipsy@gmail.com'])
+        
+        msg.html = html_content
+
+        with app.open_resource('static/IMG/Gipsy_isotipo_color.png') as logo:
+            msg.attach(
+                filename='Gipsy_isotipo_color.png',
+                content_type='image/png',
+                data=logo.read(),
+                disposition='inline',
+                headers={'Content-ID': '<Gipsy_isotipo_color.png>'}
+            )
+
+        try:
+            mail.send(msg)
+            print("Correo enviado exitosamente.")
+        except Exception as e:
+            print(f"Error al enviar correo: {e}")
+        
         return redirect(url_for('operations'))
+
 
     return render_template(
         'cashflow.operations.html',
