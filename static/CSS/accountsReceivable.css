@@ -117,6 +117,15 @@
     color: #555;
 }
 
+.customer-container {
+    margin: 10px 0;
+}
+
+.separator {
+    border-top: 1px solid #555;
+    margin: 5px 0;
+}
+
 .company-sellers {
     padding: 10px;
     display: none;
