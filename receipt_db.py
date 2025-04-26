@@ -108,11 +108,13 @@ def get_customers(store_id):
 def get_count_customers_with_accountsReceivable(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT COUNT(DISTINCT(C.ID)) AS CountCustomers
+    cursor.execute('''SELECT COUNT(DISTINCT(C.ID)) AS CountCustomers, SUM(Amount-PaidAmount) AS Balance
                     FROM Main.Customer C
                     JOIN CommissionReceipt.DebtAccount D ON C.ID = D.CustomerID
                     WHERE (Amount-PaidAmount) > 0 AND D.StoreID = %s''', (store_id,))
-    sellers = cursor.fetchone()[0]
+    sellers = list(cursor.fetchone())
+    formattedSum = "{:,.2f}".format(sellers[1]).replace(".", "X").replace(",", ".").replace("X", ",")
+    sellers[1] = formattedSum
     conn.close()
     return sellers
 
@@ -171,7 +173,7 @@ def get_invoices_by_customer(customer_id, store_id):
                    WHERE CustomerID = %s AND StoreID = %s AND D.Amount-D.PaidAmount > 0
                    ORDER BY D.N_CTA''',
                    (customer_id, store_id))
-    invoices = cursor.fetchall()
+    invoices = cursor.fetchall()    
     conn.close()
     return invoices
 

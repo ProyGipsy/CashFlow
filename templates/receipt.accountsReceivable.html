@@ -31,12 +31,12 @@
     <div class="company-container">
         {% for store in stores %}
         <button class="company-name" onclick="toggleSellers('{{ store[0] }}')">{{ store[0] }} | {{ store[1] }}
-            <span class="customer-count">{{ count_customers_by_store[store[0]] }} clientes con facturas por pagar</span>
+            <span class="customer-count">{{ count_customers_by_store[store[0]][0] }} clientes con facturas por cobrar. Total por cobrar: {{ count_customers_by_store[store[0]][1] }}</span>
         </button>
         <div class="company-sellers" id="sellers-{{ store[0] }}" style="display: none;">
             {% for customer in customers_by_store[store[0]] %}
             <p>{{ customer[0] }} | {{ customer[1] }}{{ customer[2] }}
-                <a href="javascript:void(0)" onclick="openModal('{{ customer[0] }}', '{{ customer[1]}}', '{{ customer[2]}}', '{{ store[0] }}', '{{ store[1] }}')">Registrar Cobranza</a>
+                <a href="javascript:void(0)" onclick="openModal('{{ customer[0] }}', '{{ customer[1] | replace("'", "\\'") }}', '{{ customer[2] | replace("'", "\\'") }}', '{{ store[0] }}', '{{ store[1] | replace("'", "\\'") }}')">Registrar Cobranza</a>
             </p>
             {% endfor %}
         </div>
@@ -109,9 +109,17 @@
     document.querySelectorAll('.company-name').forEach(button => {
         button.addEventListener('click', () => {
             const answer = button.nextElementSibling;
-             answer.style.display = answer.style.display === 'block' ? 'none' : 'block';
-         });
-     });
+            answer.style.display = answer.style.display === 'block' ? 'none' : 'block';
+        });
+    });
+
+    // Formateo español para las cantidades
+    function formatSpanishNumber(number) {
+        return number.toFixed(2)
+            .replace(".", "X")
+            .replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+            .replace("X", ",");
+    }
 
     /*Listado de Facturas*/
     function openModal(customerId, customerName, customerLastName, storeId, storeName) {
@@ -164,10 +172,10 @@
                         row.innerHTML = `
                             <td>${invoice.N_CTA}</td>
                             <td>${invoice.Currency}</td>
-                            <td>${invoice.Amount.toFixed(2)}</td>
-                            <td>${invoice.Balance.toFixed(2)}</td>
-                            <td>${invoice.IVA.toFixed(2)}</td>
-                            <td>${invoice.Remaining.toFixed(2)}</td>
+                            <td>${formatSpanishNumber(invoice.Amount)}</td>
+                            <td>${formatSpanishNumber(invoice.Balance)}</td>
+                            <td>${formatSpanishNumber(invoice.IVA)}</td>
+                            <td>${formatSpanishNumber(invoice.Remaining)}</td>
                             <td><input type="checkbox" class="invoice-checkbox" data-account-id="${invoice.AccountID}" /></td>
                         `;
 
@@ -220,10 +228,11 @@
         console.log(selectedAccountIDs);
 
         if (selectedAccountIDs.length > 0) {
+
+            // Verificación comentada debido a que los recibos sí permiten pagos de diferentes monedas
+            /*
             sessionStorage.setItem("selectedAccountIDs", JSON.stringify(selectedAccountIDs));
-
             let selectedCurrencies = new Set();
-
             for (const accountID of selectedAccountIDs) {
                 const invoice = document.querySelector(`.invoice-checkbox[data-account-id="${accountID}"]`).closest("tr");
                 const currency = invoice.querySelector("td:nth-child(2)").textContent.trim();
@@ -233,6 +242,7 @@
                     return;
                 }
             }
+            */
 
             const accountIdsString = selectedAccountIDs.join('-');
             window.location.href = "{{ url_for('accountsForm', account_ids='ACCOUNT_IDS') }}".replace('ACCOUNT_IDS', accountIdsString);
@@ -241,6 +251,7 @@
             alert("Por favor, selecciona al menos una factura.");
         }
     }
+
     
 </script>
 {% endblock %}
