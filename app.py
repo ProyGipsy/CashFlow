@@ -36,10 +36,6 @@ app = Flask(__name__)
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')
 app.config['MAIL_PORT'] = os.environ.get('MAIL_PORT')
 app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_1')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-mail = Mail(app)
-
 
 @app.route('/')
 def index():
@@ -81,6 +77,12 @@ def loginReceipt():
 
 
 # CASHFLOW - RUTAS
+
+# Configuración de correo SMTP para Flujo de Caja
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW')
+MAIL_RECIPIENT_CASHFLOW = os.environ.get('MAIL_RECIPIENT_CASHFLOW')
+mail = Mail(app)
 
 @app.route('/cashier')
 def homeCashier():
@@ -234,7 +236,7 @@ def operations():
 
         msg = Message(subject=subject,
                     sender=app.config['MAIL_USERNAME'],
-                    recipients=['proyectogipsy@gmail.com'])
+                    recipients=[MAIL_RECIPIENT_CASHFLOW])
         
         msg.html = html_content
 
@@ -307,6 +309,16 @@ def concepts():
    
 
 # RECIBO DE VENDEDORES - RUTAS
+
+# Configuración de correo SMTP para Recibo
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT1')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
+MAIL_RECIPIENT_RECEIPT = os.environ.get('MAIL_RECIPIENT_CASHFLOW')
+mail = Mail(app)
+
+# Verifica que las variables estén configuradas
+print(f"MAIL_USERNAME_RECEIPT1: {os.environ.get('MAIL_USERNAME_RECEIPT1')}")
+print(f"MAIL_RECIPIENT_CASHFLOW: {os.environ.get('MAIL_RECIPIENT_CASHFLOW')}")
 
 @app.route('/receiptAdmin')
 def homeAdmin():
@@ -553,7 +565,7 @@ def send_rejectionEmail():
 
     msg = Message(subject='Rechazo de Recibo de Cobranza',
                   sender=app.config['MAIL_USERNAME'],
-                  recipients=['proyectogipsy@gmail.com'])
+                  recipients=[MAIL_RECIPIENT_RECEIPT])
 
     html_body = f"""
     <html>
@@ -805,7 +817,7 @@ def send_validationEmail():
     # Lógica para enviar el correo
     msg = Message(subject='Validación de Recibo de Cobranza',
                   sender=app.config['MAIL_USERNAME'],
-                  recipients=['proyectogipsy@gmail.com'])
+                  recipients=[MAIL_RECIPIENT_RECEIPT])
     
     msg.html = html_body
 
