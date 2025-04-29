@@ -79,7 +79,7 @@ def loginReceipt():
 # CASHFLOW - RUTAS
 
 # Configuración de correo SMTP para Flujo de Caja
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW')
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW') #Correo por defecto
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW')
 MAIL_RECIPIENT_CASHFLOW = os.environ.get('MAIL_RECIPIENT_CASHFLOW')
 mail = Mail(app)
@@ -234,6 +234,14 @@ def operations():
 
         subject = 'Nuevo Ingreso Agregado' if motion_type == "1" else 'Nuevo Egreso Agregado'
 
+        print("store_id: ", store_id)
+        print("store_name: ", store_name)
+
+        if store_id == '4':
+            print("La tienda es: ", store_name)
+            app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW_REMBD')
+            print("El correo se enviará a: ", app.config['MAIL_USERNAME'])
+
         msg = Message(subject=subject,
                     sender=app.config['MAIL_USERNAME'],
                     recipients=[MAIL_RECIPIENT_CASHFLOW])
@@ -311,14 +319,10 @@ def concepts():
 # RECIBO DE VENDEDORES - RUTAS
 
 # Configuración de correo SMTP para Recibo
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT1')
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
 MAIL_RECIPIENT_RECEIPT = os.environ.get('MAIL_RECIPIENT_CASHFLOW')
 mail = Mail(app)
-
-# Verifica que las variables estén configuradas
-print(f"MAIL_USERNAME_RECEIPT1: {os.environ.get('MAIL_USERNAME_RECEIPT1')}")
-print(f"MAIL_RECIPIENT_CASHFLOW: {os.environ.get('MAIL_RECIPIENT_CASHFLOW')}")
 
 @app.route('/receiptAdmin')
 def homeAdmin():
@@ -563,6 +567,13 @@ def send_rejectionEmail():
     totalPaid = request.form.get('total_paid', '')
     totalCommission = request.form.get('total_commission', '')
 
+    print("store: ", store) # ES EL NOMBRE, ENVIAR ID DESDE EL TEMPLATE
+
+    if (store == '904' OR store == '905'):
+        print("La tienda es: ", store)
+        app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW_REMBD')
+        print("El correo se enviará a: ", app.config['MAIL_USERNAME'])
+
     msg = Message(subject='Rechazo de Recibo de Cobranza',
                   sender=app.config['MAIL_USERNAME'],
                   recipients=[MAIL_RECIPIENT_RECEIPT])
@@ -612,7 +623,7 @@ def send_rejectionEmail():
             headers={'Content-ID': '<Gipsy_imagotipo_color.png>'}
         )
 
-    mail.send(msg)
+    #mail.send(msg)
 
     return jsonify({'success': True})
 
