@@ -45,10 +45,10 @@
             {% for invoice in invoices %}
             <tr>
                 <td>{{ invoice[0] }}</td>  
-                <td>{{ "%.2f"|format(invoice[1]) }}</td> 
-                <td>{{ invoice[2] }}</td> 
-                <td>{{ invoice[3] }}</td> 
-                <td>{{ "%.2f"|format(invoice[4]) }}</td> 
+                <td>{{ "{:,.2f}".format(invoice[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td> 
+                <td>{{ invoice[2].strftime('%d-%m-%Y') }}</td> 
+                <td>{{ invoice[3].strftime('%d-%m-%Y') }}</td> 
+                <td>{{ "{:,.2f}".format(invoice[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td> 
             </tr>
             {% endfor %}
         </table>
@@ -68,9 +68,9 @@
                 {% for paymentEntry in paymentEntries %}
                 <tr class="pago-row">
                     <td>{{ paymentEntry[0] }}</td>
-                    <td>{{ paymentEntry[1] }}</td>
-                    <td>{{ "%.2f"|format(paymentEntry[2]) }}</td>
-                    <td>{{ "%.2f"|format(paymentEntry[3]) }}</td>
+                    <td>{{ paymentEntry[1].strftime('%d-%m-%Y') }}</td>
+                    <td>{{ "{:,.2f}".format(paymentEntry[2]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
+                    <td>{{ "{:,.2f}".format(paymentEntry[3]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
                     <td>{{ paymentEntry[4] }}</td>
                     <td>{{ paymentEntry[5] }} | {{ paymentEntry[6] }}</td>
                 </tr>
@@ -79,7 +79,7 @@
         </div> 
         <div class="inline-label">
             <label for="total_paid">Monto total del Recibo:</label>
-            <span id="total_paid" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][1]) }}</span> 
+            <span id="total_paid" class="small-input">{{ "{:,.2f}".format(receipts[pagination-1][1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</span> 
         </div> 
 
         <br><br>
@@ -94,15 +94,15 @@
             {% for repComm in salesRepComm %}
             <tr> 
                 <td>{{ repComm[0] }}</td>
-                <td>{{ "%.2f"|format(repComm[1]) }}</td>
+                <td>{{ "{:,.2f}".format(repComm[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
                 <td>{{ repComm[2] }}</td>
-                <td>{{ "%.2f"|format(repComm[3]) }}</td>
+                <td>{{ "{:,.2f}".format(repComm[3]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
             </tr> 
             {% endfor %}
         </table>
         <div class="inline-label">
             <label for="total_comm">Comisión Total:</label>
-            <span id="total_comm" class="small-input">{{ "%.2f"|format(receipts[ pagination - 1 ][2]) }}</span>  
+            <span id="total_comm" class="small-input">{{ "{:,.2f}".format(receipts[pagination-1][2]).replace(".", "X").replace(",", ".").replace("X", ",") }}</span>  
         </div> 
     
         {% if not is_pdf %}

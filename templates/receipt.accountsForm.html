@@ -34,12 +34,12 @@
         <tr> 
             <td><p>{{ receipt[0] }}</p></td>
             <td>
-                <p>{{ "%.2f"|format(receipt[1]) }}</p>
+                <p>{{ "{:,.2f}".format(receipt[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p>
                 <input type="hidden" name="original_amount[]" value="{{ "%.2f"|format(receipt[1]) }}" />
             </td>
-            <td><p>{{ receipt[2] }}</p></td>
-            <td><p>{{ receipt[3] }}</p></td>
-            <td><p>{{ "%.2f"|format(receipt[4]) }}</p></td>
+            <td><p>{{ receipt[2].strftime('%d-%m-%Y') }}</p></td>
+            <td><p>{{ receipt[3].strftime('%d-%m-%Y') }}</p></td>
+            <td><p>{{ "{:,.2f}".format(receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
             <td class="hidden-column">
                 <input type="hidden" name="account_id[]" value="{{ receipt[5] }}" />
             </td>
@@ -52,6 +52,7 @@
         <h3>Formas de Pago</h3> 
         <table class="styled-table" id="payment-table">
             <tr>
+                <th>Moneda</th>
                 <th>Forma de Pago</th>
                 <th>Fecha de Pago</th>
                 <th>Monto</th>
@@ -61,6 +62,10 @@
                 <th></th>
             </tr>
             <tr class="payment-row">
+                <td><select name="currency" class="input-field">
+                    <option value="">Bs</option> 
+                    <option value="">USD</option>
+                </td>
                 <td>
                     <select name="payment_method" class="input-field" onchange="updateBankAccounts(this)"> 
                         <option value="" disabled selected>Forma de Pago</option>
@@ -88,7 +93,7 @@
     <br><br>
     <div class="inline-label">
         <label for="balance_note">Monto total del Recibo:</label>
-        <span id="balance_note" class="small-input">0.00</span> 
+        <span id="balance_note" class="small-input">0,00</span> 
     </div>
 
     <br><br>
@@ -118,7 +123,7 @@
         {% for receipt in receiptDetails %}
         <tr> 
             <td><p>{{ receipt[0] }}</p></td>
-            <td><p id="balance_calculation" data-original-value="{{ "%.2f"|format(receipt[1] - receipt[4]) }}" data-due-date="{{ receipt[3] }}">{{ "%.2f"|format(receipt[1] - receipt[4]) }}</p></td>
+            <td><p id="balance_calculation" data-original-value="{{ "%.2f"|format(receipt[1] - receipt[4]) }}" data-due-date="{{ receipt[3] }}">{{ "{:,.2f}".format(receipt[1] - receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
             <td><p id="days_passed"></p></td>
             <td><p id="commission_received"></p></td>
         </tr> 
@@ -128,7 +133,7 @@
     <br><br>
     <div class="inline-label">
         <label for="commission_note">Comisión Total:</label>
-        <span id="commission_note" class="small-input">0.00</span> 
+        <span id="commission_note" class="small-input">0,00</span> 
     </div>
 
     <!-- Formulario Oculto -->
@@ -206,6 +211,14 @@
             })
             .catch(error => console.error('Error:', error));
         }
+    }
+
+    // Formateo español para las cantidades
+    function formatSpanishNumber(number) {
+        return number.toFixed(2)
+            .replace(".", "X")
+            .replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+            .replace("X", ",");
     }
 
     // Actualización de Saldo con la escritura
@@ -378,7 +391,7 @@
         amountInputs.forEach(input => {
             totalBalance += parseFloat(input.value) || 0;
         });
-        document.getElementById('balance_note').textContent = totalBalance.toFixed(2);
+        document.getElementById('balance_note').textContent = formatSpanishNumber(totalBalance);
         distributeBalanceAcrossReceipts(totalBalance);
     }
 
@@ -497,7 +510,7 @@
         receiptData.forEach((receipt, index) => {
             // Mostrar saldo pendiente con precisión
             const remainingWithPrecision = parseFloat((receipt.originalValue - receipt.discountApplied - receipt.amountPaid).toFixed(2));
-            balanceCalculationFields[index].textContent = remainingWithPrecision.toFixed(2);
+            balanceCalculationFields[index].textContent = formatSpanishNumber(remainingWithPrecision);
             receipt.remaining = remainingWithPrecision;
             
             // Calcular días transcurridos si hay fecha de pago
@@ -525,11 +538,11 @@
                 }
             });
             
-            commissionFields[index].textContent = commission.toFixed(2);
+            commissionFields[index].textContent = formatSpanishNumber(commission);
             totalCommission += commission;
         });
         
-        document.getElementById('commission_note').textContent = totalCommission.toFixed(2);
+        document.getElementById('commission_note').textContent = formatSpanishNumber(totalCommission);
     }
     
 
