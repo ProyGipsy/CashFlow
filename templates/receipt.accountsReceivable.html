@@ -31,7 +31,7 @@
     <div class="company-container">
         {% for store in stores %}
         <button class="company-name" onclick="toggleSellers('{{ store[0] }}')">{{ store[0] }} | {{ store[1] }}
-            <span class="customer-count">{{ count_customers_by_store[store[0]][0] }} clientes con facturas por cobrar. Total por cobrar: {{ count_customers_by_store[store[0]][1] }}</span>
+            <span class="customer-count">{{ count_customers_by_store[store[0]][0] }} clientes con facturas por cobrar. Total por cobrar: {{ count_customers_by_store[store[0]][1] }} {{ count_customers_by_store[store[0]][2] }}</span>
         </button>
         <div class="company-sellers" id="sellers-{{ store[0] }}" style="display: none;">
             {% for customer in customers_by_store[store[0]] %}
