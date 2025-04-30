@@ -150,13 +150,32 @@ def get_count_customers_with_unvalidated_receipts(store_id):
     conn.close()
     return customer_count
 
+def get_currency():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT DISTINCT(ID), Code FROM Main.Currency WHERE ID != 0')
+    currencies = cursor.fetchall()
+    conn.close()
+    return currencies
+
 def get_tender(currency_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT ID, Description FROM Main.Tender WHERE CurrencyID=%s', (currency_id))
-    stores = cursor.fetchall()
+    cursor.execute('SELECT ID, Description FROM Main.Tender WHERE IsRetail=0 AND CurrencyID=%s', (currency_id))
+    tenders = cursor.fetchall()
     conn.close()
-    return stores
+    return tenders
+
+def get_bankAccounts(store_id, currency_id, tender_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT AccountID, BankName, Destiny
+                   FROM CommissionReceipt.PaymentOption
+                   WHERE StoreID = %s AND CurrencyID = %s AND TenderID = %s
+                   ''', (store_id, currency_id, tender_id))
+    bankAccounts = cursor.fetchall()
+    conn.close()
+    return bankAccounts
 
 def get_commissionsRules():
     conn = get_db_connection()
@@ -206,17 +225,6 @@ def get_receiptsInfo(account_ids):
     receipts = cursor.fetchall()
     conn.close()
     return receipts
-
-def get_bankAccounts(store_id, currency_id, tender_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''SELECT AccountID, BankName, Destiny
-                   FROM CommissionReceipt.PaymentOption
-                   WHERE StoreID = %s AND CurrencyID = %s AND TenderID = %s
-                   ''', (store_id, currency_id, tender_id))
-    bankAccounts = cursor.fetchall()
-    conn.close()
-    return bankAccounts
 
 def get_commissions():
     conn = get_db_connection()

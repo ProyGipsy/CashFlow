@@ -59,32 +59,36 @@
                 <th>Descuento (%)</th>
                 <th>Referencia</th>
                 <th>Abono Realizado en</th>
-                <th></th>
             </tr>
             <tr class="payment-row">
-                <td><select name="currency" class="input-field">
-                    <option value="">Bs</option> 
-                    <option value="">USD</option>
-                </td>
-                <td>
-                    <select name="payment_method" class="input-field" onchange="updateBankAccounts(this)"> 
-                        <option value="" disabled selected>Forma de Pago</option>
-                        {% for t in tender | sort(attribute=1)  %}
-                            <option value="{{ t[0] }}">{{t[1] }}</option>
+                <td class="col-currency">
+                    <select name="currency" class="input-field" onchange="loadTenders(this.value)">
+                        {% for currency in currencies | sort(attribute=1)  %}
+                            <option value="{{ currency[0] }}">{{ currency[1] }}</option>
                         {% endfor %}
                     </select>
                 </td>
-                <td><input type="date" id="date_operation" name="date_operation" class="input-field"></td>
-                <td><input type="number" name="payment_amount" step="0.01" class="input-field" value="0.00"></td>
-                <td><input type="number" name="discount" step="0.01" class="input-field" value="0.00"></td>
-                <td><input type="text" name="reference" class="input-field"></td>
-                <td><select name="payment_made" class="input-field">
+                <td class="col-tender">
+                    <select name="payment_method" class="input-field" onchange="updateBankAccounts(this)"> 
+                        <option value="" disabled selected>Forma de Pago</option>
+                        <!-- Carga dinámica de opciones -->
+                    </select>
+                </td>
+                <td class="col-date"><input type="date" id="date_operation" name="date_operation" class="input-field"></td>
+                <td class="col-amount"><input type="number" name="payment_amount" step="0.01" class="input-field" value="0.00"></td>
+                <td class="col-discount"><input type="number" name="discount" step="0.01" class="input-field" value="0.00"></td>
+                <td class="col-reference"><input type="text" name="reference" class="input-field"></td>
+                <td class="col-account"><select name="payment_made" class="input-field">
                     <option value="" disabled selected>Cuenta Bancaria</option> 
                     {% for b in bankAccounts | sort(attribute=1)  %}
                         <option value="{{ b[0] }}">{{b[1]}} | {{b[2]}}</option>
                     {% endfor %}
                 </td>
-                <td><span class="delete-icon" onclick="deleteRow(this)"><img src="{{ url_for('static', filename='IMG/trash.png') }}" alt="Eliminar"></span></td>
+                <td class="col-actions no-border">
+                    <span class="delete-icon" onclick="deleteRow(this)">
+                        <img src="{{ url_for('static', filename='IMG/trash.png') }}" alt="Eliminar">
+                    </span>
+                </td>
             </tr>
         </table>
         <button type="button" id="add-payment" class="add-button">+</button>
@@ -179,10 +183,46 @@
 
 {% block extra_js %}
 <script>
+    // Filtro de Formas de Pago
+    function loadTenders(currencyId) {
+        fetch(`/get_tenders/${currencyId}`)
+            .then(response => response.json())
+            .then(data => {
+                const paymentMethodSelect = document.querySelector('select[name="payment_method"]');
+                while (paymentMethodSelect.options.length > 1) {
+                    paymentMethodSelect.remove(1);
+                }
+                
+                data.forEach(tender => {
+                    const option = document.createElement('option');
+                    option.value = tender.id;
+                    option.textContent = tender.description;
+                    paymentMethodSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error:', error));
+        // Agrega esto a tu función loadTenders o como evento independiente
+        document.querySelector('select[name="currency"]').addEventListener('change', function() {
+            // Cuando cambia la moneda, actualiza las cuentas bancarias si ya hay un tender seleccionado
+            const row = this.closest('tr');
+            const tenderSelect = row.querySelector('select[name="payment_method"]');
+            if (tenderSelect.value) {
+                updateBankAccounts(tenderSelect);
+            }
+        });
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        const currencySelect = document.querySelector('select[name="currency"]');
+        if (currencySelect.value) {
+            loadTenders(currencySelect.value);
+        }
+    });
+
     // Filtro de Cuentas Bancarias
     function updateBankAccounts(select) {
         const storeId = "{{ receiptStoreCustomer[0] }}";
-        const currencyId = "{{ receiptStoreCustomer[6] }}";
+        const row = select.closest('tr');
+        const currencyId = row.querySelector('select[name="currency"]').value;
         const tenderId = select.value;
 
         if (tenderId) {

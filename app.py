@@ -26,7 +26,7 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission, get_SalesRepCommission,
     set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoicePaidAmount, set_DebtPaymentRelation,
     set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo,
-    get_count_customers_with_accountsReceivable)
+    get_count_customers_with_accountsReceivable, get_currency)
 
 from onedrive import get_onedrive_headers
 
@@ -442,8 +442,7 @@ def get_invoices(customer_id, store_id):
 def accountsForm(account_ids):
     account_ids_list = account_ids.split('-')
     receiptStoreCustomer = get_receiptsStoreCustomer(account_ids_list)
-    currencyID = receiptStoreCustomer[6]
-    tender = get_tender(currencyID)
+    currencies = get_currency()
     receiptsInfo = get_receiptsInfo(account_ids_list)
     bankAccounts = []
     commissions = get_commissions()
@@ -451,12 +450,18 @@ def accountsForm(account_ids):
         'receipt.accountsForm.html',
         page='accountsForm',
         active_page='accountsReceivable',
-        tender=tender,
         receiptStoreCustomer=receiptStoreCustomer,
         receiptDetails=receiptsInfo,
         bankAccounts=bankAccounts,
-        commissions=commissions
+        commissions=commissions,
+        currencies=currencies
     )
+
+# Obtención de formas de pago según moneda
+@app.route('/get_tenders/<int:currency_id>')
+def get_tenders(currency_id):
+    tenders = get_tender(currency_id)
+    return jsonify([{'id': t[0], 'description': t[1]} for t in tenders])
 
 # Obtención de cuentas bancarias
 @app.route('/get_bankAccounts', methods=['POST'])

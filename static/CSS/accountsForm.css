@@ -63,6 +63,41 @@
     align-items: center;
 }
 
+.styled-table td.no-border {
+    border: none !important;
+}
+
+/* Definición de anchos para cada columna */
+.styled-table .col-currency {
+    width: 5%;
+}
+.styled-table .col-tender {
+    width: 15%;
+}
+.styled-table .col-date {
+    width: 10%;
+}
+.styled-table .col-amount {
+    width: 15%;
+}
+.styled-table .col-discount {
+    width: 12%;
+}
+.styled-table .col-reference {
+    width: 20%;
+}
+.styled-table .col-account {
+    width: 20%;
+}
+.styled-table .col-actions {
+    width: 3%;
+}
+.styled-table td .input-field {
+    width: 95%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
 .heading-table td {
     padding: 5px;
 }
