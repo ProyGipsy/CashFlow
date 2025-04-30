@@ -79,7 +79,7 @@ def loginReceipt():
 # CASHFLOW - RUTAS
 
 # Configuración de correo SMTP para Flujo de Caja
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW') #Correo por defecto
+#app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW') #Correo por defecto
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW')
 MAIL_RECIPIENT_CASHFLOW = os.environ.get('MAIL_RECIPIENT_CASHFLOW')
 mail = Mail(app)
@@ -232,19 +232,16 @@ def operations():
                 </html>
                 """
 
-        subject = 'Nuevo Ingreso Agregado' if motion_type == "1" else 'Nuevo Egreso Agregado'
-
-        print("store_id: ", store_id)
-        print("store_name: ", store_name)
+        subject = f'Operación {operation_id}: {"Ingreso" if motion_type == "1" else "Egreso"} Agregado'
 
         if store_id == '4':
-            print("La tienda es: ", store_name)
             app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW_REMBD')
-            print("El correo se enviará a: ", app.config['MAIL_USERNAME'])
+        else: 
+            app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW')
 
         msg = Message(subject=subject,
                     sender=app.config['MAIL_USERNAME'],
-                    recipients=[MAIL_RECIPIENT_CASHFLOW])
+                    recipients=[app.config['MAIL_USERNAME']])
         
         msg.html = html_content
 
@@ -561,18 +558,15 @@ def send_rejectionEmail():
 
     rejection_reason = request.form.get('rejection_reason', '')
     rejection_reason_html = "<br>".join(line.strip() for line in rejection_reason.split('\n') if line.strip())
-    store = request.form.get('store', '')
+    store_id = request.form.get('store_id', '')
+    store_name = request.form.get('store_name', '')
     customer = request.form.get('customer', '')
     currency = request.form.get('currency', '')
     totalPaid = request.form.get('total_paid', '')
     totalCommission = request.form.get('total_commission', '')
 
-    print("store: ", store) # ES EL NOMBRE, ENVIAR ID DESDE EL TEMPLATE
-
-    if (store == '904' OR store == '905'):
-        print("La tienda es: ", store)
-        app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW_REMBD')
-        print("El correo se enviará a: ", app.config['MAIL_USERNAME'])
+    if store_id == '904' or store_id == '905':
+        app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
 
     msg = Message(subject='Rechazo de Recibo de Cobranza',
                   sender=app.config['MAIL_USERNAME'],
@@ -584,7 +578,7 @@ def send_rejectionEmail():
             <p>El recibo de cobranza con los siguientes datos:</p>
 
             <ul style="list-style-type: disc; margin-left: 5px; padding-left: 5px;">
-                <li><strong>Empresa:</strong> {store}</li>
+                <li><strong>Empresa:</strong> {store_name}</li>
                 <li><strong>Cliente:</strong> {customer}</li>
                 <li><strong>Moneda:</strong> {currency}</li>
                 <li><strong>Monto total:</strong> {totalPaid} {currency}</li>
@@ -623,7 +617,7 @@ def send_rejectionEmail():
             headers={'Content-ID': '<Gipsy_imagotipo_color.png>'}
         )
 
-    #mail.send(msg)
+    mail.send(msg)
 
     return jsonify({'success': True})
 
@@ -824,6 +818,9 @@ def send_validationEmail():
             </body>
             </html>
             """
+    
+    if store_id == '904' or store_id == '905':
+        app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
 
     # Lógica para enviar el correo
     msg = Message(subject='Validación de Recibo de Cobranza',
