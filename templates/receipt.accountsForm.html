@@ -184,32 +184,28 @@
 {% block extra_js %}
 <script>
     // Filtro de Formas de Pago
-    function loadTenders(currencyId) {
+    function loadTenders(currencyId, row = null) {
         fetch(`/get_tenders/${currencyId}`)
             .then(response => response.json())
             .then(data => {
-                const paymentMethodSelect = document.querySelector('select[name="payment_method"]');
-                while (paymentMethodSelect.options.length > 1) {
-                    paymentMethodSelect.remove(1);
+                const targetSelect = row 
+                    ? row.querySelector('select[name="payment_method"]')
+                    : document.querySelector('select[name="payment_method"]');
+                    
+                // Limpiar opciones existentes
+                while (targetSelect.options.length > 1) {
+                    targetSelect.remove(1);
                 }
                 
+                // Agregar nuevas opciones
                 data.forEach(tender => {
                     const option = document.createElement('option');
                     option.value = tender.id;
                     option.textContent = tender.description;
-                    paymentMethodSelect.appendChild(option);
+                    targetSelect.appendChild(option);
                 });
             })
             .catch(error => console.error('Error:', error));
-        // Agrega esto a tu función loadTenders o como evento independiente
-        document.querySelector('select[name="currency"]').addEventListener('change', function() {
-            // Cuando cambia la moneda, actualiza las cuentas bancarias si ya hay un tender seleccionado
-            const row = this.closest('tr');
-            const tenderSelect = row.querySelector('select[name="payment_method"]');
-            if (tenderSelect.value) {
-                updateBankAccounts(tenderSelect);
-            }
-        });
     }
     document.addEventListener('DOMContentLoaded', function() {
         const currencySelect = document.querySelector('select[name="currency"]');
@@ -262,6 +258,7 @@
     }
 
     // Actualización de Saldo con la escritura
+    /*
     function addInputListeners() {
         const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
         amountInputs.forEach(input => {
@@ -284,6 +281,7 @@
         });
     }
     addInputListeners();
+    */
 
     // Agregar y Eliminar forma de pago
     document.getElementById('add-payment').addEventListener('click', function() {
@@ -331,6 +329,19 @@
         } else {
             alert('Debe existir al menos una forma de pago.');
         }
+    }
+
+    // Reconversión monetaria para formas de pago de diferente moneda
+    function convertAmount(receiptCurrency, amount){
+        const exchangeRate = "{{ currencies[0][2] }}"
+
+        convertedAmount = 0;
+        if(receiptCurrency == '1'){
+            convertedAmount = parseFloat(amount) * parseFloat(exchangeRate)
+        } else if (receiptCurrency == '2') {
+            convertedAmount = parseFloat(amount) / parseFloat(exchangeRate) 
+        }
+        return convertedAmount;
     }
 
     // Selección de Comprobantes de Pago
@@ -413,6 +424,7 @@
     });
 
     // Función para agregar listeners a todos los inputs de monto y fecha
+    /*
     function addInputListeners() {
         const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
         amountInputs.forEach(input => {
@@ -423,14 +435,67 @@
             input.addEventListener('change', updateDaysAndCommission);
         });
     }
+    */
+
+    function addInputListeners() {
+        const paymentRows = document.querySelectorAll('.payment-row');
+        
+        paymentRows.forEach(row => {
+            // Obtener elementos de la fila
+            const amountInput = row.querySelector('input[name="payment_amount"]');
+            const currencySelect = row.querySelector('select[name="currency"]');
+            const dateInput = row.querySelector('input[name="date_operation"]');
+            
+            // Eliminar listeners existentes para evitar duplicados
+            amountInput.removeEventListener('input', updateBalanceNote);
+            amountInput.removeEventListener('input', updateDaysAndCommission);
+            currencySelect.removeEventListener('change', handleCurrencyChange);
+            dateInput.removeEventListener('change', updateDaysAndCommission);
+            dateInput.removeEventListener('input', updateDaysAndCommission);
+            
+            // Agregar nuevos listeners con lógica unificada
+            amountInput.addEventListener('input', function() {
+                updateBalanceNote();
+                updateDaysAndCommission(); // Actualizar días y comisión cuando cambia el monto
+            });
+            
+            currencySelect.addEventListener('change', function(e) {
+                handleCurrencyChange(e); // Manejar cambio de moneda
+                updateBalanceNote();    // Actualizar saldo
+                updateDaysAndCommission(); // Actualizar días y comisión
+            });
+            
+            dateInput.addEventListener('change', updateDaysAndCommission);
+            dateInput.addEventListener('input', updateDaysAndCommission);
+        });
+    }
+
+    function handleCurrencyChange(event) {
+        const currencyId = event.target.value;
+        const row = event.target.closest('.payment-row');
+        loadTenders(currencyId, row); // Actualiza los métodos de pago para esta fila
+    }
 
     // Cálculo del Saldo de la Nota
     function updateBalanceNote() {
         let totalBalance = 0;
-        const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
-        amountInputs.forEach(input => {
-            totalBalance += parseFloat(input.value) || 0;
+        const paymentRows = document.querySelectorAll('.payment-row');
+        const receiptCurrency = "{{ receiptStoreCustomer[6] }}";
+
+        paymentRows.forEach(row => {
+            const amountInput = row.querySelector('input[name="payment_amount"]');
+            const currencySelect = row.querySelector('select[name="currency"]');
+            const amount = parseFloat(amountInput.value) || 0;
+            
+            // Conversión solo si la moneda de la fila es diferente a la del recibo
+            if (currencySelect.value != receiptCurrency) {
+                const convertedAmount = convertAmount(receiptCurrency, amount);
+                totalBalance += convertedAmount;
+            } else {
+                totalBalance += amount;
+            }
         });
+
         document.getElementById('balance_note').textContent = formatSpanishNumber(totalBalance);
         distributeBalanceAcrossReceipts(totalBalance);
     }
@@ -451,8 +516,19 @@
         // Obtener todas las filas de pago
         const paymentRows = document.querySelectorAll('.payment-row');
         const paymentData = Array.from(paymentRows).map(row => {
+
+            // Verificación y Reconversión de Moneda por Forma de Pago
+            const currencySelect = row.querySelector('select[name="currency"]');
+            const receiptCurrency = "{{ receiptStoreCustomer[6] }}";
+            entryAmount = row.querySelector('input[name="payment_amount"]').value
+            convertedAmount = entryAmount;
+            if(currencySelect.value != receiptCurrency){
+                entryAmount = row.querySelector('input[name="payment_amount"]').value
+                convertedAmount = convertAmount(receiptCurrency, entryAmount);
+            }
+
             return {
-                amount: parseFloat(row.querySelector('input[name="payment_amount"]').value) || 0,
+                amount: parseFloat(convertedAmount) || 0,
                 date: row.querySelector('input[name="date_operation"]').value,
                 dateObj: row.querySelector('input[name="date_operation"]').value ? 
                         new Date(row.querySelector('input[name="date_operation"]').value) : null,
