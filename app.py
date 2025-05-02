@@ -81,7 +81,6 @@ def loginReceipt():
 # Configuración de correo SMTP para Flujo de Caja
 #app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW') #Correo por defecto
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW')
-MAIL_RECIPIENT_CASHFLOW = os.environ.get('MAIL_RECIPIENT_CASHFLOW')
 mail = Mail(app)
 
 @app.route('/cashier')
@@ -318,7 +317,6 @@ def concepts():
 # Configuración de correo SMTP para Recibo
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
-MAIL_RECIPIENT_RECEIPT = os.environ.get('MAIL_RECIPIENT_CASHFLOW')
 mail = Mail(app)
 
 @app.route('/receiptAdmin')
@@ -472,15 +470,13 @@ def get_bank_accounts():
     bank_accounts = get_bankAccounts(store_id, currency_id, tender_id)
     return jsonify(bank_accounts)
 
-
+# Sustituyendo ruta
 @app.route('/submit_receipt', methods=['POST'])
 def submit_receipt():
-    #Conexión a la BD. Ejecución como una única transacción
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
-
         # Obtención de datos del formulario
         balance_note = float(request.form['balance_note'])
         commission_note = float(request.form['commission_note'])
@@ -492,64 +488,65 @@ def submit_receipt():
         payment_entries = [json.loads(entry) for entry in payment_entries] 
         proof_of_payments = request.files.getlist('proof_of_payment[]')
 
-        # Importes adeudados de cada factura
-        balance_calculations = []
-        index = 0
-        while f'balance_calculation_{index}' in request.form:
-                balance_calculations.append(float(request.form[f'balance_calculation_{index}']))
-                index += 1
+        # Obtener TODOS los account_ids de las facturas (no solo los de payment_entries)
+        all_account_ids = json.loads(request.form.get('all_account_ids', '[]'))
 
-        account_ids = [entry['account_id'] for entry in payment_entries if entry.get('account_id')]
-
-        for index, entry in enumerate(payment_entries):
+        # Procesar cada forma de pago
+        for entry in payment_entries:
             payment_date = datetime.strptime(entry['date'], '%Y-%m-%d').date()
             amount = float(entry['amount'])
             discount = float(entry['discount'])
             reference = entry['reference']
             payment_destination_id = entry['payment_destination_id']
-
-            # Obtención de balance, comisión y días
-            account_id = account_ids[index]
-            balance_amount = entry['balance_amount']
-            commission_amount = entry['commission_amount']
-            days_passed = entry['days_passed']
             tender_id = entry['tender_id']
+            
+            # El account_id viene del frontend (ya calculado)
+            account_id = entry.get('account_id')
 
-            if proof_of_payments and index < len(proof_of_payments):
-                file_path = save_proofOfPayment([proof_of_payments[index]], receipt_id, payment_date, index)
-                file_path = file_path[0] if file_path else ""  # Toma el primer elemento o cadena vacía
+            if proof_of_payments:
+                file_path = save_proofOfPayment(proof_of_payments, receipt_id, payment_date, payment_entries.index(entry))
+                file_path = file_path[0] if file_path else ""
             else:
-                file_path = "" 
+                file_path = ""
 
             set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
 
-            # Obtención de SalesRepID e isRetail
-            debt_account = get_salesRep_isRetail(account_id)
-            sales_rep_id = debt_account[0]
-            is_retail = debt_account[1]
-            # Inserción en SalesRepCommission
-            set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id)
+            if account_id:  # Solo si hay factura asociada
+                debt_account = get_salesRep_isRetail(account_id)
+                sales_rep_id = debt_account[0]
+                is_retail = debt_account[1]
+                set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, 
+                                     float(entry['balance_amount']), 
+                                     int(entry['days_passed']), 
+                                     float(entry['commission_amount']), 
+                                     receipt_id)
 
-        # Actualización de Monto Abonado
+        # Actualización de Monto Abonado - USAR all_account_ids
         new_amount_paid_list = request.form.getlist('amount_paid[]')
-        print("new_amount_paid_list: ", new_amount_paid_list)
         original_amounts = request.form.getlist('original_amount[]')
-        print("original_amounts: ", original_amounts)
         invoice_paid_amounts = request.form.getlist('invoice_paid_amounts[]')
-        print("invoice_paid_amounts: ", invoice_paid_amounts)
-        print("range(len(original_amounts)): ", range(len(original_amounts)))
-        for index in range(len(original_amounts)):
-            print("index: ", index)
-            print("account_id: ", account_ids[index])
-            account_id = account_ids[index]
+
+        # Validación de consistencia
+        if not (len(new_amount_paid_list) == len(original_amounts) == len(invoice_paid_amounts) == len(all_account_ids)):
+            raise ValueError("Inconsistencia en los datos recibidos")
+
+        for index in range(len(all_account_ids)):
+            account_id = all_account_ids[index]
             new_amount_paid = float(new_amount_paid_list[index])
             invoice_paidAmount = float(invoice_paid_amounts[index])
-            set_invoicePaidAmount(cursor, account_id, new_amount_paid)
-            # Inserción de la Relación Receipt-DebtAccount
-            set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount)
             
+            set_invoicePaidAmount(cursor, account_id, new_amount_paid)
+            set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount)
+
         # Confirmación la transacción
         conn.commit()
+
+        # Envío de correo electrónico de notificación
+        store_id = request.form.get('store_id', '')
+        store_name = request.form.get('store_name', '')
+        customer_name = request.form.get('customer_name', '')
+        send_receipt_notification(receipt_id, store_id, store_name, customer_name)
+
         return redirect(url_for('accountsReceivable'))
     
     except Exception as e:
@@ -560,6 +557,57 @@ def submit_receipt():
     finally:
         cursor.close()
         conn.close()
+
+def send_receipt_notification(receipt_id, store_id, store_name, customer_name):
+
+    subject = f"Recibo {receipt_id}: Se ha registrado una cobranza a la tienda {store_name} para el cliente {customer_name}"
+    app_url = os.environ.get('APP_URL')
+
+    if store_id == '904' or store_id == '905':
+        app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
+
+    msg = Message(subject=subject,
+                sender=app.config['MAIL_USERNAME'],
+                recipients=[os.environ.get('MAIL_RECIPIENT_TEST')])
+
+    body = f"""
+    <html>
+        <body>
+            <p>Se ha registrado una nueva cobranza con los siguientes detalles:</p>
+            <ul>
+                <li><strong>Número de Recibo:</strong> {receipt_id}</li>
+                <li><strong>Tienda:</strong> {store_name}</li>
+                <li><strong>Cliente:</strong> {customer_name}</li>
+            </ul>
+                
+            <p>Por favor ingrese a la <a href="{app_url}">aplicación web de GIPSY</a> de <strong>"Recibos de Vendedores"</strong> y diríjase a la sección de <strong>"Recibos de Cobranza"</strong> para revisar y validar la cobranza registrada.</p>
+                
+            <p>Atentamente,</p>
+            <p>GIPSY<br>
+            Avenida Francisco de Miranda, Centro Lido, Torre A, Piso 9, Oficina 93<br>
+            Zona industrial Guayaba, Av. Pual. Guayabal, galpón 45, Guarenas<br>
+            One Turnberry Place, 19495 Biscayne Blvd. #609 Aventura FL 33180 United States of America
+            </p>
+
+            <img src="cid:Gipsy_imagotipo_color.png" alt="Gipsy Logo" style="max-width: 200px;">
+        </body>
+    </html>
+    """
+
+    msg.html = body
+    
+    with app.open_resource('static/IMG/Gipsy_imagotipo_color.png') as logo:
+        msg.attach(
+            filename='Gipsy_imagotipo_color.png',
+            content_type='image/png',
+            data=logo.read(),
+            disposition='inline',
+            headers={'Content-ID': '<Gipsy_imagotipo_color.png>'}
+        )
+
+    mail.send(msg)
+
+    return jsonify({'success': True})
 
 
 # Rechazo de Recibo de Pago
@@ -583,7 +631,7 @@ def send_rejectionEmail():
 
     msg = Message(subject='Rechazo de Recibo de Cobranza',
                   sender=app.config['MAIL_USERNAME'],
-                  recipients=[MAIL_RECIPIENT_RECEIPT])
+                  recipients=[os.environ.get('MAIL_RECIPIENT_TEST')])
 
     html_body = f"""
     <html>
@@ -838,7 +886,7 @@ def send_validationEmail():
     # Lógica para enviar el correo
     msg = Message(subject='Validación de Recibo de Cobranza',
                   sender=app.config['MAIL_USERNAME'],
-                  recipients=[MAIL_RECIPIENT_RECEIPT])
+                  recipients=[os.environ.get('MAIL_RECIPIENT_TEST')])
     
     msg.html = html_body
 

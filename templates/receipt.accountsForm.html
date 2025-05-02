@@ -772,15 +772,12 @@
                 paymentAmount.classList.add('error');
             }
 
-            /*
-            // Comentando debido a formas de pago sin cuentas bancarias
             const paymentMade = row.querySelector('select[name="payment_made"]');
             if (!paymentMade || !paymentMade.value){
                 //alert(`Por favor seleccione una cuenta bancaria en la fila ${index + 1}`);
                 rowHasError = true;
                 paymentMade.classList.add('error');
             }
-            */
 
             if (rowHasError) {
                 isValid = false;
@@ -837,13 +834,20 @@
         // Recolección de Datos
         const formData = new FormData();
 
+        // IDs de Facturas involucradas
+        const allAccountIds = [];
+        document.querySelectorAll('input[name="account_id[]"]').forEach(input => {
+            allAccountIds.push(input.value);
+        });
+        formData.append('all_account_ids', JSON.stringify(allAccountIds));
+
         // Saldo Nota y Comisión Total
         formData.append('balance_note', cleanNumberForServer(document.getElementById('balance_note').textContent));
         formData.append('commission_note', cleanNumberForServer(document.getElementById('commission_note').textContent));
 
         // Datos para PaymentReceiptEntry
         const paymentRows = document.querySelectorAll('.payment-row');
-        const accountIds = document.querySelectorAll('input[name="account_id[]"]');
+        const accountInputs = document.querySelectorAll('input[name="account_id[]"]');
 
         paymentRows.forEach((row, index) => {
             const paymentDate = row.querySelector('input[name="date_operation"]').value;
@@ -851,7 +855,16 @@
             const discount = row.querySelector('input[name="discount"]').value;
             const reference = row.querySelector('input[name="reference"]').value;
             const paymentDestinationId = row.querySelector('select[name="payment_made"]').value;
-            const accountId = accountIds[index] ? accountIds[index].value : null;
+            
+            // Usar el account_id de la primera factura no pagada completamente
+            let accountId = null;
+            const balanceFields = document.querySelectorAll('#balance_calculation');
+            for (let i = 0; i < balanceFields.length; i++) {
+                if (parseFloat(balanceFields[i].textContent) > 0) {
+                    accountId = accountInputs[i].value;
+                    break;
+                }
+            }
 
             const tenderId = row.querySelector('select[name="payment_method"]').value;
 
@@ -897,6 +910,14 @@
             const invoicePaidAmount = field.dataset.invoicePaidAmount || '0.00';
             formData.append('invoice_paid_amounts[]', invoicePaidAmount);
         })
+
+        // Datos de la store y el customer para el correo de notificación
+        const store_id = "{{ receiptStoreCustomer[0] }}";
+        const store_name = "{{ receiptStoreCustomer[1] }}";
+        const customer_name = "{{ receiptStoreCustomer[3] }}" + " " + "{{ receiptStoreCustomer[4] }}";
+        formData.append('store_id', store_id);
+        formData.append('store_name', store_name);
+        formData.append('customer_name', customer_name);
 
         // Envío de Datos al Servidor
         fetch("{{ url_for('submit_receipt') }}", {
