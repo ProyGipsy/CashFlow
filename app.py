@@ -531,14 +531,22 @@ def submit_receipt():
             set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id)
 
         # Actualización de Monto Abonado
-        amount_paid_list = request.form.getlist('amount_paid[]')
+        new_amount_paid_list = request.form.getlist('amount_paid[]')
+        print("new_amount_paid_list: ", new_amount_paid_list)
         original_amounts = request.form.getlist('original_amount[]')
+        print("original_amounts: ", original_amounts)
+        invoice_paid_amounts = request.form.getlist('invoice_paid_amounts[]')
+        print("invoice_paid_amounts: ", invoice_paid_amounts)
+        print("range(len(original_amounts)): ", range(len(original_amounts)))
         for index in range(len(original_amounts)):
+            print("index: ", index)
+            print("account_id: ", account_ids[index])
             account_id = account_ids[index]
-            amount_paid = float(amount_paid_list[index])
-            set_invoicePaidAmount(cursor, account_id, amount_paid)
+            new_amount_paid = float(new_amount_paid_list[index])
+            invoice_paidAmount = float(invoice_paid_amounts[index])
+            set_invoicePaidAmount(cursor, account_id, new_amount_paid)
             # Inserción de la Relación Receipt-DebtAccount
-            set_DebtPaymentRelation(cursor, account_id, receipt_id)
+            set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount)
             
         # Confirmación la transacción
         conn.commit()

@@ -184,14 +184,27 @@
 {% block extra_js %}
 <script>
     // Filtro de Formas de Pago
-    function loadTenders(currencyId, row = null) {
+    function handleCurrencyChange(event) {
+        const currencyId = event.target.value;
+        const row = event.target.closest('.payment-row');
+        loadTenders(currencyId, row);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const paymentRows = document.querySelectorAll('.payment-row');
+        paymentRows.forEach(row => {
+            const currencySelect = row.querySelector('select[name="currency"]');
+            if (currencySelect && currencySelect.value) {
+                loadTenders(currencySelect.value, row);
+            }
+        });
+    });
+    function loadTenders(currencyId, row) {
         fetch(`/get_tenders/${currencyId}`)
             .then(response => response.json())
             .then(data => {
-                const targetSelect = row 
-                    ? row.querySelector('select[name="payment_method"]')
-                    : document.querySelector('select[name="payment_method"]');
-                    
+                const targetSelect = row.querySelector('select[name="payment_method"]');
+
                 // Limpiar opciones existentes
                 while (targetSelect.options.length > 1) {
                     targetSelect.remove(1);
@@ -207,12 +220,6 @@
             })
             .catch(error => console.error('Error:', error));
     }
-    document.addEventListener('DOMContentLoaded', function() {
-        const currencySelect = document.querySelector('select[name="currency"]');
-        if (currencySelect.value) {
-            loadTenders(currencySelect.value);
-        }
-    });
 
     // Filtro de Cuentas Bancarias
     function updateBankAccounts(select) {
@@ -241,7 +248,7 @@
                 data.forEach(account => {
                     const option = document.createElement("option");
                     option.value = account[0];
-                    option.textContent = `${account[1]} | ${account[2]}`; // BankName | Destiny
+                    option.textContent = `${account[1]} ${account[2]}`; // BankName | Destiny
                     paymentMadeSelect.appendChild(option);
                 });
             })
@@ -256,32 +263,6 @@
             .replace(/\B(?=(\d{3})+(?!\d))/g, ".")
             .replace("X", ",");
     }
-
-    // Actualización de Saldo con la escritura
-    /*
-    function addInputListeners() {
-        const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
-        amountInputs.forEach(input => {
-            input.removeEventListener('input', updateBalanceNote);
-            input.removeEventListener('input', updateDaysAndCommission);
-            
-            input.addEventListener('input', function() {
-                updateBalanceNote();
-                updateDaysAndCommission();
-            });
-        });
-        
-        const dateInputs = document.querySelectorAll('input[name="date_operation"]');
-        dateInputs.forEach(input => {
-            input.removeEventListener('change', updateDaysAndCommission);
-            input.removeEventListener('input', updateDaysAndCommission);
-            
-            input.addEventListener('change', updateDaysAndCommission);
-            input.addEventListener('input', updateDaysAndCommission);
-        });
-    }
-    addInputListeners();
-    */
 
     // Agregar y Eliminar forma de pago
     document.getElementById('add-payment').addEventListener('click', function() {
@@ -308,6 +289,10 @@
         dateInput.setAttribute("max", maxDate);
 
         document.getElementById('payment-table').appendChild(newPagoRow);
+
+        // Carga de tenders default
+        const defaultCurrencyId = '1';
+        loadTenders(defaultCurrencyId, newPagoRow);
         
         // Establecer listeners para los nuevos inputs
         addInputListeners();
@@ -348,12 +333,23 @@
     function handleFileSelection(input) {
         const container = document.getElementById('selected-files-container');
         container.innerHTML = '';
+        
+        const paymentRows = document.querySelectorAll('.payment-row').length;
+        const filesToProcess = Array.from(input.files).slice(0, paymentRows); // Limitar a N archivos
+        
+        if (filesToProcess.length > 0) {
 
-        if (input.files && input.files.length > 0) {
-            for (let i = 0; i < input.files.length; i++) {
-                const file = input.files[i];
+            if (input.files.length > paymentRows) {
+                alert(`Solo puede cargar un máximo de ${paymentRows} comprobante(s) para ${paymentRows} forma(s) de pago`);
+                
+                const dataTransfer = new DataTransfer();
+                filesToProcess.forEach(file => dataTransfer.items.add(file));
+                input.files = dataTransfer.files;
+            }
+            
+            filesToProcess.forEach((file, i) => {
                 const reader = new FileReader();
-
+                
                 reader.onload = function(e) {
                     const previewDiv = document.createElement('div');
                     previewDiv.className = 'file-preview';
@@ -374,12 +370,10 @@
                             <button class="remove-file" onclick="removeFile(${i})">×</button>
                         `;
                     }
-
                     container.appendChild(previewDiv);
                 };
-
                 reader.readAsDataURL(file);
-            }
+            });
         }
     }
     function updateFileName() {
@@ -423,20 +417,6 @@
         updateBalanceNote();
     });
 
-    // Función para agregar listeners a todos los inputs de monto y fecha
-    /*
-    function addInputListeners() {
-        const amountInputs = document.querySelectorAll('input[name="payment_amount"]');
-        amountInputs.forEach(input => {
-            input.addEventListener('input', updateBalanceNote);
-        });
-        const dateInputs = document.querySelectorAll('input[name="date_operation"]');
-        dateInputs.forEach(input => {
-            input.addEventListener('change', updateDaysAndCommission);
-        });
-    }
-    */
-
     function addInputListeners() {
         const paymentRows = document.querySelectorAll('.payment-row');
         
@@ -468,12 +448,6 @@
             dateInput.addEventListener('change', updateDaysAndCommission);
             dateInput.addEventListener('input', updateDaysAndCommission);
         });
-    }
-
-    function handleCurrencyChange(event) {
-        const currencyId = event.target.value;
-        const row = event.target.closest('.payment-row');
-        loadTenders(currencyId, row); // Actualiza los métodos de pago para esta fila
     }
 
     // Cálculo del Saldo de la Nota
@@ -551,8 +525,8 @@
                 originalValue: parseFloat(field.getAttribute('data-original-value')) || 0,
                 currentValue: parseFloat(field.textContent) || 0,
                 dueDate: new Date(field.getAttribute('data-due-date')),
-                remaining: parseFloat(field.getAttribute('data-original-value')) || 0, // Usar el valor original
-                paymentDate: null, // Esta es la fecha del primer pago que contribuyó
+                remaining: parseFloat(field.getAttribute('data-original-value')) || 0,
+                paymentDate: null,
                 amountPaid: 0.00,
                 discountApplied: 0.00
             };
@@ -624,6 +598,9 @@
 
         // Actualizar la interfaz con los resultados
         receiptData.forEach((receipt, index) => {
+            // Guardar el monto pagado para cada factura
+            receipt.element.dataset.invoicePaidAmount = receipt.amountPaid.toFixed(2);
+
             // Mostrar saldo pendiente con precisión
             const remainingWithPrecision = parseFloat((receipt.originalValue - receipt.discountApplied - receipt.amountPaid).toFixed(2));
             balanceCalculationFields[index].textContent = formatSpanishNumber(remainingWithPrecision);
@@ -795,17 +772,20 @@
                 paymentAmount.classList.add('error');
             }
 
+            /*
+            // Comentando debido a formas de pago sin cuentas bancarias
             const paymentMade = row.querySelector('select[name="payment_made"]');
             if (!paymentMade || !paymentMade.value){
                 //alert(`Por favor seleccione una cuenta bancaria en la fila ${index + 1}`);
                 rowHasError = true;
                 paymentMade.classList.add('error');
             }
+            */
 
             if (rowHasError) {
                 isValid = false;
-                emptyRows.push(index + 1); // Guardar número de fila (1-based)
-                row.style.backgroundColor = '#ffdddd'; // Resaltar fila completa
+                emptyRows.push(index + 1);
+                row.style.backgroundColor = '#ffdddd';
             }
         });
 
@@ -840,6 +820,14 @@
         document.getElementById("confirmationModal").style.display = "none";
     }
 
+    // Eliminación de formato español de cantidades para manejo como float
+    function cleanNumberForServer(numberStr) {
+        if (typeof numberStr !== 'string') {
+            return numberStr;
+        }
+        return numberStr.replace(/\./g, '').replace(',', '.');
+    }
+
     function sendReceipt() {
         closeConfirmationModal();
         document.getElementById('loadingModal').style.display = 'flex';
@@ -850,8 +838,8 @@
         const formData = new FormData();
 
         // Saldo Nota y Comisión Total
-        formData.append('balance_note', document.getElementById('balance_note').textContent);
-        formData.append('commission_note', document.getElementById('commission_note').textContent);
+        formData.append('balance_note', cleanNumberForServer(document.getElementById('balance_note').textContent));
+        formData.append('commission_note', cleanNumberForServer(document.getElementById('commission_note').textContent));
 
         // Datos para PaymentReceiptEntry
         const paymentRows = document.querySelectorAll('.payment-row');
@@ -873,13 +861,13 @@
 
             formData.append('payment_entries[]', JSON.stringify({
                 date: paymentDate,
-                amount: amount,
-                discount: discount,
+                amount: cleanNumberForServer(amount),
+                discount: cleanNumberForServer(discount),
                 reference: reference,
                 payment_destination_id: paymentDestinationId,
                 account_id: accountId,
-                balance_amount: balanceAmount, 
-                commission_amount: commissionAmount,
+                balance_amount: cleanNumberForServer(balanceAmount), 
+                commission_amount: cleanNumberForServer(commissionAmount),
                 days_passed: daysPassed,
                 tender_id: tenderId
             }));
@@ -903,6 +891,13 @@
             formData.append('amount_paid[]', amountPaid.toFixed(2));
         });
 
+        // Montos pagados por cada factura
+        const invoicePaidAmountFields = document.querySelectorAll('#balance_calculation');
+        invoicePaidAmountFields.forEach((field, index) => {
+            const invoicePaidAmount = field.dataset.invoicePaidAmount || '0.00';
+            formData.append('invoice_paid_amounts[]', invoicePaidAmount);
+        })
+
         // Envío de Datos al Servidor
         fetch("{{ url_for('submit_receipt') }}", {
             method: 'POST',
@@ -915,12 +910,14 @@
             } else {
                 alert("Error al enviar los datos.");
                 saveButton.disabled = false;
+                document.getElementById('loadingModal').style.display = 'none';
             }
         })
         .catch(error => {
             console.error('Error:', error);
             alert("Error al enviar los datos.");
             saveButton.disabled = false;
+            document.getElementById('loadingModal').style.display = 'none';
         });
     }
 

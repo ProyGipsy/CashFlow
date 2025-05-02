@@ -465,12 +465,12 @@ def set_invoicePaidAmount(cursor, account_id, new_paidAmount):
                    ''', (new_paidAmount, account_id))
     
 
-def set_DebtPaymentRelation(cursor, account_id, receipt_id):
+def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount):
     cursor.execute('''
                     INSERT INTO CommissionReceipt.DebtPaymentRelation
-                    (DebtAccountID, PaymentReceiptID, isRetail)
-                    VALUES (%s, %s, %s)
-                    ''', (account_id, int(receipt_id), 0))
+                    (DebtAccountID, PaymentReceiptID, isRetail, PaidAmount)
+                    VALUES (%s, %s, %s, %s)
+                    ''', (account_id, int(receipt_id), 0, invoice_paidAmount))
 
 
 def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id):

@@ -281,6 +281,7 @@ input[type="submit"]:hover {
 .edit-icon img, .delete-icon img{
     width: 24px;
     height: auto;
+    cursor: pointer;
 }
 
 /*Modal*/
