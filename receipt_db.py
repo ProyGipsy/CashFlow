@@ -263,11 +263,12 @@ def get_invoices_by_receipt(receipt_id):
 def get_paymentEntries_by_receipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT T.Description, E.PaymentDate, E.Amount, E.Discount, E.Reference, O.BankName, O.Destiny, E.ProofOfPaymentPath
+    cursor.execute('''SELECT DISTINCT T.Description, E.PaymentDate, E.Amount, E.Discount, E.Reference, O.BankName, O.Destiny, E.ProofOfPaymentPath, C.Code
                     FROM CommissionReceipt.PaymentReceiptEntry E
                     JOIN CommissionReceipt.PaymentOption O ON E.PaymentDestinationID = O.AccountID
                     JOIN Main.Tender T ON E.TenderID = T.ID
-                    WHERE E.ReceiptID = %s
+                    JOIN Main.Currency C ON T.CurrencyID = C.ID
+                    WHERE T.IsRetail = 0 AND E.ReceiptID = %s
                     ''', (receipt_id,))
     paymentEntries = cursor.fetchall()
     conn.close()
@@ -358,7 +359,30 @@ def get_onedriveStoreLogo(logo_name):
     except Exception as e:
         print(f"Error al obtener logo {logo_name}: {str(e)}")
         return None
+    
+def get_paymentRelations_by_receipt(receipt_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT DebtAccountID, PaidAmount 
+        FROM CommissionReceipt.DebtPaymentRelation
+        WHERE PaymentReceiptID = %s
+    ''', (receipt_id,))
+    relations = cursor.fetchall()
+    conn.close()
+    return relations
 
+def get_invoiceCurrentPaidAmount(account_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT PaidAmount 
+        FROM CommissionReceipt.DebtAccount
+        WHERE AccountID = %s
+    ''', (account_id,))
+    paid_amount = cursor.fetchone()[0]
+    conn.close()
+    return paid_amount
 
 
 # Escritura de datos en la BD a través de la Interfaz
@@ -463,6 +487,17 @@ def set_invoicePaidAmount(cursor, account_id, new_paidAmount):
                    SET PaidAmount = %s
                    WHERE AccountID = %s
                    ''', (new_paidAmount, account_id))
+    
+def revert_invoicePaidAmount(account_id, new_paidAmount):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE CommissionReceipt.DebtAccount
+        SET PaidAmount = %s
+        WHERE AccountID = %s
+    ''', (new_paidAmount, account_id))
+    conn.commit()
+    conn.close()
     
 
 def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount):

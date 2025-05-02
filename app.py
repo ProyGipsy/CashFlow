@@ -25,8 +25,8 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     get_customers_with_unvalidated_receipts, get_count_customers_with_unvalidated_receipts, get_unvalidated_receipts_by_customer,
     get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission, get_SalesRepCommission,
     set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoicePaidAmount, set_DebtPaymentRelation,
-    set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo,
-    get_count_customers_with_accountsReceivable, get_currency)
+    set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
+    get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount)
 
 from onedrive import get_onedrive_headers
 
@@ -511,15 +511,10 @@ def submit_receipt():
 
             set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
 
-            if account_id:  # Solo si hay factura asociada
-                debt_account = get_salesRep_isRetail(account_id)
-                sales_rep_id = debt_account[0]
-                is_retail = debt_account[1]
-                set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, 
-                                     float(entry['balance_amount']), 
-                                     int(entry['days_passed']), 
-                                     float(entry['commission_amount']), 
-                                     receipt_id)
+            debt_account = get_salesRep_isRetail(account_id)
+            sales_rep_id = debt_account[0]
+            is_retail = debt_account[1]
+            set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, float(entry['balance_amount']), int(entry['days_passed']), float(entry['commission_amount']), receipt_id)
 
         # Actualización de Monto Abonado - USAR all_account_ids
         new_amount_paid_list = request.form.getlist('amount_paid[]')
@@ -616,6 +611,23 @@ def send_rejectionEmail():
 
     receipt_id = int(request.form.get('receipt_id', ''))
     set_isReviewedReceipt(receipt_id)
+
+    # Revirtiendo monto abonado
+    try:
+        payment_relations = get_paymentRelations_by_receipt(receipt_id)
+        for relation in payment_relations:
+            debtAccount_id = relation[0]
+            print("debtAccount_id: ", debtAccount_id)
+            paid_amount = float(relation[1])
+            print("paid_amount: ", paid_amount)
+            current_paid = float(get_invoiceCurrentPaidAmount(debtAccount_id))
+            print("current_paid: ", current_paid)
+            new_paid_amount = current_paid - paid_amount
+            revert_invoicePaidAmount(debtAccount_id, new_paid_amount)
+   
+    except Exception as e:
+        app.logger.error(f"Error al revertir pagos: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
 
     rejection_reason = request.form.get('rejection_reason', '')
     rejection_reason_html = "<br>".join(line.strip() for line in rejection_reason.split('\n') if line.strip())

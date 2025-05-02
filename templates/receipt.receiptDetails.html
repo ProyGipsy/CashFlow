@@ -58,6 +58,7 @@
             <h3>Formas de Pago</h3> 
             <table class="styled-table" id="pago-table">
                 <tr>
+                    <th>Moneda</th>
                     <th>Forma de Pago</th>
                     <th>Fecha de Pago</th>
                     <th>Monto</th>
@@ -67,12 +68,13 @@
                 </tr>
                 {% for paymentEntry in paymentEntries %}
                 <tr class="pago-row">
+                    <td>{{ paymentEntry[8] }}</td>
                     <td>{{ paymentEntry[0] }}</td>
                     <td>{{ paymentEntry[1].strftime('%d-%m-%Y') }}</td>
                     <td>{{ "{:,.2f}".format(paymentEntry[2]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
                     <td>{{ "{:,.2f}".format(paymentEntry[3]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
                     <td>{{ paymentEntry[4] }}</td>
-                    <td>{{ paymentEntry[5] }} | {{ paymentEntry[6] }}</td>
+                    <td>{{ paymentEntry[5] }} {{ paymentEntry[6] }}</td>
                 </tr>
                 {% endfor %}
             </table>
@@ -412,10 +414,12 @@
                 openFinalRejectionModal()
             } else {
                 alert('Error al enviar el correo de rechazo.');
+                closeLoadingRejectionModal();
             }
         })
         .catch(error => {
             console.error('Error:', error);
+            closeLoadingRejectionModal();
         });
     }
 
