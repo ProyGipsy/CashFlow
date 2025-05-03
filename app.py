@@ -484,6 +484,9 @@ def submit_receipt():
         # Inserción de Recibo en BD
         receipt_id = set_paymentReceipt(cursor, balance_note, commission_note)
 
+        # Obtenención de datos de comisiones por factura
+        commission_data = json.loads(request.form.get('commission_data', '[]'))
+
         payment_entries = request.form.getlist('payment_entries[]')
         payment_entries = [json.loads(entry) for entry in payment_entries] 
         proof_of_payments = request.files.getlist('proof_of_payment[]')
@@ -511,11 +514,6 @@ def submit_receipt():
 
             set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
 
-            debt_account = get_salesRep_isRetail(account_id)
-            sales_rep_id = debt_account[0]
-            is_retail = debt_account[1]
-            set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, float(entry['balance_amount']), int(entry['days_passed']), float(entry['commission_amount']), receipt_id)
-
         # Actualización de Monto Abonado - USAR all_account_ids
         new_amount_paid_list = request.form.getlist('amount_paid[]')
         original_amounts = request.form.getlist('original_amount[]')
@@ -527,10 +525,26 @@ def submit_receipt():
 
         for index in range(len(all_account_ids)):
             account_id = all_account_ids[index]
+
+            # Datos e inserción en SalesRepCommission
+            debt_account = get_salesRep_isRetail(account_id)
+            sales_rep_id = debt_account[0]
+            is_retail = debt_account[1]
+            commission_info = next((item for item in commission_data if item['account_id'] == account_id), None)
+            balance_amount = float(commission_info['balance_amount'])
+            print("balance_amount: ", balance_amount)
+            days_passed = int(commission_info['days_passed'])
+            print("days_passed: ", days_passed)
+            commission_amount = float(commission_info['commission_amount'])
+            print("commission_amount: ", commission_amount)
+            set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id)
+
+            # Actualización de factura
             new_amount_paid = float(new_amount_paid_list[index])
             invoice_paidAmount = float(invoice_paid_amounts[index])
-            
             set_invoicePaidAmount(cursor, account_id, new_amount_paid)
+
+            # Relación factura-recibo
             set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount)
 
         # Confirmación la transacción

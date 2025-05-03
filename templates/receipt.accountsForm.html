@@ -855,23 +855,8 @@
             const discount = row.querySelector('input[name="discount"]').value;
             const reference = row.querySelector('input[name="reference"]').value;
             const paymentDestinationId = row.querySelector('select[name="payment_made"]').value;
-            
-            // Usar el account_id de la primera factura no pagada completamente
-            let accountId = null;
-            const balanceFields = document.querySelectorAll('#balance_calculation');
-            for (let i = 0; i < balanceFields.length; i++) {
-                if (parseFloat(balanceFields[i].textContent) > 0) {
-                    accountId = accountInputs[i].value;
-                    break;
-                }
-            }
 
             const tenderId = row.querySelector('select[name="payment_method"]').value;
-
-            const balanceAmount = parseFloat(document.querySelectorAll('#balance_calculation')[index].textContent);
-            const commissionAmount = parseFloat(document.querySelectorAll('#commission_received')[index].textContent);
-            console.log("commissionAmount: ", commissionAmount)
-            const daysPassed = parseInt(document.querySelectorAll('#days_passed')[index].textContent)
 
             formData.append('payment_entries[]', JSON.stringify({
                 date: paymentDate,
@@ -879,13 +864,22 @@
                 discount: cleanNumberForServer(discount),
                 reference: reference,
                 payment_destination_id: paymentDestinationId,
-                account_id: accountId,
-                balance_amount: cleanNumberForServer(balanceAmount), 
-                commission_amount: commissionAmount,
-                days_passed: daysPassed,
                 tender_id: tenderId
             }));
         });
+
+        // Datos para SalesRepCommission
+        const commissionData = [];
+        document.querySelectorAll('#commission_received').forEach((comm, idx) => {
+            commissionData.push({
+                account_id: accountInputs[idx].value,
+                balance_amount: cleanNumberForServer(document.querySelectorAll('#balance_calculation')[idx].textContent),
+                days_passed: parseInt(document.querySelectorAll('#days_passed')[idx].textContent),
+                commission_amount: cleanNumberForServer(comm.textContent)
+            });
+            console.log("commission_data: ", commission_data);
+        });
+        formData.append('commission_data', JSON.stringify(commissionData));
 
         // Adición de Comprobantes de Pago
         const proofOfPayments = document.querySelector('input[type="file"][name="proof_of_payment[]"]');
