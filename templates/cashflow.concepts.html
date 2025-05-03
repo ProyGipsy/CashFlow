@@ -165,7 +165,6 @@
     }
 
     function addRow() {
-        console.log("Se está agregando una nueva fila");
         const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
         const newRow = table.insertRow();
         newRow.innerHTML = `
@@ -182,11 +181,9 @@
         `;
         nextId++;
         isChanged = true;
-        console.log("isChanged = ", isChanged)
     }
 
     function submitNewConcept(){
-        console.log("Estoy en submitNewConcept");
         const name = document.getElementById('newName').value;
         const desc = document.querySelector('[placeholder="Descripción"]').value;
         const typeMotion = document.querySelector('select.input-field').value; // Obtener el texto del select
