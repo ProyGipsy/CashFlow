@@ -192,16 +192,21 @@ def set_concepts(concepts):
         id = concept['id']
         name = concept['name']
         desc = concept['desc']
-        motion = concept['motion']
+        motion_id = concept['motion']
+        
         cursor.execute(f"""
             MERGE INTO cashflow.Concept AS target
-            USING (VALUES (%s, %s, %s, %s)) AS source (ConceptID, ConceptName, ConceptDescription, motion)
+            USING (VALUES (%s, %s, %s, %s)) AS source (ConceptID, ConceptName, ConceptDescription, MotionID)
             ON target.ConceptID = source.ConceptID
             WHEN MATCHED THEN
-                UPDATE SET target.ConceptName = source.ConceptName, target.ConceptDescription = source.ConceptDescription, target.motion = source.motion
+                UPDATE SET 
+                    target.ConceptName = source.ConceptName, 
+                    target.ConceptDescription = source.ConceptDescription, 
+                    target.MotionID = source.MotionID
             WHEN NOT MATCHED THEN
-                INSERT (ConceptName, ConceptDescription, motion) VALUES (source.ConceptName, source.ConceptDescription, source.motion);
-        """, (id, name, desc, motion))
+                INSERT (ConceptName, ConceptDescription, MotionID) 
+                VALUES (source.ConceptName, source.ConceptDescription, source.MotionID);
+        """, (id, name, desc, motion_id))
     
     conn.commit()
     conn.close()
