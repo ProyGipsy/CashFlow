@@ -188,7 +188,7 @@
         const desc = document.querySelector('[placeholder="Descripción"]').value;
         const typeMotion = document.querySelector('select.input-field').value; // Obtener el texto del select
         
-        if (name && desc && typeMotion) {
+        if (name && typeMotion) {
             // Asigna el ID directamente
             document.getElementById('addId').value = nextId - 1; // Usa el ID que se mostró
             document.getElementById('addName').value = name;
@@ -201,81 +201,56 @@
     }
 
     function saveChanges() {
-
-        // Verificación de campos en blanco
         const table = document.getElementById('rules-table').getElementsByTagName('tbody')[0];
         let hasEmptyConcept = false;
-        let emptyConcept = [];
-        
+        let concepts = [];
+
         for (let row of table.rows) {
+            const id = row.cells[0].textContent.trim();
             const nameInput = row.cells[1].querySelector('input');
-            let conceptName = '';
-            
-            if (nameInput) {
-                conceptName = nameInput.value.trim();
-            } else {
-                conceptName = row.cells[1].textContent.trim();
-            }
-            
-            if (conceptName === '') {
+            const descInput = row.cells[2].querySelector('input');
+            const typeMotionInput = row.cells[3].querySelector('select');
+
+            const name = nameInput ? nameInput.value.trim() : row.cells[1].textContent.trim();
+            const desc = descInput ? descInput.value.trim() : row.cells[2].textContent.trim();
+            const typeMotion = typeMotionInput ? typeMotionInput.value : row.cells[3].textContent.trim();
+
+            if (name === '') {
                 hasEmptyConcept = true;
-                const conceptId = row.cells[0].textContent.trim();
-                emptyConcept.push(conceptId);
                 row.style.backgroundColor = '#ffdddd';
             } else {
-                row.style.backgroundColor = ''; // Quitar resaltado si estaba
+                row.style.backgroundColor = '';
+                concepts.push({ id, name, desc, motion: typeMotion });
             }
         }
-        
+
         if (hasEmptyConcept) {
-            document.getElementById('loadingModal').style.display = 'none';
             alert("Hay conceptos con nombre en blanco. Por favor, complete todos los nombres antes de guardar.");
             return;
         }
 
-        // Proceso de guardado
-        document.getElementById('loadingModal').style.display = 'flex';
-        const concepts = [];
-        
-        for (let row of table.rows) {
-            const id = row.cells[0].textContent.trim(); // Obtener el ID directamente del texto
-            const nameInput = row.cells[1].querySelector('input');
-            const descInput = row.cells[2].querySelector('input');
-            const typeMotionInput = row.cells[3].querySelector('select');
-    
-            const name = nameInput ? nameInput.value.trim() : row.cells[1].textContent.trim();
-            const desc = descInput ? descInput.value.trim() : row.cells[2].textContent.trim();
-            const typeMotion = typeMotionInput ? typeMotionInput.value : row.cells[3].textContent.trim();
-    
-            console.log(name);
-            console.log(desc);
-            console.log(typeMotion);
-            
-            if (id && name && desc && typeMotion) {
-                concepts.push({ id, name, desc, motion: typeMotion }); // Enviar el type_motion al servidor
-            }
-        }
-        
-        // Enviar los datos al servidor
-        if (concepts.length > 0) {
-    
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", "{{ url_for('concepts') }}", true);
-            xhr.setRequestHeader("Content-Type", "application/json");
-        
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    window.location.reload();
-                } else {
-                    alert("Hubo un error al guardar los cambios.");
-                }
-            };
-        
-            xhr.send(JSON.stringify(concepts));
-            isChanged = false;
-        } else {
+        if (concepts.length === 0) {
             alert("No se realizaron cambios.");
+            return;
         }
+
+        document.getElementById('loadingModal').style.display = 'flex';
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "{{ url_for('concepts') }}", true);
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        xhr.onload = function() {
+            document.getElementById('loadingModal').style.display = 'none'; // Ocultar modal
+            if (xhr.status === 200) {
+                window.location.reload();
+            } else {
+                alert("Hubo un error al guardar los cambios.");
+            }
+        };
+
+        xhr.send(JSON.stringify(concepts));
+        isChanged = false;
     }
 
     function undoChanges() {
