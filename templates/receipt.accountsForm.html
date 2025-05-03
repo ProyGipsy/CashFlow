@@ -870,17 +870,18 @@
 
             const balanceAmount = parseFloat(document.querySelectorAll('#balance_calculation')[index].textContent);
             const commissionAmount = parseFloat(document.querySelectorAll('#commission_received')[index].textContent);
+            console.log("commissionAmount: ", commissionAmount)
             const daysPassed = parseInt(document.querySelectorAll('#days_passed')[index].textContent)
 
             formData.append('payment_entries[]', JSON.stringify({
                 date: paymentDate,
-                amount: cleanNumberForServer(amount),
+                amount: amount,
                 discount: cleanNumberForServer(discount),
                 reference: reference,
                 payment_destination_id: paymentDestinationId,
                 account_id: accountId,
                 balance_amount: cleanNumberForServer(balanceAmount), 
-                commission_amount: cleanNumberForServer(commissionAmount),
+                commission_amount: commissionAmount,
                 days_passed: daysPassed,
                 tender_id: tenderId
             }));

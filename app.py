@@ -504,7 +504,7 @@ def submit_receipt():
             account_id = entry.get('account_id')
 
             if proof_of_payments:
-                file_path = save_proofOfPayment(proof_of_payments, receipt_id, payment_date, payment_entries.index(entry))
+                file_path = save_proofOfPayment([proof_of_payments[payment_entries.index(entry)]], receipt_id, payment_date, payment_entries.index(entry))
                 file_path = file_path[0] if file_path else ""
             else:
                 file_path = ""
