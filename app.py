@@ -499,6 +499,7 @@ def submit_receipt():
             payment_date = datetime.strptime(entry['date'], '%Y-%m-%d').date()
             amount = float(entry['amount'])
             discount = float(entry['discount'])
+            print("discount: ", discount)
             reference = entry['reference']
             payment_destination_id = entry['payment_destination_id']
             tender_id = entry['tender_id']
@@ -513,6 +514,7 @@ def submit_receipt():
                 file_path = ""
 
             set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
+            print("Se debió insertar set_paymentEntry")
 
         # Actualización de Monto Abonado - USAR all_account_ids
         new_amount_paid_list = request.form.getlist('amount_paid[]')
@@ -569,7 +571,7 @@ def submit_receipt():
 
 def send_receipt_notification(receipt_id, store_id, store_name, customer_name):
 
-    subject = f"Recibo {receipt_id}: Se ha registrado una cobranza a la tienda {store_name} para el cliente {customer_name}"
+    subject = f"Recibo {receipt_id}: Se ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
     app_url = os.environ.get('APP_URL')
 
     if store_id == '904' or store_id == '905':
@@ -631,11 +633,8 @@ def send_rejectionEmail():
         payment_relations = get_paymentRelations_by_receipt(receipt_id)
         for relation in payment_relations:
             debtAccount_id = relation[0]
-            print("debtAccount_id: ", debtAccount_id)
             paid_amount = float(relation[1])
-            print("paid_amount: ", paid_amount)
             current_paid = float(get_invoiceCurrentPaidAmount(debtAccount_id))
-            print("current_paid: ", current_paid)
             new_paid_amount = current_paid - paid_amount
             revert_invoicePaidAmount(debtAccount_id, new_paid_amount)
    
