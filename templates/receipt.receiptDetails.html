@@ -376,11 +376,18 @@
 
     // Acción al Rechazar (enviar correo explicando el motivo)
     function sendRejectionWithReason() {
+
+        const reason = document.getElementById("rejectionReason").value;
+
+        if (!reason.trim()) {
+            alert("Por favor, ingrese un motivo para el rechazo.");
+            return;
+        }
+
         closeRejectionReasonModal();
         openLoadingRejectionModal();
 
         const receipt_id = "{{ receipts[ pagination - 1 ][0] }} "
-        const reason = document.getElementById("rejectionReason").value;
         const store_id = "{{ store[0] }}";
         const store_name = "{{ store[1] }}";
         const customer = "{{ customer[1] }}" + " " + "{{ customer[2] }}";
@@ -388,9 +395,17 @@
         const totalPaid = '{{ "%.2f"|format(receipts[ pagination - 1 ][1]) }}';
         const totalCommission = '{{ "%.2f"|format(receipts[ pagination - 1 ][2]) }}';
 
-        if (!reason.trim()) {
-            alert("Por favor, ingrese un motivo para el rechazo.");
-            return;
+        // Obtención del descuento aplicado (actualmente, sólo toma el último)
+        // Verificar si la lógica de descuento es correcta
+        let lastNonZeroDiscount = 0;
+        const discountCells = document.querySelectorAll('#pago-table .pago-row td:nth-child(5)');
+        for (let i = discountCells.length - 1; i >= 0; i--) {
+            const discountText = discountCells[i].textContent;
+            const discountValue = parseFloat(discountText.replace('.', '').replace(',', '.'));
+            if (discountValue > 0) {
+                lastNonZeroDiscount = discountValue;
+                break;
+            }
         }
 
         const formData = new FormData(document.getElementById('pdfForm'));
@@ -402,6 +417,7 @@
         formData.append('currency', currency);
         formData.append('total_paid', totalPaid);
         formData.append('total_commission', totalCommission);
+        formData.append('last_discount', lastNonZeroDiscount);
 
         fetch('/send_rejectionReceipt_email', {
             method: 'POST',

@@ -376,11 +376,11 @@ def get_invoiceCurrentPaidAmount(account_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT PaidAmount 
+        SELECT PaidAmount, Amount 
         FROM CommissionReceipt.DebtAccount
         WHERE AccountID = %s
     ''', (account_id,))
-    paid_amount = cursor.fetchone()[0]
+    paid_amount = cursor.fetchone()
     conn.close()
     return paid_amount
 

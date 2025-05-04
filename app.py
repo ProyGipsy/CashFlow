@@ -499,7 +499,6 @@ def submit_receipt():
             payment_date = datetime.strptime(entry['date'], '%Y-%m-%d').date()
             amount = float(entry['amount'])
             discount = float(entry['discount'])
-            print("discount: ", discount)
             reference = entry['reference']
             payment_destination_id = entry['payment_destination_id']
             tender_id = entry['tender_id']
@@ -514,7 +513,6 @@ def submit_receipt():
                 file_path = ""
 
             set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
-            print("Se debió insertar set_paymentEntry")
 
         # Actualización de Monto Abonado - USAR all_account_ids
         new_amount_paid_list = request.form.getlist('amount_paid[]')
@@ -534,11 +532,8 @@ def submit_receipt():
             is_retail = debt_account[1]
             commission_info = next((item for item in commission_data if item['account_id'] == account_id), None)
             balance_amount = float(commission_info['balance_amount'])
-            print("balance_amount: ", balance_amount)
             days_passed = int(commission_info['days_passed'])
-            print("days_passed: ", days_passed)
             commission_amount = float(commission_info['commission_amount'])
-            print("commission_amount: ", commission_amount)
             set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id)
 
             # Actualización de factura
@@ -631,11 +626,19 @@ def send_rejectionEmail():
     # Revirtiendo monto abonado
     try:
         payment_relations = get_paymentRelations_by_receipt(receipt_id)
-        for relation in payment_relations:
+        last_discount = float(request.form.get('last_discount', 0))
+        for i, relation in enumerate(payment_relations):
             debtAccount_id = relation[0]
             paid_amount = float(relation[1])
-            current_paid = float(get_invoiceCurrentPaidAmount(debtAccount_id))
-            new_paid_amount = current_paid - paid_amount
+            debtAccount_amounts = get_invoiceCurrentPaidAmount(debtAccount_id)
+            current_paid = float(debtAccount_amounts[0])
+            total_amount = float(debtAccount_amounts[1])
+
+            if i==0 and last_discount > 0:
+                discount_amount = total_amount * (last_discount/100)
+                paid_amount += discount_amount
+
+            new_paid_amount = round(current_paid - paid_amount, 2)
             revert_invoicePaidAmount(debtAccount_id, new_paid_amount)
    
     except Exception as e:
