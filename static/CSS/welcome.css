@@ -1,3 +1,15 @@
+.back {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+}
+
+.back img {
+    width: 30px;
+    height: auto;
+}
+
 body {
     margin: 0;
     font-family: Arial, sans-serif;
@@ -37,13 +49,15 @@ body::after {
 
 .grid {
     display: grid;
-    grid-template-columns: repeat(4, 200px);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 20px;
     justify-content: center;
+    justify-items: center;
     max-width: 1000px;
     width: 100%;
     padding: 0 20px;
     margin: 0 auto;
+    grid-auto-flow: dense; 
 }
 
 .card {
@@ -55,6 +69,11 @@ body::after {
     color: #333;
     padding: 20px;
     transition: background-color 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 200px;
 }
 
 .card:hover {
@@ -64,7 +83,6 @@ body::after {
 .card-img {
     max-width: 60%;
     height: auto;
-    /*margin-bottom: 2px;*/
 }
 
 .card.disabled {

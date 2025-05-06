@@ -39,10 +39,14 @@ app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('indexLogin.html')
+
+@app.route('/welcome', methods=['GET', 'POST'])
+def welcome():
+    return render_template('welcome.html')
 
 
-# INICIOS DE SESIÓN
+# INICIOS DE SESIÓN INDIVIDUALES (Descartados con el nuevo flujo)
 
 @app.route('/loginCashflow', methods=['GET', 'POST'])
 def loginCashflow():

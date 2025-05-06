@@ -1,0 +1,38 @@
+<!doctype html>
+<head>
+    <title>Gipsy - Inicio de Sesión</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='CSS/login.css') }}"/>
+    <link rel="icon" type="image/jpg" href="{{ url_for('static', filename='IMG/Gipsy_isotipo_color.png') }}">
+</head>
+<html>
+   <body>
+    <!--
+    <a class="back" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+   -->
+     <main>
+        <div class="card">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Gipsy's logo"/>
+            </div>
+            <div class="form">
+                <div class="title">
+                    <h2>Inicie Sesión</h2>
+                </div>
+                <form id="loginForm" action="{{ url_for('welcome') }}" method="POST">
+                    <input type="text" name="User" placeholder="Usuario" required>
+                    <br>
+                    <div class="password-container">
+                        <input type="password" name="Password" placeholder="Contraseña" required>
+                    </div>
+                    <br>
+                    <input type="submit" value="Ingresar">
+                    <br>
+                </form>
+                {% if error %}
+                    <p style="color: red; text-align: center;">{{ error }}</p>
+                {% endif %}
+            </div>
+        </div>
+     </main>  
+   </body>
+</html>
