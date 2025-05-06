@@ -147,19 +147,6 @@ def operations():
                             position: relative;
                         }}
                         
-                        .logo-left {{
-                            margin-right: 20px;
-                            height: 60px;
-                            display: flex;
-                            align-items: center;
-                        }}
-                        
-                        .logo-left img {{
-                            height: 100%;
-                            width: auto;
-                            max-height: 60px;
-                        }}
-                        
                         .header h2 {{
                             position: absolute;
                             left: 50%; /* Centrado horizontal */
@@ -190,14 +177,33 @@ def operations():
                         th {{
                             background-color: #f0f0f0 !important;
                         }}
+
+                        .signature-section {{
+                            margin-top: 60px;
+                            width: 100%;
+                            font-size: 14px;
+                            line-height: 2;
+                        }}
+
+                        .signature-item {{
+                            display: block;
+                            margin-bottom: 25px;
+                            width: 100%;
+                        }}
+
+                        .signature-line {{
+                            display: inline-block;
+                            border-bottom: 1px solid #000000;
+                            width: 30%;
+                            margin-left: 10px;
+                            padding-bottom: 3px;
+                            vertical-align: middle;
+                        }}
                     </style>
                 </head>
                 <body>
                     <div class="header">
-                        <div class="logo-left">
-                            <img src="cid:Gipsy_isotipo_color.png" alt="Logo Cobranza">
-                        </div>
-                        <h2>Reporte de Operación Gipsy Corp</h2>
+                        <h2>{"Comprobante de Entrada" if motion_type == "1" else "Comprobante de Salida"}</h2>
                     </div>
                     <table border="1" cellpadding="5" cellspacing="0">
                         <tr>
@@ -221,12 +227,20 @@ def operations():
                             <td>{amount:.2f}</td>
                         </tr>
                     </table>
-                    <p style="color: #666; font-style: italic;">
-                        Flujo de Caja GIPSY<br>
-                        Avenida Francisco de Miranda, Centro Lido, Torre A, Piso 9, Oficina 93<br>
-                        Zona industrial Guayaba, Av. Pual. Guayabal, galpón 45, Guarenas<br>
-                        One Turnberry Place, 19495 Biscayne Blvd. #609 Aventura FL 33180 United States of America
-                    </p>
+                    <div class="signature-section">
+                        <div class="signature-item">
+                            Recibido por: <span class="signature-line">&nbsp;</span>
+                        </div>
+                        <div class="signature-item">
+                            C.I. del receptor: <span class="signature-line">&nbsp;</span>
+                        </div>
+                        <div class="signature-item">
+                            Fecha: <span class="signature-line">&nbsp;</span>
+                        </div>
+                        <div class="signature-item">
+                            Firma: <span class="signature-line">&nbsp;</span>
+                        </div>
+                    </div>
                 </body>
                 </html>
                 """
@@ -243,15 +257,6 @@ def operations():
                     recipients=[app.config['MAIL_USERNAME']])
         
         msg.html = html_content
-
-        with app.open_resource('static/IMG/Gipsy_isotipo_color.png') as logo:
-            msg.attach(
-                filename='Gipsy_isotipo_color.png',
-                content_type='image/png',
-                data=logo.read(),
-                disposition='inline',
-                headers={'Content-ID': '<Gipsy_isotipo_color.png>'}
-            )
 
         try:
             mail.send(msg)
@@ -312,7 +317,7 @@ def concepts():
     return render_template('cashflow.concepts.html', page='concepts', active_page='concepts', concepts=concepts, last_id=last_id)
    
 
-# RECIBO DE VENDEDORES - RUTAS
+# RECIBO DE COBRANZA AL MAYOR - RUTAS
 
 # Configuración de correo SMTP para Recibo
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
@@ -588,7 +593,7 @@ def send_receipt_notification(receipt_id, store_id, store_name, customer_name):
                 <li><strong>Cliente:</strong> {customer_name}</li>
             </ul>
                 
-            <p>Por favor ingrese a la <a href="{app_url}">aplicación web de GIPSY</a> de <strong>"Recibos de Vendedores"</strong> y diríjase a la sección de <strong>"Recibos de Cobranza"</strong> para revisar y validar la cobranza registrada.</p>
+            <p>Por favor ingrese a la <a href="{app_url}">aplicación web de GIPSY</a> de <strong>"Registro de Cobranza al Mayor"</strong> y diríjase a la sección de <strong>"Recibos de Cobranza"</strong> para revisar y validar la cobranza registrada.</p>
                 
             <p>Atentamente,</p>
             <p>GIPSY<br>
@@ -781,44 +786,46 @@ def send_validationEmail():
 
                     .header {{
                         display: flex;
-                        justify-content: center;
                         align-items: center;
                         margin-bottom: 20px;
-                        border-bottom: 2px solid black;
-                        padding-bottom: 10px;
                         position: relative;
                     }}
 
-                    .header img {{
-                        max-height: 80px;
-                        filter: grayscale(100%);
+                    .logo-left {{
+                        margin-right: 20px;
+                        height: 60px;
+                        display: flex;
+                        align-items: center;
                     }}
 
-                    .logo-left {{
-                        position: absolute;
-                        left: 0;
+                    .logo-left img {{
+                        height: 100%;
+                        width: auto;
+                        max-height: 60px;
                     }}
 
                     .logo-right {{
-                        position: absolute;
-                        right: 0;
+                        margin-left: 20px;
+                        width: 20px;
+                        display: flex;
+                        align-items: center;
                     }}
 
                     .logo-right img {{
-                        max-height: 100px;
-                        filter: grayscale(100%);
+                        height: 100%;
+                        width: auto;
+                        max-height: 60px;
                     }}
 
-                    .header-text {{
-                        text-align: center;
-                        margin: 0 auto;
-                        max-width: 60%;
-                    }}
-
-                    .header-text h1, h3 {{
-                        font-size: 14px !important;
+                    .header h2 {{
+                        position: absolute;
+                        left: 50%; /* Centrado horizontal */
+                        transform: translateX(-50%);
                         margin: 0;
-                        color: black !important;
+                        width: 100%;
+                        text-align: center;
+                        line-height: 60px;
+                        pointer-events: none;
                     }}
 
                     .header-text p {{
@@ -886,17 +893,19 @@ def send_validationEmail():
             </head>
             <body>
                 <div class="header">
-                    <div class="logo-left">
+                     <!--
+                     <div class="logo-left">
                         <img src="cid:Gipsy_isotipo_color.png" alt="Logo Cobranza">
                     </div>
-                    <div class="header-text">
-                        <h1>Reporte de Cobranza Gipsy Corp</h1>
-                        <p><strong>{store_name}</strong></p>
-                        <p><strong>{customer_name}</strong></p>
-                    </div>
-                    <div class="logo-right">
+                     -->
+                    <h2>Reporte de Cobranza al Mayor</h2>
+                    <p><strong>{store_name}</strong></p>
+                    <p><strong>{customer_name}</strong></p>
+                     <!--
+                     <div class="logo-right">
                         {f'<img src="cid:logo_store" alt="Logo Store">' if logo_store_path else ''}
                     </div>
+                     -->
                 </div>
                 {html_content}
                 <br>
