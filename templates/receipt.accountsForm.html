@@ -297,19 +297,47 @@
         // Establecer listeners para los nuevos inputs
         addInputListeners();
     });
+    // function deleteRow(btn) {
+    //     const row = btn.parentNode.parentNode;
+    //     const table = document.getElementById('payment-table');
+        
+    //     // Deshacer descuento
+    //     const discountInput = row.querySelector('input[name="discount"]');
+    //     if (discountInput && parseFloat(discountInput.value) > 0) {
+    //         resetDiscountForRow(row);
+    //     }
+        
+    //     if (table.rows.length > 2) {
+    //         row.parentNode.removeChild(row);
+    //         isChanged = true;
+    //         updateBalanceNote(); // Recalcular todo
+    //     } else {
+    //         alert('Debe existir al menos una forma de pago.');
+    //     }
+    // }
     function deleteRow(btn) {
         const row = btn.parentNode.parentNode;
         const table = document.getElementById('payment-table');
         
-        // Deshacer descuento
+        // Deshacer descuento si existe
         const discountInput = row.querySelector('input[name="discount"]');
         if (discountInput && parseFloat(discountInput.value) > 0) {
-            resetDiscountForRow(row);
+            // Buscar la factura asociada a esta fila
+            const invoiceIndex = paymentToInvoiceMap.get(row);
+            if (invoiceIndex !== undefined) {
+                const balanceField = document.querySelectorAll('#balance_calculation')[invoiceIndex];
+                // Restaurar el valor original (sin este descuento)
+                const originalValue = parseFloat(balanceField.dataset.originalValue);
+                const currentPaid = parseFloat(balanceField.dataset.invoicePaidAmount || '0');
+                balanceField.textContent = formatSpanishNumber(originalValue - currentPaid);
+            }
         }
+        
+        // Eliminar del mapeo
+        paymentToInvoiceMap.delete(row);
         
         if (table.rows.length > 2) {
             row.parentNode.removeChild(row);
-            isChanged = true;
             updateBalanceNote(); // Recalcular todo
         } else {
             alert('Debe existir al menos una forma de pago.');
@@ -549,12 +577,20 @@
                     
                     if (invoiceIndex !== undefined && invoiceIndex !== -1) {
                         const invoice = receiptData[invoiceIndex];
-                        const discountAmount = invoice.originalValue * (discountValue / 100);
-                        invoice.discountApplied = discountAmount;
-                        invoice.remaining = invoice.originalValue - discountAmount;
+                        const discountAmount = invoice.remaining * (discountValue / 100);
+                        invoice.discountApplied += discountAmount;
+                        invoice.remaining = invoice.remaining - discountAmount;
                         invoice.element.textContent = invoice.remaining.toFixed(2);
                         invoice.element.dataset.hasDiscount = 'true';
                         payment.row.dataset.hasAppliedDiscount = 'true';
+
+                        // Si el saldo llega a 0, buscar la siguiente factura para futuros descuentos
+                        if (invoice.remaining <= 0) {
+                            const nextInvoiceIndex = receiptData.findIndex((inv, idx) => idx > invoiceIndex && inv.remaining > 0);
+                            if (nextInvoiceIndex !== -1) {
+                                paymentToInvoiceMap.set(payment.row, nextInvoiceIndex);
+                            }
+                        }
                     }
                 }
             }
@@ -624,7 +660,11 @@
                 if (!commissionApplied) {
                     if (daysPassed <= comm[2]) { // Comparar con DaysSinceDue
                         if (comm[3] == 1) { // Si la comisión está activa
-                            commission = receipt.amountPaid * (comm[1] / 100);
+                            // Commisión = (Base Imponible - Descuentos) * reglaNegocio 
+                            // Base Imponible = MontoPagado / 1.16
+                            // Los descuentos ya se restan del monto total, debido a que en los cálculos se muestra el
+                            // importe adeudado actualizado y con base en eso se toma el monto pagado de esa factura.
+                            commission = receipt.amountPaid/1.16 * (comm[1] / 100);
                             commissionApplied = true;
                         }
                     }
@@ -661,6 +701,9 @@
             return;
         }
 
+        // Obtener la fila de pago completa
+        const paymentRow = discountInput.closest('.payment-row');
+
         // Obtener todas las facturas con su información
         const balanceFields = document.querySelectorAll('#balance_calculation');
         const receiptData = Array.from(balanceFields).map((field, index) => ({
@@ -671,15 +714,12 @@
             currentValue: parseFloat(field.textContent),
             hasDiscount: field.dataset.hasDiscount === 'true'
         }));
-
-        // Obtener la fila de pago completa
-        const paymentRow = discountInput.closest('.payment-row');
         
         // Determinar a qué factura corresponde esta forma de pago
         let targetInvoiceIndex = paymentToInvoiceMap.get(paymentRow);
         
         // Si no está mapeada, encontrar la primera factura con saldo
-        if (targetInvoiceIndex === undefined) {
+        if (targetInvoiceIndex === undefined || receiptData[targetInvoiceIndex].currentValue <= 0) {
             targetInvoiceIndex = receiptData.findIndex(invoice => invoice.currentValue > 0);
             if (targetInvoiceIndex === -1) {
                 alert("No hay facturas con saldo pendiente");
@@ -690,21 +730,29 @@
         }
 
         // Verificar si la factura objetivo ya tiene descuento de otra forma de pago
-        if (receiptData[targetInvoiceIndex].hasDiscount && !paymentRow.dataset.hasAppliedDiscount) {
-            alert("Esta factura ya tiene un descuento aplicado desde otra forma de pago");
-            discountInput.value = 0;
-            return;
-        }
+        // if (receiptData[targetInvoiceIndex].hasDiscount && !paymentRow.dataset.hasAppliedDiscount) {
+        //     alert("Esta factura ya tiene un descuento aplicado desde otra forma de pago");
+        //     discountInput.value = 0;
+        //     return;
+        // }
 
         // Aplicar el descuento
         const targetInvoice = receiptData[targetInvoiceIndex];
-        const discountAmount = targetInvoice.originalValue * (discountValue / 100);
-        const newValue = targetInvoice.originalValue - discountAmount;
+        const discountAmount = targetInvoice.currentValue * (discountValue / 100);
+        const newValue = targetInvoice.currentValue - discountAmount;
         
         // Actualizar la interfaz
         targetInvoice.element.textContent = newValue.toFixed(2);
         targetInvoice.element.dataset.hasDiscount = 'true';
         paymentRow.dataset.hasAppliedDiscount = 'true';
+
+        // Si luego del descuento el saldo es 0, buscar la siguiente factura para futuros descuentos
+        if (newValue <= 0) {
+            const nextInvoiceIndex = receiptData.findIndex((invoice, idx) => idx > targetInvoiceIndex && invoice.currentValue > 0);
+            if (nextInvoiceIndex !== -1) {
+                paymentToInvoiceMap.set(paymentRow, nextInvoiceIndex);
+            }
+        }
         
         // Recalcular días y comisiones
         updateDaysAndCommission();

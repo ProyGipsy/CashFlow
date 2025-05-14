@@ -58,7 +58,7 @@
                     <th>Moneda</th>
                     <th>Monto Original</th>
                     <th>Monto Abonado</th>
-                    <th>Monto IVA Retenido</th>
+                    <!--<th>Monto IVA Retenido</th>-->
                     <th>Monto Restante</th>
                     <th>Registrar</th>
                 </tr>
@@ -177,7 +177,7 @@
                             <td>${invoice.Currency}</td>
                             <td>${formatSpanishNumber(invoice.Amount)}</td>
                             <td>${formatSpanishNumber(invoice.Balance)}</td>
-                            <td>${formatSpanishNumber(invoice.IVA)}</td>
+                            <!--<td>${formatSpanishNumber(invoice.IVA)}</td>-->
                             <td>${formatSpanishNumber(invoice.Remaining)}</td>
                             <td><input type="checkbox" class="invoice-checkbox" data-account-id="${invoice.AccountID}" /></td>
                         `;

@@ -594,29 +594,11 @@ def send_receipt_notification(receipt_id, store_id, store_name, customer_name):
             </ul>
                 
             <p>Por favor ingrese a la <a href="{app_url}">aplicación web de GIPSY</a> de <strong>"Registro de Cobranza al Mayor"</strong> y diríjase a la sección de <strong>"Recibos de Cobranza"</strong> para revisar y validar la cobranza registrada.</p>
-                
-            <p>Atentamente,</p>
-            <p>GIPSY<br>
-            Avenida Francisco de Miranda, Centro Lido, Torre A, Piso 9, Oficina 93<br>
-            Zona industrial Guayaba, Av. Pual. Guayabal, galpón 45, Guarenas<br>
-            One Turnberry Place, 19495 Biscayne Blvd. #609 Aventura FL 33180 United States of America
-            </p>
-
-            <img src="cid:Gipsy_imagotipo_color.png" alt="Gipsy Logo" style="max-width: 200px;">
         </body>
     </html>
     """
 
     msg.html = body
-    
-    with app.open_resource('static/IMG/Gipsy_imagotipo_color.png') as logo:
-        msg.attach(
-            filename='Gipsy_imagotipo_color.png',
-            content_type='image/png',
-            data=logo.read(),
-            disposition='inline',
-            headers={'Content-ID': '<Gipsy_imagotipo_color.png>'}
-        )
 
     mail.send(msg)
 
@@ -690,30 +672,10 @@ def send_rejectionEmail():
             </blockquote>
             
             <p>Se solicita verificar y volver a realizar el registro de la cobranza.</p>
-            
-            <p>Atentamente,</p>
-            
-            <p style="color: #666; font-style: italic;">
-                GIPSY<br>
-                Avenida Francisco de Miranda, Centro Lido, Torre A, Piso 9, Oficina 93<br>
-                Zona industrial Guayaba, Av. Pual. Guayabal, galpón 45, Guarenas<br>
-                One Turnberry Place, 19495 Biscayne Blvd. #609 Aventura FL 33180 United States of America
-            </p>
-            
-            <img src="cid:Gipsy_imagotipo_color.png" alt="Gipsy Logo" style="max-width: 200px;">
         </body>
     </html>
     """
     msg.html = html_body
-    
-    with app.open_resource('static/IMG/Gipsy_imagotipo_color.png') as logo:
-        msg.attach(
-            filename='Gipsy_imagotipo_color.png',
-            content_type='image/png',
-            data=logo.read(),
-            disposition='inline',
-            headers={'Content-ID': '<Gipsy_imagotipo_color.png>'}
-        )
 
     mail.send(msg)
 
@@ -893,30 +855,13 @@ def send_validationEmail():
             </head>
             <body>
                 <div class="header">
-                     <!--
-                     <div class="logo-left">
-                        <img src="cid:Gipsy_isotipo_color.png" alt="Logo Cobranza">
-                    </div>
-                     -->
                     <h2>Reporte de Cobranza al Mayor</h2>
                     <p><strong>{store_name}</strong></p>
                     <p><strong>{customer_name}</strong></p>
-                     <!--
-                     <div class="logo-right">
-                        {f'<img src="cid:logo_store" alt="Logo Store">' if logo_store_path else ''}
-                    </div>
-                     -->
                 </div>
                 {html_content}
                 <br>
                 <p>Se anexan los comprobantes de pago del recibo.</p>
-                <p>Atentamente,</p>
-                <p style="color: #666; font-style: italic;">
-                    GIPSY<br>
-                    Avenida Francisco de Miranda, Centro Lido, Torre A, Piso 9, Oficina 93<br>
-                    Zona industrial Guayaba, Av. Pual. Guayabal, galpón 45, Guarenas<br>
-                    One Turnberry Place, 19495 Biscayne Blvd. #609 Aventura FL 33180 United States of America
-                </p>
             </body>
             </html>
             """
@@ -932,39 +877,6 @@ def send_validationEmail():
                   recipients=[app.config['MAIL_USERNAME']])
     
     msg.html = html_body
-
-    # Adjuntar logo Gipsy (fijo)
-    with app.open_resource('static/IMG/Gipsy_isotipo_color.png') as logo:
-        msg.attach(
-            filename='Gipsy_isotipo_color.png',
-            content_type='image/png',
-            data=logo.read(),
-            disposition='inline',
-            headers={'Content-ID': '<Gipsy_isotipo_color.png>'}
-        )
-
-    # Adjuntar logo Store (dinámico desde OneDrive)
-    if logo_store_path:
-        logo_content = get_onedriveStoreLogo(logo_store_path)
-        
-        if logo_content:
-            # Determinar el tipo MIME basado en la extensión del archivo
-            if logo_store_path.lower().endswith('.png'):
-                mime_type = 'image/png'
-            elif logo_store_path.lower().endswith('.jpg') or logo_store_path.lower().endswith('.jpeg'):
-                mime_type = 'image/jpeg'
-            else:
-                mime_type = 'application/octet-stream'  # Tipo genérico si no se reconoce
-                
-            msg.attach(
-                filename=logo_store_path,
-                content_type=mime_type,
-                data=logo_content,
-                disposition='inline',
-                headers={'Content-ID': '<logo_store>'}
-            )
-        else:
-            print(f"No se pudo obtener el logo {logo_store_path} desde OneDrive")
 
     # Adjuntar comprobantes de pago (dinámico desde OneDrive)
     headers = get_onedrive_headers()

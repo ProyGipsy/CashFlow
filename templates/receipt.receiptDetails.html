@@ -117,12 +117,12 @@
                         {% set file_info = paymentEntry[7] %}
                         {% if file_info.name.lower().endswith(('.jpeg', '.jpg', '.png')) %}
                             <!-- Para imágenes: embed_url o URL directa con thumbnails -->
-                            <a href="{{ file_info.web_url }}" target="_blank">
-                                <img src="{{ file_info.web_url }}" alt="Comprobante" title="Click para ampliar">
+                            <a href="{{ file_info.url }}" target="_blank">
+                                <img src="{{ file_info.url }}" alt="{{ file_info.name }}" title="Click para ampliar">
                             </a>
                         {% elif file_info.name.lower().endswith('.pdf') %}
                             <!-- Para PDFs: web_url -->
-                            <a class="pdf-link" href="{{ file_info.web_url }}" target="_blank">
+                            <a class="pdf-link" href="{{ file_info.url }}" target="_blank">
                                 <img class="pdf-icon" src="{{ url_for('static', filename='IMG/pdf_icon.png') }}" alt="PDF">
                                 <span class="pdf-filename">{{ file_info.name }}</span>
                             </a>

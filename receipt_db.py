@@ -312,16 +312,31 @@ def get_onedriveProofsOfPayments(paymentEntries):
                 response = requests.get(file_url, headers=headers)
                 if response.status_code == 200:
                     file_data = response.json()
-                    updated_entry = list(entry)
+                    #updated_entry = list(entry)
                     
                     file_id = file_data['id']
+
+                    # Generación de enlace de compartición
+                    share_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/createLink"
+                    share_data = {
+                        "type": "view",
+                        "scope": "anonymous"
+                    }
+                    share_response = requests.post(share_url, headers=headers, json=share_data)
+
+                    if share_response.status_code == 200:
+                        shared_link = share_response.json()["link"]["webUrl"]
+                        print("(code 200) shared_link: ", shared_link)
+                    # else:
+                    #     shared_link = file_data.get('webUrl')
+                    #     print("(else) shared_link: ", shared_link)
+
+                    updated_entry = list(entry)
                     updated_entry[7] = {
-                        'url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content",
-                        'embed_url': f"https://onedrive.live.com/embed?resid={file_id}",
-                        'web_url': file_data.get('webUrl'),
-                        'file_url': file_url,
+                        'url': shared_link,
                         'name': filename
                     }
+                    print("updated_entry: ", updated_entry)
                     
                     updated_entries.append(tuple(updated_entry))
                 
