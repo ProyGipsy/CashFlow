@@ -33,7 +33,11 @@
                 <li>
                     <div class="optionContainer {% if active_page == 'loginReceipt' %}active{% endif %}">
                         {% if active_page == 'loginReceipt' %}<div class="verticalLine"></div>{% endif %}
-                        <a href="{{ url_for('loginReceipt') }}" class="optionLink">Cerrar Sesión</a>
+                        <a href="{{ url_for('welcome') }}" class="optionLink">Menú Principal</a>
+                    </div>
+                    <div class="optionContainer {% if active_page == 'loginCashflow' %}active{% endif %}">
+                        {% if active_page == 'loginReceipt' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('index') }}" class="optionLink">Cerrar Sesión</a>
                     </div>
                 </li>
             </ul>

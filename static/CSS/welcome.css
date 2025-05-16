@@ -47,7 +47,7 @@ body::after {
     margin-bottom: 30px;
 }
 
-.grid {
+/* .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 20px;
@@ -58,6 +58,16 @@ body::after {
     padding: 0 20px;
     margin: 0 auto;
     grid-auto-flow: dense; 
+} */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, 250px);
+    gap: 20px;
+    justify-content: center;
+    max-width: 1000px;
+    width: 100%;
+    padding: 0 20px;
+    margin: 0 auto;
 }
 
 .card {
@@ -89,4 +99,20 @@ body::after {
     pointer-events: none;
     filter: grayscale(100%);
     opacity: 0.6;
+}
+
+.header {
+    text-align: center;
+    width: 100%;
+    max-width: 600px;
+}
+
+.header h2 {
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.header p {
+    color: #666;
+    margin-top: 0;
 }

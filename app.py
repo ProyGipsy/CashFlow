@@ -46,6 +46,10 @@ def index():
 def welcome():
     return render_template('welcome.html')
 
+@app.route('/receiptRole', methods=['GET', 'POST'])
+def receiptRole():
+    return render_template('receipt.role.html')
+
 
 # INICIOS DE SESIÓN INDIVIDUALES (Descartados con el nuevo flujo)
 
