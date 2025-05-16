@@ -50,13 +50,16 @@
     <br> 
     <div id="formas-de-pago"> 
         <h3>Formas de Pago</h3> 
+        <span>
+            <b>Descuento a aplicar (%):</b>
+            <input id="general_discount" type="number" name="discount" step="0.01" class="input-field small-input" value="0.00"  onchange="applyDiscount()">
+        </span>
         <table class="styled-table" id="payment-table">
             <tr>
                 <th>Moneda</th>
                 <th>Forma de Pago</th>
                 <th>Fecha de Pago</th>
                 <th>Monto</th>
-                <th>Descuento (%)</th>
                 <th>Referencia</th>
                 <th>Abono Realizado en</th>
             </tr>
@@ -76,7 +79,6 @@
                 </td>
                 <td class="col-date"><input type="date" id="date_operation" name="date_operation" class="input-field"></td>
                 <td class="col-amount"><input type="number" name="payment_amount" step="0.01" class="input-field" value="0.00"></td>
-                <td class="col-discount"><input type="number" name="discount" step="0.01" class="input-field" value="0.00"></td>
                 <td class="col-reference"><input type="text" name="reference" class="input-field"></td>
                 <td class="col-account"><select name="payment_made" class="input-field">
                     <option value="" disabled selected>Cuenta Bancaria</option> 
@@ -297,41 +299,10 @@
         // Establecer listeners para los nuevos inputs
         addInputListeners();
     });
-    // function deleteRow(btn) {
-    //     const row = btn.parentNode.parentNode;
-    //     const table = document.getElementById('payment-table');
-        
-    //     // Deshacer descuento
-    //     const discountInput = row.querySelector('input[name="discount"]');
-    //     if (discountInput && parseFloat(discountInput.value) > 0) {
-    //         resetDiscountForRow(row);
-    //     }
-        
-    //     if (table.rows.length > 2) {
-    //         row.parentNode.removeChild(row);
-    //         isChanged = true;
-    //         updateBalanceNote(); // Recalcular todo
-    //     } else {
-    //         alert('Debe existir al menos una forma de pago.');
-    //     }
-    // }
+
     function deleteRow(btn) {
         const row = btn.parentNode.parentNode;
         const table = document.getElementById('payment-table');
-        
-        // Deshacer descuento si existe
-        const discountInput = row.querySelector('input[name="discount"]');
-        if (discountInput && parseFloat(discountInput.value) > 0) {
-            // Buscar la factura asociada a esta fila
-            const invoiceIndex = paymentToInvoiceMap.get(row);
-            if (invoiceIndex !== undefined) {
-                const balanceField = document.querySelectorAll('#balance_calculation')[invoiceIndex];
-                // Restaurar el valor original (sin este descuento)
-                const originalValue = parseFloat(balanceField.dataset.originalValue);
-                const currentPaid = parseFloat(balanceField.dataset.invoicePaidAmount || '0');
-                balanceField.textContent = formatSpanishNumber(originalValue - currentPaid);
-            }
-        }
         
         // Eliminar del mapeo
         paymentToInvoiceMap.delete(row);
@@ -514,7 +485,8 @@
         const balanceCalculationFields = document.querySelectorAll('#balance_calculation');
         const daysPassedFields = document.querySelectorAll('#days_passed');
         const commissionFields = document.querySelectorAll('#commission_received');
-        
+        const generalDiscount = parseFloat(document.getElementById('general_discount').value) || 0;
+
         // Obtener todas las filas de pago
         const paymentRows = document.querySelectorAll('.payment-row');
         const paymentData = Array.from(paymentRows).map(row => {
@@ -546,8 +518,8 @@
 
         // Para cada factura, llevar registro de:
         const receiptData = Array.from(balanceFields).map((field, index) => {
-            // Resetear el flag de descuento (se volverá a establecer al aplicar descuentos)
-            field.dataset.hasDiscount = 'false';
+            const originalValue = parseFloat(field.getAttribute('data-original-value')) || 0;
+            const discountedValue = originalValue * (1 - generalDiscount / 100);
             return {
                 element: field,
                 originalValue: parseFloat(field.getAttribute('data-original-value')) || 0,
@@ -556,55 +528,8 @@
                 remaining: parseFloat(field.getAttribute('data-original-value')) || 0,
                 paymentDate: null,
                 amountPaid: 0.00,
-                discountApplied: 0.00
+                discountApplied: originalValue - discountedValue
             };
-        });
-
-        // Aplicar primero los descuentos
-        paymentData.forEach(payment => {
-            const discountInput = payment.row.querySelector('input[name="discount"]');
-            if (discountInput) {
-                const discountValue = parseFloat(discountInput.value) || 0;
-                if (discountValue > 0) {
-                    // Encontrar la factura correspondiente a esta forma de pago
-                    let invoiceIndex = paymentToInvoiceMap.get(payment.row);
-                    if (invoiceIndex === undefined) {
-                        invoiceIndex = receiptData.findIndex(inv => inv.remaining > 0);
-                        if (invoiceIndex !== -1) {
-                            paymentToInvoiceMap.set(payment.row, invoiceIndex);
-                        }
-                    }
-                    
-                    if (invoiceIndex !== undefined && invoiceIndex !== -1) {
-                        const invoice = receiptData[invoiceIndex];
-                        const discountAmount = invoice.remaining * (discountValue / 100);
-                        invoice.discountApplied += discountAmount;
-                        invoice.remaining = invoice.remaining - discountAmount;
-                        invoice.element.textContent = invoice.remaining.toFixed(2);
-                        invoice.element.dataset.hasDiscount = 'true';
-                        payment.row.dataset.hasAppliedDiscount = 'true';
-
-                        // Si el saldo llega a 0, buscar la siguiente factura para futuros descuentos
-                        if (invoice.remaining <= 0) {
-                            const nextInvoiceIndex = receiptData.findIndex((inv, idx) => idx > invoiceIndex && inv.remaining > 0);
-                            if (nextInvoiceIndex !== -1) {
-                                paymentToInvoiceMap.set(payment.row, nextInvoiceIndex);
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        // Para cada forma de pago, determinar a qué factura corresponde
-        paymentRows.forEach(paymentRow => {
-            paymentRow.dataset.hasAppliedDiscount = 'false';
-            
-            // Encontrar la factura correspondiente (primera con saldo)
-            let invoiceIndex = receiptData.findIndex(inv => inv.remaining > 0);
-            if (invoiceIndex !== -1) {
-                paymentToInvoiceMap.set(paymentRow, invoiceIndex);
-            }
         });
 
         // Distribuir los pagos a las facturas con precisión decimal
@@ -685,11 +610,12 @@
 
     document.addEventListener("input", function(event) {
         if (event.target.name === "discount") {
-            applyDiscount(event.target);
+            applyDiscount();
         }
     });
 
-    function applyDiscount(discountInput) {
+    function applyDiscount() {
+        const discountInput = document.getElementById('general_discount');
         const discountValue = parseFloat(discountInput.value) || 0;
         
         // Validar el descuento
@@ -701,58 +627,14 @@
             return;
         }
 
-        // Obtener la fila de pago completa
-        const paymentRow = discountInput.closest('.payment-row');
-
-        // Obtener todas las facturas con su información
+        // Aplicar descuento a todas las facturas
         const balanceFields = document.querySelectorAll('#balance_calculation');
-        const receiptData = Array.from(balanceFields).map((field, index) => ({
-            index: index,
-            element: field,
-            originalValue: parseFloat(field.dataset.originalValue),
-            dueDate: field.dataset.dueDate,
-            currentValue: parseFloat(field.textContent),
-            hasDiscount: field.dataset.hasDiscount === 'true'
-        }));
-        
-        // Determinar a qué factura corresponde esta forma de pago
-        let targetInvoiceIndex = paymentToInvoiceMap.get(paymentRow);
-        
-        // Si no está mapeada, encontrar la primera factura con saldo
-        if (targetInvoiceIndex === undefined || receiptData[targetInvoiceIndex].currentValue <= 0) {
-            targetInvoiceIndex = receiptData.findIndex(invoice => invoice.currentValue > 0);
-            if (targetInvoiceIndex === -1) {
-                alert("No hay facturas con saldo pendiente");
-                discountInput.value = 0;
-                return;
-            }
-            paymentToInvoiceMap.set(paymentRow, targetInvoiceIndex);
-        }
-
-        // Verificar si la factura objetivo ya tiene descuento de otra forma de pago
-        // if (receiptData[targetInvoiceIndex].hasDiscount && !paymentRow.dataset.hasAppliedDiscount) {
-        //     alert("Esta factura ya tiene un descuento aplicado desde otra forma de pago");
-        //     discountInput.value = 0;
-        //     return;
-        // }
-
-        // Aplicar el descuento
-        const targetInvoice = receiptData[targetInvoiceIndex];
-        const discountAmount = targetInvoice.currentValue * (discountValue / 100);
-        const newValue = targetInvoice.currentValue - discountAmount;
-        
-        // Actualizar la interfaz
-        targetInvoice.element.textContent = newValue.toFixed(2);
-        targetInvoice.element.dataset.hasDiscount = 'true';
-        paymentRow.dataset.hasAppliedDiscount = 'true';
-
-        // Si luego del descuento el saldo es 0, buscar la siguiente factura para futuros descuentos
-        if (newValue <= 0) {
-            const nextInvoiceIndex = receiptData.findIndex((invoice, idx) => idx > targetInvoiceIndex && invoice.currentValue > 0);
-            if (nextInvoiceIndex !== -1) {
-                paymentToInvoiceMap.set(paymentRow, nextInvoiceIndex);
-            }
-        }
+        balanceFields.forEach(field => {
+            const originalValue = parseFloat(field.dataset.originalValue);
+            const discountedValue = originalValue * (1 - discountValue / 100);
+            field.textContent = formatSpanishNumber(discountedValue);
+            field.dataset.hasDiscount = discountValue > 0 ? 'true' : 'false';
+        });
         
         // Recalcular días y comisiones
         updateDaysAndCommission();
@@ -865,14 +747,6 @@
     }
 
     // Eliminación de formato español de cantidades para manejo como float
-    // function cleanNumberForServer(numberStr) {
-    //     if (typeof numberStr !== 'string') {
-    //         return numberStr;
-    //     }
-    //     return numberStr.replace(/\./g, '').replace(',', '.');
-    // }
-
-    // Eliminación de formato español de cantidades para manejo como float
     function cleanNumberForServer(numberStr) {
         return typeof numberStr !== 'string' ? numberStr : numberStr.replace(/\./g, '').replace(',', '.');
     }
@@ -900,20 +774,23 @@
         // Datos para PaymentReceiptEntry
         const paymentRows = document.querySelectorAll('.payment-row');
         const accountInputs = document.querySelectorAll('input[name="account_id[]"]');
+        const discountInput = document.getElementById('general_discount');
 
         paymentRows.forEach((row, index) => {
             const paymentDate = row.querySelector('input[name="date_operation"]').value;
             const amount = row.querySelector('input[name="payment_amount"]').value;
-            const discount = row.querySelector('input[name="discount"]').value;
             const reference = row.querySelector('input[name="reference"]').value;
             const paymentDestinationId = row.querySelector('select[name="payment_made"]').value;
+            const discountValue = parseFloat(discountInput.value) || 0;
 
             const tenderId = row.querySelector('select[name="payment_method"]').value;
 
             formData.append('payment_entries[]', JSON.stringify({
                 date: paymentDate,
                 amount: amount,
-                discount: discount,
+                // Este descuento no se aplica por método de pago, sino que es un descuento general del recibo
+                // Almacenado allí por el campo de la BD, mostrado general en la interfaz
+                discount: discountValue,
                 reference: reference,
                 payment_destination_id: paymentDestinationId,
                 tender_id: tenderId

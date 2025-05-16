@@ -263,12 +263,13 @@ def get_invoices_by_receipt(receipt_id):
 def get_paymentEntries_by_receipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT T.Description, E.PaymentDate, E.Amount, E.Discount, E.Reference, O.BankName, O.Destiny, E.ProofOfPaymentPath, C.Code
+    cursor.execute('''SELECT DISTINCT T.Description, E.PaymentDate, E.Amount, E.Discount, E.Reference, O.BankName, O.Destiny, E.ProofOfPaymentPath, C.Code, E.PaymentEntryID
                     FROM CommissionReceipt.PaymentReceiptEntry E
                     JOIN CommissionReceipt.PaymentOption O ON E.PaymentDestinationID = O.AccountID
                     JOIN Main.Tender T ON E.TenderID = T.ID
                     JOIN Main.Currency C ON T.CurrencyID = C.ID
                     WHERE T.IsRetail = 0 AND E.ReceiptID = %s
+                    ORDER BY E.PaymentEntryID
                     ''', (receipt_id,))
     paymentEntries = cursor.fetchall()
     conn.close()
@@ -506,6 +507,11 @@ def set_invoicePaidAmount(cursor, account_id, new_paidAmount):
 def revert_invoicePaidAmount(account_id, new_paidAmount):
     conn = get_db_connection()
     cursor = conn.cursor()
+    print('''
+        UPDATE CommissionReceipt.DebtAccount
+        SET PaidAmount = %s
+        WHERE AccountID = %s
+    ''', (new_paidAmount, account_id))
     cursor.execute('''
         UPDATE CommissionReceipt.DebtAccount
         SET PaidAmount = %s
