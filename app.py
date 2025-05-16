@@ -28,7 +28,8 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
     get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount)
 
-from onedrive import get_onedrive_headers
+# COMENTADO PARA REALIZAR PRUEBA MIENTRAS HABILITAN EL TOKEN
+#from onedrive import get_onedrive_headers
 
 app = Flask(__name__)
 
@@ -385,7 +386,7 @@ def receiptDetails(customer_id, store_id, pagination=1):
     salesRepComm = get_SalesRepCommission(receipt_id)
 
     # Obtención de comprobantes de pago desde OneDrive, actualización de paymentEntries
-    paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
+    #paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
 
     return render_template('receipt.receiptDetails.html', 
                            page='receiptDetails', 
@@ -479,7 +480,6 @@ def get_bank_accounts():
     bank_accounts = get_bankAccounts(store_id, currency_id, tender_id)
     return jsonify(bank_accounts)
 
-# Sustituyendo ruta
 @app.route('/submit_receipt', methods=['POST'])
 def submit_receipt():
     conn = get_db_connection()
@@ -515,21 +515,22 @@ def submit_receipt():
             # El account_id viene del frontend (ya calculado)
             account_id = entry.get('account_id')
 
-            if proof_of_payments:
-                file_path = save_proofOfPayment([proof_of_payments[payment_entries.index(entry)]], receipt_id, payment_date, payment_entries.index(entry))
-                file_path = file_path[0] if file_path else ""
-            else:
-                file_path = ""
+            # COMENTADO PARA REALIZAR PRUEBA MIENTRAS HABILITAN EL TOKEN
+            # if proof_of_payments:
+            #     file_path = save_proofOfPayment([proof_of_payments[payment_entries.index(entry)]], receipt_id, payment_date, payment_entries.index(entry))
+            #     file_path = file_path[0] if file_path else ""
+            # else:
+            #     file_path = ""
 
+            file_path = "Guardado de comprobantes comentado"
             set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
 
-        # Actualización de Monto Abonado - USAR all_account_ids
-        new_amount_paid_list = request.form.getlist('amount_paid[]')
+        # Actualización de Monto Abonado
         original_amounts = request.form.getlist('original_amount[]')
         invoice_paid_amounts = request.form.getlist('invoice_paid_amounts[]')
 
         # Validación de consistencia
-        if not (len(new_amount_paid_list) == len(original_amounts) == len(invoice_paid_amounts) == len(all_account_ids)):
+        if not (len(original_amounts) == len(invoice_paid_amounts) == len(all_account_ids)):
             raise ValueError("Inconsistencia en los datos recibidos")
 
         for index in range(len(all_account_ids)):
@@ -546,11 +547,11 @@ def submit_receipt():
             set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id)
 
             # Actualización de factura
-            new_amount_paid = float(new_amount_paid_list[index])
-            invoice_paidAmount = float(invoice_paid_amounts[index])
+            new_amount_paid = float(original_amounts[index]) - balance_amount
             set_invoicePaidAmount(cursor, account_id, new_amount_paid)
 
             # Relación factura-recibo
+            invoice_paidAmount = float(invoice_paid_amounts[index])
             set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount)
 
         # Confirmación la transacción
@@ -598,29 +599,11 @@ def send_receipt_notification(receipt_id, store_id, store_name, customer_name):
             </ul>
                 
             <p>Por favor ingrese a la <a href="{app_url}">aplicación web de GIPSY</a> de <strong>"Registro de Cobranza al Mayor"</strong> y diríjase a la sección de <strong>"Recibos de Cobranza"</strong> para revisar y validar la cobranza registrada.</p>
-                
-            <p>Atentamente,</p>
-            <p>GIPSY<br>
-            Avenida Francisco de Miranda, Centro Lido, Torre A, Piso 9, Oficina 93<br>
-            Zona industrial Guayaba, Av. Pual. Guayabal, galpón 45, Guarenas<br>
-            One Turnberry Place, 19495 Biscayne Blvd. #609 Aventura FL 33180 United States of America
-            </p>
-
-            <img src="cid:Gipsy_imagotipo_color.png" alt="Gipsy Logo" style="max-width: 200px;">
         </body>
     </html>
     """
 
     msg.html = body
-    
-    with app.open_resource('static/IMG/Gipsy_imagotipo_color.png') as logo:
-        msg.attach(
-            filename='Gipsy_imagotipo_color.png',
-            content_type='image/png',
-            data=logo.read(),
-            disposition='inline',
-            headers={'Content-ID': '<Gipsy_imagotipo_color.png>'}
-        )
 
     mail.send(msg)
 
@@ -637,16 +620,17 @@ def send_rejectionEmail():
     # Revirtiendo monto abonado
     try:
         payment_relations = get_paymentRelations_by_receipt(receipt_id)
-        last_discount = float(request.form.get('last_discount', 0))
-        for i, relation in enumerate(payment_relations):
+        discount_value = float(request.form.get('discount_value', 0))
+        for relation in payment_relations:
             debtAccount_id = relation[0]
             paid_amount = float(relation[1])
+
             debtAccount_amounts = get_invoiceCurrentPaidAmount(debtAccount_id)
             current_paid = float(debtAccount_amounts[0])
             total_amount = float(debtAccount_amounts[1])
 
-            if i==0 and last_discount > 0:
-                discount_amount = total_amount * (last_discount/100)
+            if discount_value > 0:
+                discount_amount = round(total_amount * (discount_value/100), 2)
                 paid_amount += discount_amount
 
             new_paid_amount = round(current_paid - paid_amount, 2)
@@ -694,30 +678,10 @@ def send_rejectionEmail():
             </blockquote>
             
             <p>Se solicita verificar y volver a realizar el registro de la cobranza.</p>
-            
-            <p>Atentamente,</p>
-            
-            <p style="color: #666; font-style: italic;">
-                GIPSY<br>
-                Avenida Francisco de Miranda, Centro Lido, Torre A, Piso 9, Oficina 93<br>
-                Zona industrial Guayaba, Av. Pual. Guayabal, galpón 45, Guarenas<br>
-                One Turnberry Place, 19495 Biscayne Blvd. #609 Aventura FL 33180 United States of America
-            </p>
-            
-            <img src="cid:Gipsy_imagotipo_color.png" alt="Gipsy Logo" style="max-width: 200px;">
         </body>
     </html>
     """
     msg.html = html_body
-    
-    with app.open_resource('static/IMG/Gipsy_imagotipo_color.png') as logo:
-        msg.attach(
-            filename='Gipsy_imagotipo_color.png',
-            content_type='image/png',
-            data=logo.read(),
-            disposition='inline',
-            headers={'Content-ID': '<Gipsy_imagotipo_color.png>'}
-        )
 
     mail.send(msg)
 
@@ -897,30 +861,13 @@ def send_validationEmail():
             </head>
             <body>
                 <div class="header">
-                     <!--
-                     <div class="logo-left">
-                        <img src="cid:Gipsy_isotipo_color.png" alt="Logo Cobranza">
-                    </div>
-                     -->
                     <h2>Reporte de Cobranza al Mayor</h2>
                     <p><strong>{store_name}</strong></p>
                     <p><strong>{customer_name}</strong></p>
-                     <!--
-                     <div class="logo-right">
-                        {f'<img src="cid:logo_store" alt="Logo Store">' if logo_store_path else ''}
-                    </div>
-                     -->
                 </div>
                 {html_content}
                 <br>
                 <p>Se anexan los comprobantes de pago del recibo.</p>
-                <p>Atentamente,</p>
-                <p style="color: #666; font-style: italic;">
-                    GIPSY<br>
-                    Avenida Francisco de Miranda, Centro Lido, Torre A, Piso 9, Oficina 93<br>
-                    Zona industrial Guayaba, Av. Pual. Guayabal, galpón 45, Guarenas<br>
-                    One Turnberry Place, 19495 Biscayne Blvd. #609 Aventura FL 33180 United States of America
-                </p>
             </body>
             </html>
             """
@@ -936,39 +883,6 @@ def send_validationEmail():
                   recipients=[app.config['MAIL_USERNAME']])
     
     msg.html = html_body
-
-    # Adjuntar logo Gipsy (fijo)
-    with app.open_resource('static/IMG/Gipsy_isotipo_color.png') as logo:
-        msg.attach(
-            filename='Gipsy_isotipo_color.png',
-            content_type='image/png',
-            data=logo.read(),
-            disposition='inline',
-            headers={'Content-ID': '<Gipsy_isotipo_color.png>'}
-        )
-
-    # Adjuntar logo Store (dinámico desde OneDrive)
-    if logo_store_path:
-        logo_content = get_onedriveStoreLogo(logo_store_path)
-        
-        if logo_content:
-            # Determinar el tipo MIME basado en la extensión del archivo
-            if logo_store_path.lower().endswith('.png'):
-                mime_type = 'image/png'
-            elif logo_store_path.lower().endswith('.jpg') or logo_store_path.lower().endswith('.jpeg'):
-                mime_type = 'image/jpeg'
-            else:
-                mime_type = 'application/octet-stream'  # Tipo genérico si no se reconoce
-                
-            msg.attach(
-                filename=logo_store_path,
-                content_type=mime_type,
-                data=logo_content,
-                disposition='inline',
-                headers={'Content-ID': '<logo_store>'}
-            )
-        else:
-            print(f"No se pudo obtener el logo {logo_store_path} desde OneDrive")
 
     # Adjuntar comprobantes de pago (dinámico desde OneDrive)
     headers = get_onedrive_headers()
