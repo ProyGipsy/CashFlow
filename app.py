@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 
 from datetime import datetime
-from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response, current_app)
+from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response, current_app, session)
+from flask_session import Session
 from flask_mail import Mail, Message
 
 from cashflow_db import (get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts,
@@ -28,18 +29,52 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
     get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount)
 
+from accessControl import (get_user_data)
+
 # COMENTADO PARA REALIZAR PRUEBA MIENTRAS HABILITAN EL TOKEN
 #from onedrive import get_onedrive_headers
 
 app = Flask(__name__)
+
+# Configuración de sesión para usuarios
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
 
 # Configuración del servidor SMTP
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')
 app.config['MAIL_PORT'] = os.environ.get('MAIL_PORT')
 app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
+    if request.method == 'POST':
+        username = request.form.get('User')
+        password = request.form.get('Password')
+
+        user_data = get_user_data(username, password)
+        print("user_data: ", user_data)
+
+        if user_data:
+
+            # Creación de la sesión
+            session['user_id'] = user_data[0]
+            print("session['user_id']: ", session['user_id'])
+            session['logged_in'] = True
+
+            session['salesRep_id'] = user_data[1]
+            print("session['salesRep_id']: ", session['salesRep_id'])
+            session['user_firstName'] = user_data[2]
+            print("session['user_firstName']: ", session['user_firstName'])
+            session['user_lastName'] = user_data[3]
+            print("session['user_lastName']: ", session['user_lastName'])
+            session['module_id'] = user_data[4]
+            print("session['module_id']: ", session['module_id'])
+
+            return render_template('welcome.html')
+        else: 
+            return render_template('indexLogin.html', error="Credenciales incorrectas, por favor intente de nuevo.")
+   
     return render_template('indexLogin.html')
 
 @app.route('/welcome', methods=['GET', 'POST'])
