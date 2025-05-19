@@ -118,7 +118,22 @@
                 {% for paymentEntry in paymentEntries %}
                     {% if paymentEntry[7] %}
                         {% set file_info = paymentEntry[7] %}
-                        <!-- CORTADA PARA TRABAJAR MIENTRAS HABILITAN EL TOKEN -->
+                        {% if file_info.error %}
+                        <div class="file-error">
+                            Error de conexión, por favor, recargue la página.
+                        </div>
+                        {% elif not file_info.error and file_info.name.lower().endswith(('.jpeg', '.jpg', '.png')) %}
+                            <!-- Para imágenes: embed_url o URL directa con thumbnails -->
+                            <a href="{{ file_info.url }}" target="_blank">
+                                <img src="{{ file_info.url }}" alt="{{ file_info.name }}" title="Click para ampliar">
+                            </a>
+                        {% elif not file_info.error and file_info.name.lower().endswith('.pdf') %}
+                            <!-- Para PDFs: web_url -->
+                            <a class="pdf-link" href="{{ file_info.url }}" target="_blank">
+                                <img class="pdf-icon" src="{{ url_for('static', filename='IMG/pdf_icon.png') }}" alt="PDF">
+                                <span class="pdf-filename">{{ file_info.name }}</span>
+                            </a>
+                        {% endif %}
                     {% endif %}
                 {% endfor %}
             {% else %}

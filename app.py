@@ -29,7 +29,7 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount)
 
 # COMENTADO PARA REALIZAR PRUEBA MIENTRAS HABILITAN EL TOKEN
-#from onedrive import get_onedrive_headers
+from onedrive import get_onedrive_headers
 
 app = Flask(__name__)
 
@@ -382,7 +382,7 @@ def receiptDetails(customer_id, store_id, pagination=1):
     salesRepComm = get_SalesRepCommission(receipt_id)
 
     # Obtención de comprobantes de pago desde OneDrive, actualización de paymentEntries
-    #paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
+    paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
 
     return render_template('receipt.receiptDetails.html', 
                            page='receiptDetails', 
@@ -512,13 +512,12 @@ def submit_receipt():
             account_id = entry.get('account_id')
 
             # COMENTADO PARA REALIZAR PRUEBA MIENTRAS HABILITAN EL TOKEN
-            # if proof_of_payments:
-            #     file_path = save_proofOfPayment([proof_of_payments[payment_entries.index(entry)]], receipt_id, payment_date, payment_entries.index(entry))
-            #     file_path = file_path[0] if file_path else ""
-            # else:
-            #     file_path = ""
+            if proof_of_payments:
+                file_path = save_proofOfPayment([proof_of_payments[payment_entries.index(entry)]], receipt_id, payment_date, payment_entries.index(entry))
+                file_path = file_path[0] if file_path else ""
+            else:
+                file_path = ""
 
-            file_path = "Guardado de comprobantes comentado"
             set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
 
         # Actualización de Monto Abonado
