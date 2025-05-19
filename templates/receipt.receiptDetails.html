@@ -45,10 +45,10 @@
             {% for invoice in invoices %}
             <tr>
                 <td>{{ invoice[0] }}</td>  
-                <td>{{ "{:,.2f}".format(invoice[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td> 
+                <td>{{ invoices[0][6] }} {{ "{:,.2f}".format(invoice[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td> 
                 <td>{{ invoice[2].strftime('%d-%m-%Y') }}</td> 
                 <td>{{ invoice[3].strftime('%d-%m-%Y') }}</td> 
-                <td>{{ "{:,.2f}".format(invoice[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td> 
+                <td>{{ invoices[0][6] }} {{ "{:,.2f}".format(invoice[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td> 
             </tr>
             {% endfor %}
         </table>
@@ -83,6 +83,7 @@
         </div> 
         <div class="inline-label">
             <label for="total_paid">Monto total del Recibo:</label>
+            {{ invoices[0][6] }}
             <span id="total_paid" class="small-input">{{ "{:,.2f}".format(receipts[pagination-1][1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</span> 
         </div> 
 
@@ -98,14 +99,15 @@
             {% for repComm in salesRepComm %}
             <tr> 
                 <td>{{ repComm[0] }}</td>
-                <td>{{ "{:,.2f}".format(repComm[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
+                <td>{{ invoices[0][6] }} {{ "{:,.2f}".format(repComm[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
                 <td>{{ repComm[2] }}</td>
-                <td>{{ "{:,.2f}".format(repComm[3]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
+                <td>{{ invoices[0][6] }} {{ "{:,.2f}".format(repComm[3]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
             </tr> 
             {% endfor %}
         </table>
         <div class="inline-label">
             <label for="total_comm">Comisión Total:</label>
+            {{ invoices[0][6] }}
             <span id="total_comm" class="small-input">{{ "{:,.2f}".format(receipts[pagination-1][2]).replace(".", "X").replace(",", ".").replace("X", ",") }}</span>  
         </div> 
     

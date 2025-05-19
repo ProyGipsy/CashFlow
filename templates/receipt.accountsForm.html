@@ -34,18 +34,25 @@
         <tr> 
             <td><p>{{ receipt[0] }}</p></td>
             <td>
-                <p>{{ "{:,.2f}".format(receipt[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p>
+                <p>{{ receiptStoreCustomer[5] }} {{ "{:,.2f}".format(receipt[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p>
                 <input type="hidden" name="original_amount[]" value="{{ "%.2f"|format(receipt[1]) }}" />
             </td>
             <td><p>{{ receipt[2].strftime('%d-%m-%Y') }}</p></td>
             <td><p>{{ receipt[3].strftime('%d-%m-%Y') }}</p></td>
-            <td><p>{{ "{:,.2f}".format(receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
+            <td><p>{{ receiptStoreCustomer[5] }} {{ "{:,.2f}".format(receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
             <td class="hidden-column">
                 <input type="hidden" name="account_id[]" value="{{ receipt[5] }}" />
             </td>
         </tr> 
         {% endfor %}
     </table>
+    <div class="inline-label">
+        <label for="total_debt">Total Deuda Facturas:</label>
+        {{ receiptStoreCustomer[5] }}
+        <span id="total_debt" class="small-input">
+            {{ "{:,.2f}".format(receiptDetails | sum(attribute=1)).replace(".", "X").replace(",", ".").replace("X", ",") }}
+        </span>
+    </div>
 
     <br> 
     <div id="formas-de-pago"> 
@@ -54,6 +61,13 @@
             <b>Descuento a aplicar (%):</b>
             <input id="general_discount" type="number" name="discount" step="0.01" class="input-field small-input" value="0.00"  onchange="applyDiscount()">
         </span>
+        <div class="inline-label">
+            <label for="total_balance">Total a pagar después del descuento:</label>
+            {{ receiptStoreCustomer[5] }}
+            <span id="total_balance" class="small-input">
+                {{ "{:,.2f}".format(receiptDetails | sum(attribute=1)).replace(".", "X").replace(",", ".").replace("X", ",") }}
+            </span>
+        </div>
         <table class="styled-table" id="payment-table">
             <tr>
                 <th>Moneda</th>
@@ -99,6 +113,7 @@
     <br><br>
     <div class="inline-label">
         <label for="balance_note">Monto total del Recibo:</label>
+        {{ receiptStoreCustomer[5] }}
         <span id="balance_note" class="small-input">0,00</span> 
     </div>
 
@@ -139,6 +154,7 @@
     <br><br>
     <div class="inline-label">
         <label for="commission_note">Comisión Total:</label>
+        {{ receiptStoreCustomer[5] }}
         <span id="commission_note" class="small-input">0,00</span> 
     </div>
 
@@ -629,12 +645,17 @@
 
         // Aplicar descuento a todas las facturas
         const balanceFields = document.querySelectorAll('#balance_calculation');
+        let totalBalance = 0;
         balanceFields.forEach(field => {
             const originalValue = parseFloat(field.dataset.originalValue);
             const discountedValue = originalValue * (1 - discountValue / 100);
             field.textContent = formatSpanishNumber(discountedValue);
             field.dataset.hasDiscount = discountValue > 0 ? 'true' : 'false';
+            totalBalance += discountedValue
         });
+
+        // Actualización de total adeudado
+        document.getElementById('total_balance').textContent = formatSpanishNumber(totalBalance);
         
         // Recalcular días y comisiones
         updateDaysAndCommission();
