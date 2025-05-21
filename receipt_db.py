@@ -313,7 +313,6 @@ def get_onedriveProofsOfPayments(paymentEntries):
                 response = requests.get(file_url, headers=headers)
                 if response.status_code == 200:
                     file_data = response.json()
-                    #updated_entry = list(entry)
                     
                     file_id = file_data['id']
 
@@ -325,20 +324,24 @@ def get_onedriveProofsOfPayments(paymentEntries):
                     }
                     share_response = requests.post(share_url, headers=headers, json=share_data)
 
+                    updated_entry = list(entry)
                     if share_response.status_code == 200:
                         shared_link = share_response.json()["link"]["webUrl"]
-                        print("(code 200) shared_link: ", shared_link)
-                    # else:
-                    #     shared_link = file_data.get('webUrl')
-                    #     print("(else) shared_link: ", shared_link)
+                        updated_entry[7] = {
+                            'url': shared_link,
+                            'name': filename,
+                            'error': False,
+                            'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
+                        }
+                    else:
+                        shared_link = file_data.get('webUrl')
+                        updated_entry[7] = {
+                            'url': shared_link,
+                            'name': filename,
+                            'error': True,
+                            'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
+                        }
 
-                    updated_entry = list(entry)
-                    updated_entry[7] = {
-                        'url': shared_link,
-                        'name': filename
-                    }
-                    print("updated_entry: ", updated_entry)
-                    
                     updated_entries.append(tuple(updated_entry))
                 
                 else:
@@ -507,11 +510,6 @@ def set_invoicePaidAmount(cursor, account_id, new_paidAmount):
 def revert_invoicePaidAmount(account_id, new_paidAmount):
     conn = get_db_connection()
     cursor = conn.cursor()
-    print('''
-        UPDATE CommissionReceipt.DebtAccount
-        SET PaidAmount = %s
-        WHERE AccountID = %s
-    ''', (new_paidAmount, account_id))
     cursor.execute('''
         UPDATE CommissionReceipt.DebtAccount
         SET PaidAmount = %s
