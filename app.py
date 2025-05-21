@@ -884,7 +884,7 @@ def send_validationEmail():
     for paymentEntry in paymentEntries:
         file_info = paymentEntry[7]
         if file_info:
-            file_url = file_info.get('url', '')
+            file_url = file_info.get('email_url', '')
             filename = file_info.get('name', '')
             mime_type = "application/pdf" if filename.lower().endswith('.pdf') else "image/jpeg"
 

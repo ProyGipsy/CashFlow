@@ -330,14 +330,16 @@ def get_onedriveProofsOfPayments(paymentEntries):
                         updated_entry[7] = {
                             'url': shared_link,
                             'name': filename,
-                            'error': False
+                            'error': False,
+                            'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
                         }
                     else:
                         shared_link = file_data.get('webUrl')
                         updated_entry[7] = {
                             'url': shared_link,
                             'name': filename,
-                            'error': True
+                            'error': True,
+                            'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
                         }
 
                     updated_entries.append(tuple(updated_entry))
