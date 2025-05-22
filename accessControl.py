@@ -14,20 +14,37 @@ def get_db_connection():
 def get_user_data(username, password):
     conn = get_db_connection()
     cursor = conn.cursor()
-    print('''
-                    SELECT U.userId, U.salesRepId, U.firstName, U.lastName, P.moduleId
-                    FROM AccessControl.Users U
-                    JOIN AccessControl.UserRoles R ON U.userId = R.userId
-                    JOIN AccessControl.RolePermissions P ON R.roleId = P.roleId
-                    WHERE U.username=%s AND U.passwordHash=%s
-                   ''', (username, password))
     cursor.execute('''
-                    SELECT U.userId, U.salesRepId, U.firstName, U.lastName, P.moduleId
+                    SELECT U.userId, U.salesRepId, U.firstName, U.lastName, R.roleId, P.moduleId
                     FROM AccessControl.Users U
                     JOIN AccessControl.UserRoles R ON U.userId = R.userId
                     JOIN AccessControl.RolePermissions P ON R.roleId = P.roleId
                     WHERE U.username=%s AND U.passwordHash=%s
                    ''', (username, password))
-    user = cursor.fetchone()
+    results = cursor.fetchall()
     conn.close()
-    return user
+
+    if results:
+        user_data = {
+            'user_id': results[0][0],
+            'salesRep_id': results[0][1],
+            'firstName': results[0][2],
+            'lastName': results[0][3],
+            'roles_id': [row[4] for row in results],
+            'modules_id': [row[5] for row in results]
+        }
+        return user_data
+        
+    return None
+
+def get_roleInfo(role_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+                    SELECT name 
+                    FROM AccessControl.Roles
+                    WHERE roleId = %s
+                   ''', (role_id,))
+    roleInfo = cursor.fetchone()[0]
+    conn.close()
+    return roleInfo

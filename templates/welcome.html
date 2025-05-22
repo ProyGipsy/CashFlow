@@ -10,17 +10,24 @@
 <body>
     <a class="back" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='IMG/salida.png') }}" alt="Cerrar Sesión"></a>
     <div class="container">
-        <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Logo" class="logo">
+        <div class="header">
+            <img src="{{ url_for('static', filename='IMG/Gipsy_imagotipo_color.png') }}" alt="Logo" class="logo">
+            <h2>Bienvenido(a), {{session['user_firstName']}}</h2>
+        </div>
         <br><br>
         <div class="grid">
+            {% if 1 in session['modules'] %}
             <a href="{{ url_for('homeCashier') }}" class="card">
                 <img src="{{ url_for('static', filename='IMG/cash-flow.png') }}" alt="Flujo de Caja" class="card-img">
                 <h3>Flujo de Caja</h3>
             </a>
-            <a href="{{ url_for('receiptRole') }}" class="card">
+            {% endif %}
+            {% if 0 in session['modules'] %}
+            <a onclick="handleReceiptRole()" class="card">
                 <img src="{{ url_for('static', filename='IMG/receipt.png') }}" alt="Registro de Cobranza al Mayor" class="card-img">
                 <h3>Registro de Cobranza al Mayor</h3>
             </a>
+            {% endif %}
             <!--
             <a href="{{ url_for('welcome') }}" class="card disabled">
                 <img src="{{ url_for('static', filename='IMG/document.png') }}" alt="Gestión de Documentos" class="card-img">
@@ -35,5 +42,50 @@
             -->
         </div>
     </div>
+
+    <div id="modalRole" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div class="modal-header">
+                <h2>Registro de Cobranza al Mayor</h2>
+                <p>Seleccione el rol con el que quiera ingresar.</p>
+            </div>
+            
+            <div class="grid role-grid">
+                {% for role in roles_info %}
+                <div class="role-card card" onclick="selectRole({{ role.id }})">
+                    <img src="{{ url_for('static', filename='IMG/' + ('admin2.png' if role.id == 1 else 'seller2.png')) }}" 
+                        alt="{{ role.name }}" class="role-card-img">
+                    <h4>{{ role.name }}</h4>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
+
+<script>
+    function handleReceiptRole(){
+        const userRoles = {{ roles_info | tojson }};
+
+        if (userRoles.length == 1) {
+            const roleId = userRoles[0].id;
+            selectRole(roleId);
+        }
+        else if(userRoles.length > 1) {
+            const modal = document.getElementById("modalRole");
+            document.getElementById('modalRole').style.display = 'block';
+        }
+    }
+
+    function selectRole(roleId) {
+        window.location.href = roleId === 0 ? "{{ url_for('homeSeller') }}" : "{{ url_for('homeAdmin') }}";
+    }
+
+    function closeModal() {
+        document.getElementById('modalRole').style.display = 'none';
+    }
+
+</script>

@@ -29,7 +29,7 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
     get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount)
 
-from accessControl import (get_user_data)
+from accessControl import (get_user_data, get_roleInfo)
 
 # COMENTADO PARA REALIZAR PRUEBA MIENTRAS HABILITAN EL TOKEN
 from onedrive import get_onedrive_headers
@@ -53,25 +53,20 @@ def index():
         password = request.form.get('Password')
 
         user_data = get_user_data(username, password)
-        print("user_data: ", user_data)
 
         if user_data:
 
             # Creación de la sesión
-            session['user_id'] = user_data[0]
-            print("session['user_id']: ", session['user_id'])
-            session['logged_in'] = True
-
-            session['salesRep_id'] = user_data[1]
-            print("session['salesRep_id']: ", session['salesRep_id'])
-            session['user_firstName'] = user_data[2]
-            print("session['user_firstName']: ", session['user_firstName'])
-            session['user_lastName'] = user_data[3]
-            print("session['user_lastName']: ", session['user_lastName'])
-            session['module_id'] = user_data[4]
-            print("session['module_id']: ", session['module_id'])
-
-            return render_template('welcome.html')
+            session.update({
+                'user_id': user_data['user_id'],
+                'logged_in': True,
+                'salesRep_id': user_data['salesRep_id'],
+                'user_firstName': user_data['firstName'],
+                'user_lastName': user_data['lastName'],
+                'roles': user_data['roles_id'],
+                'modules': user_data['modules_id']
+            })
+            return redirect(url_for('welcome'))
         else: 
             return render_template('indexLogin.html', error="Credenciales incorrectas, por favor intente de nuevo.")
    
@@ -79,11 +74,21 @@ def index():
 
 @app.route('/welcome', methods=['GET', 'POST'])
 def welcome():
-    return render_template('welcome.html')
+    roles_info = []
+    seen_roles = set() 
 
-@app.route('/receiptRole', methods=['GET', 'POST'])
-def receiptRole():
-    return render_template('receipt.role.html')
+    print("Roles de usuario: ", session.get('roles', []))
+    for role in session.get('roles', []):
+        if role not in seen_roles:
+            seen_roles.add(role)
+            role_name = get_roleInfo(role)
+            if role_name:
+                roles_info.append({
+                    'id': role,
+                    'name': role_name
+                })
+
+    return render_template('welcome.html', roles_info=roles_info)
 
 
 # INICIOS DE SESIÓN INDIVIDUALES (Descartados con el nuevo flujo)
@@ -458,9 +463,9 @@ def homeSeller():
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
-    stores = get_receiptStores_DebtAccount()
-    customers_by_store = {store[0]: get_customers(store[0]) for store in stores}
-    count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable(store[0]) for store in stores}
+    stores = get_receiptStores_DebtAccount(session['salesRep_id'])
+    customers_by_store = {store[0]: get_customers(store[0], session['salesRep_id']) for store in stores}
+    count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable(store[0], session['salesRep_id']) for store in stores}
     return render_template('receipt.accountsReceivable.html',
                            page='accountsReceivable',
                            active_page='accountsReceivable',
@@ -470,7 +475,7 @@ def accountsReceivable():
 
 @app.route('/get_invoices/<customer_id>/<store_id>')
 def get_invoices(customer_id, store_id):
-    invoices = get_invoices_by_customer(customer_id, store_id)
+    invoices = get_invoices_by_customer(customer_id, store_id, session['salesRep_id'])
     # Formatear datos para JSON
     formatted_invoices = [
         {
