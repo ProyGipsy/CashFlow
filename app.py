@@ -31,7 +31,6 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
 
 from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepEmail)
 
-# COMENTADO PARA REALIZAR PRUEBA MIENTRAS HABILITAN EL TOKEN
 from onedrive import get_onedrive_headers
 
 app = Flask(__name__)
@@ -426,9 +425,7 @@ def receiptDetails(customer_id, store_id, pagination=1):
     receipt_id = paginated_receipts[0][0]
     invoices = get_invoices_by_receipt(receipt_id)
     salesRep_id = invoices[0][7]
-    print("salesRep_id: ", salesRep_id)
     salesRep_email = get_salesRepEmail(salesRep_id)
-    print("salesRep_email: ", salesRep_email)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
     salesRepComm = get_SalesRepCommission(receipt_id)
 
@@ -560,10 +557,8 @@ def submit_receipt():
             payment_destination_id = entry['payment_destination_id']
             tender_id = entry['tender_id']
             
-            # El account_id viene del frontend (ya calculado)
             account_id = entry.get('account_id')
 
-            # COMENTADO PARA REALIZAR PRUEBA MIENTRAS HABILITAN EL TOKEN
             if proof_of_payments:
                 file_path = save_proofOfPayment([proof_of_payments[payment_entries.index(entry)]], receipt_id, payment_date, payment_entries.index(entry))
                 file_path = file_path[0] if file_path else ""
@@ -671,9 +666,7 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
     else:
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
 
-    print("session['user_id']: ", session['user_id'])
     salesRep_Recipient = get_userEmail(session['user_id'])
-    print("salesRep_Recipient: ", salesRep_Recipient)
 
     msg = Message(subject=subject,
                 sender=app.config['MAIL_USERNAME'],
@@ -742,7 +735,6 @@ def send_rejectionEmail():
     totalPaid = request.form.get('total_paid', '')
     totalCommission = request.form.get('total_commission', '')
     salesRep_email = request.form.get('salesRep_email', '')
-    print("Rejection salesRep_email: ", salesRep_email)
 
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
@@ -793,7 +785,6 @@ def send_validationEmail():
     pagination = int(request.form.get('pagination', ''))
     receipt_id = int(request.form.get('receipt_id', ''))
     salesRep_email = request.form.get('salesRep_email', '')
-    print("Validation salesRep_email: ", salesRep_email)
 
     receipts_per_page = 1
     receipts = get_unvalidated_receipts_by_customer(customer_id)
