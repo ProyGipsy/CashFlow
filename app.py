@@ -29,7 +29,7 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
     get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount)
 
-from accessControl import (get_user_data, get_roleInfo)
+from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepEmail)
 
 # COMENTADO PARA REALIZAR PRUEBA MIENTRAS HABILITAN EL TOKEN
 from onedrive import get_onedrive_headers
@@ -77,7 +77,6 @@ def welcome():
     roles_info = []
     seen_roles = set() 
 
-    print("Roles de usuario: ", session.get('roles', []))
     for role in session.get('roles', []):
         if role not in seen_roles:
             seen_roles.add(role)
@@ -426,6 +425,10 @@ def receiptDetails(customer_id, store_id, pagination=1):
     # Obtención de receipt_id, facturas y formas de pago por página
     receipt_id = paginated_receipts[0][0]
     invoices = get_invoices_by_receipt(receipt_id)
+    salesRep_id = invoices[0][7]
+    print("salesRep_id: ", salesRep_id)
+    salesRep_email = get_salesRepEmail(salesRep_id)
+    print("salesRep_email: ", salesRep_email)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
     salesRepComm = get_SalesRepCommission(receipt_id)
 
@@ -441,6 +444,7 @@ def receiptDetails(customer_id, store_id, pagination=1):
                            store=store,
                            customer=customer,
                            invoices=invoices,
+                           salesRep_email=salesRep_email,
                            paymentEntries=paymentEntries,
                            salesRepComm = salesRepComm,
                            pagination=pagination,
@@ -604,7 +608,10 @@ def submit_receipt():
         store_id = request.form.get('store_id', '')
         store_name = request.form.get('store_name', '')
         customer_name = request.form.get('customer_name', '')
-        send_receipt_notification(receipt_id, store_id, store_name, customer_name)
+        currency = request.form.get('currency', '')
+        send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency)
+        send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency)
+        
 
         return redirect(url_for('accountsReceivable'))
     
@@ -617,7 +624,7 @@ def submit_receipt():
         cursor.close()
         conn.close()
 
-def send_receipt_notification(receipt_id, store_id, store_name, customer_name):
+def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_amount, currency):
 
     subject = f"Recibo {receipt_id}: Se ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
     app_url = os.environ.get('APP_URL')
@@ -639,9 +646,52 @@ def send_receipt_notification(receipt_id, store_id, store_name, customer_name):
                 <li><strong>Número de Recibo:</strong> {receipt_id}</li>
                 <li><strong>Tienda:</strong> {store_name}</li>
                 <li><strong>Cliente:</strong> {customer_name}</li>
+                <li><strong>Monto Total:</strong> {currency} {total_receipt_amount}</li>
+                <li><strong>Comisión a Recibir:</strong> {currency} {commission_amount}</li>
             </ul>
                 
             <p>Por favor ingrese a la <a href="{app_url}">aplicación web de GIPSY</a> de <strong>"Registro de Cobranza al Mayor"</strong> y diríjase a la sección de <strong>"Recibos de Cobranza"</strong> para revisar y validar la cobranza registrada.</p>
+        </body>
+    </html>
+    """
+
+    msg.html = body
+
+    mail.send(msg)
+
+    return jsonify({'success': True})
+
+def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_amount, currency):
+
+    subject = f"Recibo {receipt_id}: Usted ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
+    app_url = os.environ.get('APP_URL')
+
+    if store_id == '904' or store_id == '905':
+        app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
+    else:
+        app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
+
+    print("session['user_id']: ", session['user_id'])
+    salesRep_Recipient = get_userEmail(session['user_id'])
+    print("salesRep_Recipient: ", salesRep_Recipient)
+
+    msg = Message(subject=subject,
+                sender=app.config['MAIL_USERNAME'],
+                recipients=[salesRep_Recipient])
+
+    body = f"""
+    <html>
+        <body>
+            <p>Hola, vendedor(a) {session['user_firstName']} {session['user_lastName']}.</p>
+            <p>Usted ha registrado una nueva cobranza con los siguientes detalles:</p>
+            <ul>
+                <li><strong>Número de Recibo:</strong> {receipt_id}</li>
+                <li><strong>Tienda:</strong> {store_name}</li>
+                <li><strong>Cliente:</strong> {customer_name}</li>
+                <li><strong>Monto Total:</strong> {currency} {total_receipt_amount}</li>
+                <li><strong>Comisión a Recibir:</strong> {currency} {commission_amount}</li>
+            </ul>
+            <p>El equipo administrativo la revisará y validará en breve. Una vez confirmada, recibirá una notificación adicional.</p>
         </body>
     </html>
     """
@@ -691,15 +741,18 @@ def send_rejectionEmail():
     currency = request.form.get('currency', '')
     totalPaid = request.form.get('total_paid', '')
     totalCommission = request.form.get('total_commission', '')
+    salesRep_email = request.form.get('salesRep_email', '')
+    print("Rejection salesRep_email: ", salesRep_email)
 
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
     else:
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
 
-    msg = Message(subject='Rechazo de Recibo de Cobranza',
+    subject = f"Recibo de Cobranza #{ receipt_id }: Rechazado"
+    msg = Message(subject=subject,
                   sender=app.config['MAIL_USERNAME'],
-                  recipients=[app.config['MAIL_USERNAME']])
+                  recipients=[app.config['MAIL_USERNAME'], salesRep_email])
 
     html_body = f"""
     <html>
@@ -739,6 +792,8 @@ def send_validationEmail():
     customer_id = request.form.get('customer_id', '')
     pagination = int(request.form.get('pagination', ''))
     receipt_id = int(request.form.get('receipt_id', ''))
+    salesRep_email = request.form.get('salesRep_email', '')
+    print("Validation salesRep_email: ", salesRep_email)
 
     receipts_per_page = 1
     receipts = get_unvalidated_receipts_by_customer(customer_id)
@@ -921,9 +976,10 @@ def send_validationEmail():
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
 
     # Lógica para enviar el correo
-    msg = Message(subject='Validación de Recibo de Cobranza',
+    subject = f"Recibo de Cobranza #{ receipt_id }: Validado"
+    msg = Message(subject=subject,
                   sender=app.config['MAIL_USERNAME'],
-                  recipients=[app.config['MAIL_USERNAME']])
+                  recipients=[app.config['MAIL_USERNAME'], salesRep_email])
     
     msg.html = html_body
 

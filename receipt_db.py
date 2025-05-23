@@ -158,7 +158,7 @@ def get_count_customers_with_unvalidated_receipts(store_id):
 def get_currency():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT DISTINCT(ID), Code, ExchangeRate FROM Main.Currency WHERE ID != 0')
+    cursor.execute('SELECT DISTINCT(ID), Code, ExchangeRate FROM Main.Currency WHERE ID != 0 AND isRetail = 0')
     currencies = cursor.fetchall()
     conn.close()
     return currencies
@@ -255,7 +255,7 @@ def get_unvalidated_receipts_by_customer(customer_id):
 def get_invoices_by_receipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(D.N_CTA), D.Amount, D.DueDate, D.DueDate, D.PaidAmount, D.AccountID, C.Description
+    cursor.execute('''SELECT DISTINCT(D.N_CTA), D.Amount, D.DueDate, D.DueDate, D.PaidAmount, D.AccountID, C.Description, D.SalesRepID
                     FROM CommissionReceipt.DebtAccount D
                     JOIN CommissionReceipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID
                     JOIN Main.Currency C ON D.CurrencyID = C.ID

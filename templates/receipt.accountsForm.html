@@ -859,9 +859,11 @@
         const store_id = "{{ receiptStoreCustomer[0] }}";
         const store_name = "{{ receiptStoreCustomer[1] }}";
         const customer_name = "{{ receiptStoreCustomer[3] }}" + " " + "{{ receiptStoreCustomer[4] }}";
+        const currency = "{{ receiptStoreCustomer[5] }}"
         formData.append('store_id', store_id);
         formData.append('store_name', store_name);
         formData.append('customer_name', customer_name);
+        formData.append('currency', currency);
 
         // Envío de Datos al Servidor
         fetch("{{ url_for('submit_receipt') }}", {

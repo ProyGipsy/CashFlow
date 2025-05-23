@@ -289,10 +289,12 @@
         const customer_id = "{{ customer[0] }}";
         const pagination = "{{ pagination }}"
         const receipt_id = "{{ receipts[ pagination - 1 ][0] }} "
+        const salesRep_email = "{{ salesRep_email }}"
         formData.append('store_id', store_id);
         formData.append('customer_id', customer_id);
         formData.append('pagination', pagination);
         formData.append('receipt_id', receipt_id);
+        formData.append('salesRep_email', salesRep_email);
         
         // Enviar el HTML
         fetch('/send_validateReceipt_email', {
@@ -404,6 +406,7 @@
         const totalPaid = '{{ "%.2f"|format(receipts[ pagination - 1 ][1]) }}';
         const totalCommission = '{{ "%.2f"|format(receipts[ pagination - 1 ][2]) }}';
         const discountValue = "{{ paymentEntries[0][3] }}";
+        const salesRep_email = "{{ salesRep_email }}"
 
         const formData = new FormData(document.getElementById('pdfForm'));
         formData.append('receipt_id', receipt_id);
@@ -415,6 +418,7 @@
         formData.append('total_paid', totalPaid);
         formData.append('total_commission', totalCommission);
         formData.append('discount_value', discountValue);
+        formData.append('salesRep_email', salesRep_email);
 
         fetch('/send_rejectionReceipt_email', {
             method: 'POST',

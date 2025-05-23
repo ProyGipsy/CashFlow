@@ -48,3 +48,27 @@ def get_roleInfo(role_id):
     roleInfo = cursor.fetchone()[0]
     conn.close()
     return roleInfo
+
+def get_userEmail(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+                    SELECT email
+                    FROM AccessControl.Users
+                    WHERE userId = %s
+                   ''', (user_id,))
+    userEmail = cursor.fetchone()[0]
+    conn.close()
+    return userEmail
+
+def get_salesRepEmail(salesRep_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+                    SELECT email
+                    FROM AccessControl.Users
+                    WHERE salesRepId = %s
+                   ''', (salesRep_id,))
+    salesRepEmail = cursor.fetchone()[0]
+    conn.close()
+    return salesRepEmail
