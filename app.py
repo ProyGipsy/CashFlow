@@ -755,8 +755,8 @@ def send_rejectionEmail():
                 <li><strong>Empresa:</strong> {store_name}</li>
                 <li><strong>Cliente:</strong> {customer}</li>
                 <li><strong>Moneda:</strong> {currency}</li>
-                <li><strong>Monto total:</strong> {totalPaid} {currency}</li>
-                <li><strong>Comisión a recibir:</strong> {totalCommission} {currency}</li>
+                <li><strong>Monto total:</strong> {currency} {totalPaid}</li>
+                <li><strong>Comisión a recibir:</strong> {currency} {totalCommission}</li>
             </ul>          
             
             <p>ha sido rechazado por el siguiente motivo:</p>

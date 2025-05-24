@@ -232,8 +232,6 @@
 
         if (selectedAccountIDs.length > 0) {
 
-            // Verificación comentada debido a que los recibos sí permiten pagos de diferentes monedas
-            /*
             sessionStorage.setItem("selectedAccountIDs", JSON.stringify(selectedAccountIDs));
             let selectedCurrencies = new Set();
             for (const accountID of selectedAccountIDs) {
@@ -245,7 +243,6 @@
                     return;
                 }
             }
-            */
 
             const accountIdsString = selectedAccountIDs.join('-');
             window.location.href = "{{ url_for('accountsForm', account_ids='ACCOUNT_IDS') }}".replace('ACCOUNT_IDS', accountIdsString);
