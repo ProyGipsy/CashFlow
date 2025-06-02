@@ -101,7 +101,7 @@ def get_customers(store_id, salesRep_id):
     cursor.execute('''SELECT DISTINCT (C.ID), C.FirstName, C.LastName
                     FROM Main.Customer C
                     JOIN CommissionReceipt.DebtAccount D ON C.ID = D.CustomerID
-                    WHERE (Amount-PaidAmount) > 0 AND D.StoreID = %s AND D.SalesRepID = %s''', (store_id, salesRep_id))
+                    WHERE C.isRetail = 0 AND (Amount-PaidAmount) > 0 AND D.StoreID = %s AND D.SalesRepID = %s''', (store_id, salesRep_id))
     sellers = cursor.fetchall()
     conn.close()
     return sellers
