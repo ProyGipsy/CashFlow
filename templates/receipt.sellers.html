@@ -31,7 +31,7 @@
         <div class="company-sellers" id="sellers-{{ store[0] }}" style="display: none;">
             {% for seller in sellers_by_store[store[0]] %}
             <div class="customer-container">
-                <p>{{ seller[1] }} <a href="{{ url_for('sellerDetails', seller_id=seller[0]) }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
+                <p>{{ seller[0] }} | {{ seller[1] }} <a href="{{ url_for('sellerDetails', seller_id=seller[0]) }}"><img src="{{ url_for('static', filename='IMG/details.png') }}" alt="Detalles"></a></p>
                 <div class="separator"></div>
             </div>
             {% endfor %}

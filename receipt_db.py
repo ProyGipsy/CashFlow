@@ -20,10 +20,12 @@ def get_db_connection():
 def get_receiptStores_Sellers():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(S.ID), S.Name
-                    FROM Main.Store S
-                    JOIN Main.SalesRep R ON S.ID = StoreID
-                    WHERE S.ID != 0''')
+    cursor.execute('''SELECT DISTINCT T.ID, T.Name
+                    FROM Main.Store T
+                    JOIN CommissionReceipt.DebtAccount D ON T.ID = D.StoreID
+                    JOIN Main.SalesRep S ON D.SalesRepID = S.ID
+                    WHERE T.ID != 0 AND S.isRetail = 0
+                    ORDER BY T.ID;''')
     stores = cursor.fetchall()
     conn.close()
     return stores
@@ -64,7 +66,11 @@ def get_receiptStore_by_id(store_id):
 def get_sellers(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT ID, Name FROM Main.SalesRep WHERE StoreID = %s', (store_id,))
+    cursor.execute('''SELECT DISTINCT S.ID, S.Name
+                    FROM Main.SalesRep S
+                    JOIN CommissionReceipt.DebtAccount D ON S.ID = D.SalesRepID
+                    WHERE S.isRetail = 0 AND S.isGalac = 1 AND D.StoreID = %s
+                    ORDER BY S.ID''', (store_id,))
     sellers = cursor.fetchall()
     conn.close()
     return sellers
@@ -72,7 +78,10 @@ def get_sellers(store_id):
 def get_count_sellers(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(ID) FROM Main.SalesRep WHERE StoreID = %s', (store_id,))
+    cursor.execute('''SELECT COUNT(DISTINCT(S.ID))
+                    FROM Main.SalesRep S
+                    JOIN CommissionReceipt.DebtAccount D ON S.ID = D.SalesRepID
+                    WHERE S.isRetail = 0 AND S.isGalac = 1 AND D.StoreID = %s''', (store_id,))
     sellers = cursor.fetchone()[0]
     conn.close()
     return sellers
