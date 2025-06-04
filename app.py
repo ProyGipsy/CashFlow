@@ -27,7 +27,8 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission, get_SalesRepCommission,
     set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoicePaidAmount, set_DebtPaymentRelation,
     set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
-    get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount)
+    get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount,
+    get_customers_admin, get_count_customers_with_accountsReceivable_admin, get_receiptStores_DebtAccount_admin, get_invoices_by_customer_admin)
 
 from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepEmail)
 
@@ -464,9 +465,18 @@ def homeSeller():
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
-    stores = get_receiptStores_DebtAccount(session['salesRep_id'])
-    customers_by_store = {store[0]: get_customers(store[0], session['salesRep_id']) for store in stores}
-    count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable(store[0], session['salesRep_id']) for store in stores}
+    
+
+    print("session['salesRep_id']: ", session['salesRep_id'])
+    if (session['salesRep_id'] == '99'):
+        print("Estoy en modo admin")
+        stores = get_receiptStores_DebtAccount_admin()
+        customers_by_store = {store[0]: get_customers_admin(store[0]) for store in stores}
+        count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable_admin(store[0]) for store in stores}
+    else:
+        stores = get_receiptStores_DebtAccount(session['salesRep_id'])
+        customers_by_store = {store[0]: get_customers(store[0], session['salesRep_id']) for store in stores}
+        count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable(store[0], session['salesRep_id']) for store in stores}
     return render_template('receipt.accountsReceivable.html',
                            page='accountsReceivable',
                            active_page='accountsReceivable',
@@ -476,7 +486,10 @@ def accountsReceivable():
 
 @app.route('/get_invoices/<customer_id>/<store_id>')
 def get_invoices(customer_id, store_id):
-    invoices = get_invoices_by_customer(customer_id, store_id, session['salesRep_id'])
+    if (session['salesRep_id'] == '99'):
+        invoices = get_invoices_by_customer_admin(customer_id, store_id)
+    else: 
+        invoices = get_invoices_by_customer(customer_id, store_id, session['salesRep_id'])
     # Formatear datos para JSON
     formatted_invoices = [
         {

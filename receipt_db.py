@@ -42,6 +42,17 @@ def get_receiptStores_DebtAccount(salesRep_id):
     conn.close()
     return stores
 
+def get_receiptStores_DebtAccount_admin():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT DISTINCT(S.ID), S.Name
+                    FROM Main.Store S
+                    JOIN CommissionReceipt.DebtAccount D ON S.ID = D.StoreID
+                    WHERE S.ID != 0 AND (D.Amount-D.PaidAmount) > 0 ''',)
+    stores = cursor.fetchall()
+    conn.close()
+    return stores
+
 def get_receiptStores_Receipts():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -110,7 +121,26 @@ def get_customers(store_id, salesRep_id):
     cursor.execute('''SELECT DISTINCT (C.ID), C.FirstName, C.LastName
                     FROM Main.Customer C
                     JOIN CommissionReceipt.DebtAccount D ON C.ID = D.CustomerID
-                    WHERE C.isRetail = 0 AND (Amount-PaidAmount) > 0 AND D.StoreID = %s AND D.SalesRepID = %s''', (store_id, salesRep_id))
+                    WHERE C.isRetail = 0 AND (Amount-PaidAmount) > 0 AND D.StoreID = %s AND D.SalesRepID = %s
+                            AND D.SalesRepID IN (SELECT ID
+                                                    FROM Main.SalesRep
+                                                    WHERE isGalac = 1)
+                   ''', (store_id, salesRep_id))
+    sellers = cursor.fetchall()
+    conn.close()
+    return sellers
+
+def get_customers_admin(store_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT DISTINCT (C.ID), C.FirstName, C.LastName
+                    FROM Main.Customer C
+                    JOIN CommissionReceipt.DebtAccount D ON C.ID = D.CustomerID
+                    WHERE C.isRetail = 0 AND (Amount-PaidAmount) > 0 AND D.StoreID = %s
+                            AND D.SalesRepID IN (SELECT ID
+                                                FROM Main.SalesRep
+                                                WHERE isGalac = 1)
+                   ''', (store_id))
     sellers = cursor.fetchall()
     conn.close()
     return sellers
@@ -125,9 +155,34 @@ def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
                             SUM(D.Amount - D.PaidAmount) AS Balance
                         FROM CommissionReceipt.DebtAccount D
                         WHERE (D.Amount - D.PaidAmount) > 0 AND D.StoreID = %s AND D.SalesRepID = %s
+                                AND D.SalesRepID IN (SELECT ID
+                                                    FROM Main.SalesRep
+                                                    WHERE isGalac = 1)
                         GROUP BY D.CurrencyID
                     ) AS T
                     JOIN Main.Currency M ON T.CurrencyID = M.ID;''', (store_id, salesRep_id))
+    sellers = list(cursor.fetchone())
+    formattedSum = "{:,.2f}".format(sellers[1]).replace(".", "X").replace(",", ".").replace("X", ",")
+    sellers[1] = formattedSum
+    conn.close()
+    return sellers
+
+def get_count_customers_with_accountsReceivable_admin(store_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT T.CountCustomers, T.Balance, M.Code AS Currency
+                    FROM (
+                        SELECT D.CurrencyID, 
+                            COUNT(DISTINCT D.CustomerID) AS CountCustomers, 
+                            SUM(D.Amount - D.PaidAmount) AS Balance
+                        FROM CommissionReceipt.DebtAccount D
+                        WHERE (D.Amount - D.PaidAmount) > 0 AND D.StoreID = %s
+                                AND D.SalesRepID IN (SELECT ID
+											FROM Main.SalesRep
+											WHERE isGalac = 1)
+                        GROUP BY D.CurrencyID
+                    ) AS T
+                    JOIN Main.Currency M ON T.CurrencyID = M.ID;''', (store_id))
     sellers = list(cursor.fetchone())
     formattedSum = "{:,.2f}".format(sellers[1]).replace(".", "X").replace(",", ".").replace("X", ",")
     sellers[1] = formattedSum
@@ -206,8 +261,27 @@ def get_invoices_by_customer(customer_id, store_id, salesRep_id):
                    FROM CommissionReceipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
                    WHERE CustomerID = %s AND StoreID = %s AND D.Amount-D.PaidAmount > 0 AND D.SalesRepID = %s
+                        AND D.SalesRepID IN (SELECT ID
+                                                    FROM Main.SalesRep
+                                                    WHERE isGalac = 1)
                    ORDER BY D.N_CTA''',
                    (customer_id, store_id, salesRep_id))
+    invoices = cursor.fetchall()    
+    conn.close()
+    return invoices
+
+def get_invoices_by_customer_admin(customer_id, store_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.PaidAmount, C.Description
+                   FROM CommissionReceipt.DebtAccount D
+                   JOIN Main.Currency C ON D.CurrencyID = C.ID
+                   WHERE CustomerID = %s AND StoreID = %s AND D.Amount-D.PaidAmount > 0
+						AND D.SalesRepID IN (SELECT ID
+											FROM Main.SalesRep
+											WHERE isGalac = 1)
+                   ORDER BY D.N_CTA''',
+                   (customer_id, store_id))
     invoices = cursor.fetchall()    
     conn.close()
     return invoices
