@@ -143,7 +143,7 @@ def get_customers_with_unvalidated_receipts(store_id):
             JOIN CommissionReceipt.DebtAccount D ON C.ID = D.CustomerID
             JOIN CommissionReceipt.DebtPaymentRelation P ON D.AccountID = P.DebtAccountID
             JOIN CommissionReceipt.PaymentReceipt R ON P.PaymentReceiptID = R.ReceiptID
-            WHERE R.IsReviewed = 0 AND D.StoreID = %s
+            WHERE  C.isRetail = 0 AND R.IsReviewed = 0 AND D.StoreID = %s
             ''', (store_id,))
     customers = cursor.fetchall()
     conn.close()
