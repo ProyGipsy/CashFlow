@@ -100,7 +100,7 @@ def get_count_sellers(store_id):
 def get_seller_details(seller_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT ID, Name, EmailAddress, Telephone, CONCAT(FLOOR(PercentOfSale*100), '%'), StoreID FROM Main.SalesRep WHERE ID = %s", (seller_id,))
+    cursor.execute("SELECT ID, Name, EmailAddress, Telephone, CONCAT(FLOOR(PercentOfSale*100), '%') FROM Main.SalesRep WHERE ID = %s", (seller_id,))
     seller = cursor.fetchone()
     conn.close()
     return seller
@@ -148,7 +148,7 @@ def get_customers_admin(store_id):
 def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT T.CountCustomers, T.Balance, M.Code AS Currency
+    cursor.execute('''SELECT DISTINCT T.CountCustomers, T.Balance, M.Code AS Currency
                     FROM (
                         SELECT D.CurrencyID, 
                             COUNT(DISTINCT D.CustomerID) AS CountCustomers, 
@@ -170,7 +170,7 @@ def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
 def get_count_customers_with_accountsReceivable_admin(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT T.CountCustomers, T.Balance, M.Code AS Currency
+    cursor.execute('''SELECT DISTINCT T.CountCustomers, T.Balance, M.Code AS Currency
                     FROM (
                         SELECT D.CurrencyID, 
                             COUNT(DISTINCT D.CustomerID) AS CountCustomers, 
