@@ -465,11 +465,7 @@ def homeSeller():
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
-    
-
-    print("session['salesRep_id']: ", session['salesRep_id'])
     if (session['salesRep_id'] == '99'):
-        print("Estoy en modo admin")
         stores = get_receiptStores_DebtAccount_admin()
         customers_by_store = {store[0]: get_customers_admin(store[0]) for store in stores}
         count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable_admin(store[0]) for store in stores}

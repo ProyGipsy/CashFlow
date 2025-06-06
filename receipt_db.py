@@ -172,9 +172,7 @@ def get_count_customers_with_accountsReceivable_admin(store_id):
                     ) AS T
                     JOIN Main.Currency M ON T.CurrencyID = M.ID;''', (store_id))
     sellers = list(cursor.fetchone())
-    print("sellers: ", sellers)
     formattedSum = "{:,.2f}".format(sellers[1]).replace(".", "X").replace(",", ".").replace("X", ",")
-    print("formattedSum: ", formattedSum)
     sellers[1] = formattedSum
     conn.close()
     return sellers
