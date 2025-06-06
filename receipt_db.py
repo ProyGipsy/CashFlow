@@ -599,7 +599,7 @@ def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount):
 
 def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id):
     cursor.execute('''
-                    INSERT INTO  Commission_Receipt].[SalesRepCommission] 
+                    INSERT INTO Commission_Receipt.SalesRepCommission
                     (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CommissionAmount, CreatedAt, ReceiptID)
                     VALUES (%s, %s, %s, %s, %s, %s, GETDATE(), %s)
                     ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id))
