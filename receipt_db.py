@@ -287,6 +287,7 @@ def get_receiptsInfo(account_ids):
     account_ids_tuple = tuple(account_ids)
     conn = get_db_connection()
     cursor = conn.cursor()
+    # Fixing query (InvoiceIssueDate)
     cursor.execute('''SELECT D.N_CTA, D.Amount, D.InvoiceIssueDate, D.DueDate, D.PaidAmount, D.AccountID
                    FROM Commission_Receipt.DebtAccount D
                    WHERE AccountID IN %s
