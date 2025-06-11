@@ -530,6 +530,9 @@
         const receiptData = Array.from(balanceCalculationFields).map((field, index) => {
             const originalValue = parseFloat(field.getAttribute('data-original-value')) || 0;
             const discountedValue = originalValue * (1 - generalDiscount / 100);
+            // Obtener tipo de documento desde la tabla de facturas
+            const docTypeCell = document.querySelectorAll('.heading-table tr')[index + 1]?.children[1];
+            const docType = docTypeCell ? docTypeCell.textContent.trim() : '';
             return {
                 element: field,
                 originalValue: originalValue,
@@ -538,7 +541,8 @@
                 remaining: discountedValue,
                 paymentDate: null,
                 amountPaid: 0.00,
-                retentionApplied: 0.00 // Retención aplicada a esta factura
+                retentionApplied: 0.00, // Retención aplicada a esta factura
+                docType: docType // Guardar tipo de documento
             };
         });
         // Distribuir pagos y retenciones a facturas en orden
@@ -597,14 +601,18 @@
                 if (!commissionApplied) {
                     if (daysPassed <= comm[2]) {
                         if (comm[3] == 1) {
-                            // Solo el monto pagado NO cubierto por retención genera comisión
                             let amountForCommission = invoice.amountPaid - invoice.retentionApplied;
                             if (amountForCommission < 0) amountForCommission = 0;
                             // Commisión = (Base Imponible - Descuentos) * reglaNegocio 
                             // Base Imponible = MontoPagado / 1.16
                             // Los descuentos ya se restan del monto total, debido a que en los cálculos se muestra el
                             // importe adeudado actualizado y con base en eso se toma el monto pagado de esa factura.
-                            commission = amountForCommission/1.16 * (comm[1] / 100);
+                            // OJO: Las N/E no tienen IVA, por tanto no se divide entre 1.16
+                            if (invoice.docType === 'FAC') {
+                                commission = amountForCommission / 1.16 * (comm[1] / 100);
+                            } else if (invoice.docType === 'N/E') {
+                                commission = amountForCommission * (comm[1] / 100);
+                            }
                             commissionApplied = true;
                         }
                     }
