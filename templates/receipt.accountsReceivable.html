@@ -55,6 +55,7 @@
             <thead>
                 <tr>
                     <th>N_CTA</th>
+                    <th>Tipo de Documento</th>
                     <th>Moneda</th>
                     <th>Monto Original</th>
                     <th>Monto Abonado</th>
@@ -174,6 +175,7 @@
 
                         row.innerHTML = `
                             <td>${invoice.N_CTA}</td>
+                            <td>${invoice.DocumentType}</td>
                             <td>${invoice.Currency}</td>
                             <td>${formatSpanishNumber(invoice.Amount)}</td>
                             <td>${formatSpanishNumber(invoice.Balance)}</td>

@@ -25,6 +25,7 @@
     <table class="styled-table heading-table"> 
         <tr> 
             <th>N_CTA</th>
+            <th>Tipo de Documento</th>
             <th>Total Deuda (T/D)</th>
             <th>Fecha Emisión</th>
             <th>Fecha Vencimiento</th>
@@ -33,6 +34,7 @@
         {% for receipt in receiptDetails %}
         <tr> 
             <td><p>{{ receipt[0] }}</p></td>
+            <td><p>{{ receipt[6] }}</p></td>
             <td>
                 <p>{{ receiptStoreCustomer[5] }} {{ "{:,.2f}".format(receipt[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p>
                 <input type="hidden" name="original_amount[]" value="{{ "%.2f"|format(receipt[1]) }}" />
@@ -596,17 +598,13 @@
                     if (daysPassed <= comm[2]) {
                         if (comm[3] == 1) {
                             // Solo el monto pagado NO cubierto por retención genera comisión
-                            console.log("invoice.amountPaid: ", invoice.amountPaid);
-                            console.log("invoice.retentionApplied: ", invoice.retentionApplied);
                             let amountForCommission = invoice.amountPaid - invoice.retentionApplied;
                             if (amountForCommission < 0) amountForCommission = 0;
-                            console.log("amountForCommission: ", amountForCommission);
                             // Commisión = (Base Imponible - Descuentos) * reglaNegocio 
                             // Base Imponible = MontoPagado / 1.16
                             // Los descuentos ya se restan del monto total, debido a que en los cálculos se muestra el
                             // importe adeudado actualizado y con base en eso se toma el monto pagado de esa factura.
                             commission = amountForCommission/1.16 * (comm[1] / 100);
-                            console.log("commission: ", commission);
                             commissionApplied = true;
                         }
                     }
