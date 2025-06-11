@@ -269,6 +269,8 @@
                     option.textContent = `${account[1]} ${account[2]}`; // BankName | Destiny
                     paymentMadeSelect.appendChild(option);
                 });
+
+                updateDaysAndCommission();
             })
             .catch(error => console.error('Error:', error));
         }
@@ -502,120 +504,117 @@
         const daysPassedFields = document.querySelectorAll('#days_passed');
         const commissionFields = document.querySelectorAll('#commission_received');
         const generalDiscount = parseFloat(document.getElementById('general_discount').value) || 0;
-
-        // Obtener todas las filas de pago
         const paymentRows = document.querySelectorAll('.payment-row');
+        const receiptCurrency = "{{ receiptStoreCustomer[6] }}";
+        // Preparar datos de pagos
         const paymentData = Array.from(paymentRows).map(row => {
-
-            // Verificación y Reconversión de Moneda por Forma de Pago
             const currencySelect = row.querySelector('select[name="currency"]');
-            const receiptCurrency = "{{ receiptStoreCustomer[6] }}";
-            entryAmount = row.querySelector('input[name="payment_amount"]').value
-            convertedAmount = entryAmount;
+            let entryAmount = row.querySelector('input[name="payment_amount"]').value;
+            let convertedAmount = entryAmount;
+            const paymentMethodSelect = row.querySelector('select[name="payment_method"]');
+            const paymentMethodText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex]?.text || '';
             if(currencySelect.value != receiptCurrency){
-                entryAmount = row.querySelector('input[name="payment_amount"]').value
                 convertedAmount = convertAmount(receiptCurrency, entryAmount);
             }
-
             return {
                 amount: parseFloat(convertedAmount) || 0,
                 date: row.querySelector('input[name="date_operation"]').value,
-                dateObj: row.querySelector('input[name="date_operation"]').value ? 
-                        new Date(row.querySelector('input[name="date_operation"]').value) : null,
+                dateObj: row.querySelector('input[name="date_operation"]').value ? new Date(row.querySelector('input[name="date_operation"]').value) : null,
+                isRetention: paymentMethodText.toUpperCase().includes('RETENCIONES'),
                 row: row
             };
         });
-
-        let remainingBalance = balanceNote;
-        let totalCommission = 0;
-        
-        paymentToInvoiceMap = new Map();
-        const balanceFields = document.querySelectorAll('#balance_calculation');
-
-        // Para cada factura, llevar registro de:
-        const receiptData = Array.from(balanceFields).map((field, index) => {
+        // Preparar datos de facturas
+        const receiptData = Array.from(balanceCalculationFields).map((field, index) => {
             const originalValue = parseFloat(field.getAttribute('data-original-value')) || 0;
             const discountedValue = originalValue * (1 - generalDiscount / 100);
             return {
                 element: field,
-                originalValue: parseFloat(field.getAttribute('data-original-value')) || 0,
-                currentValue: parseFloat(field.textContent) || 0,
+                originalValue: originalValue,
+                discountedValue: discountedValue,
                 dueDate: new Date(field.getAttribute('data-due-date')),
-                remaining: parseFloat(field.getAttribute('data-original-value')) || 0,
+                remaining: discountedValue,
                 paymentDate: null,
                 amountPaid: 0.00,
-                discountApplied: originalValue - discountedValue
+                retentionApplied: 0.00 // Retención aplicada a esta factura
             };
         });
-
-        // Distribuir los pagos a las facturas con precisión decimal
-        paymentData.forEach(payment => {
-            let paymentAmount = parseFloat(payment.amount.toFixed(2)); // Trabajar con 2 decimales
-            
-            for (let i = 0; i < receiptData.length && paymentAmount > 0; i++) {
-                const receipt = receiptData[i];
-                
-                // Considerar el saldo con precisión decimal
-                const remainingWithPrecision = parseFloat((receipt.originalValue - receipt.discountApplied - receipt.amountPaid).toFixed(2));
-                
-                if (remainingWithPrecision > 0) {
-                    const amountToApply = Math.min(paymentAmount, remainingWithPrecision);
-                    
-                    // Si es la primera vez que se paga esta factura, asignar la fecha de pago
-                    if (receipt.amountPaid === 0.00 && payment.dateObj) {
-                        receipt.paymentDate = payment.dateObj; // <-- Aquí asignamos la fecha del primer pago
-                    }
-                    
-                    receipt.amountPaid = parseFloat((receipt.amountPaid + amountToApply).toFixed(2));
-                    receipt.remaining = parseFloat((receipt.originalValue - receipt.discountApplied - receipt.amountPaid).toFixed(2));
-                    paymentAmount = parseFloat((paymentAmount - amountToApply).toFixed(2));
-                }
+        // Distribuir pagos y retenciones a facturas en orden
+        let paymentIndex = 0;
+        let invoiceIndex = 0;
+        while (paymentIndex < paymentData.length && invoiceIndex < receiptData.length) {
+            let payment = paymentData[paymentIndex];
+            let invoice = receiptData[invoiceIndex];
+            let invoiceRemaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+            if (invoiceRemaining <= 0) {
+                invoiceIndex++;
+                continue;
             }
-        });
-
-        // Actualizar la interfaz con los resultados
-        receiptData.forEach((receipt, index) => {
-            // Guardar el monto pagado para cada factura
-            receipt.element.dataset.invoicePaidAmount = receipt.amountPaid.toFixed(2);
-
-            // Mostrar saldo pendiente con precisión
-            const remainingWithPrecision = parseFloat((receipt.originalValue - receipt.discountApplied - receipt.amountPaid).toFixed(2));
-            balanceCalculationFields[index].textContent = formatSpanishNumber(remainingWithPrecision);
-            receipt.remaining = remainingWithPrecision;
-            
-            // Calcular días transcurridos si hay fecha de pago
+            let amountToApply = Math.min(payment.amount, invoiceRemaining);
+            if (amountToApply > 0) {
+                invoice.amountPaid = parseFloat((invoice.amountPaid + amountToApply).toFixed(2));
+                invoice.remaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+                // Si es la primera vez que se paga esta factura, asignar la fecha de pago
+                if (!invoice.paymentDate && payment.dateObj) {
+                    invoice.paymentDate = payment.dateObj;
+                }
+                // Si es retención, registrar cuánto de la retención se aplicó a esta factura
+                if (payment.isRetention) {
+                    invoice.retentionApplied = parseFloat((invoice.retentionApplied + amountToApply).toFixed(2));
+                }
+                payment.amount = parseFloat((payment.amount - amountToApply).toFixed(2));
+            }
+            // Si el pago se agotó, pasar al siguiente
+            if (payment.amount <= 0.001) {
+                paymentIndex++;
+            }
+            // Si la factura se cubrió, pasar a la siguiente
+            if (invoice.remaining <= 0.001) {
+                invoiceIndex++;
+            }
+        }
+        // Actualizar la interfaz y calcular comisión por factura
+        let totalCommission = 0;
+        const businessRules = JSON.parse('{{ commissions | tojson | safe }}');
+        receiptData.forEach((invoice, idx) => {
+            // Mostrar saldo pendiente
+            balanceCalculationFields[idx].textContent = formatSpanishNumber(invoice.remaining);
+            invoice.element.dataset.invoicePaidAmount = invoice.amountPaid.toFixed(2);
+            // Calcular días transcurridos
             let daysElapsed = 0;
-            if (receipt.paymentDate && !isNaN(receipt.dueDate.getTime())) {
-                const difference = receipt.paymentDate - receipt.dueDate;
+            if (invoice.paymentDate && !isNaN(invoice.dueDate.getTime())) {
+                const difference = invoice.paymentDate - invoice.dueDate;
                 daysElapsed = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
             }
-            daysPassedFields[index].textContent = isNaN(daysElapsed) ? "0" : daysElapsed;
-            
+            daysPassedFields[idx].textContent = isNaN(daysElapsed) ? "0" : daysElapsed;
             // Calcular comisión
-            const daysPassed = parseInt(daysPassedFields[index].textContent) || 0;
-            const businessRules = {{ commissions | tojson }};
             let commission = 0;
             let commissionApplied = false;
-
+            const daysPassed = parseInt(daysPassedFields[idx].textContent) || 0;
             businessRules.forEach(comm => {
                 if (!commissionApplied) {
-                    if (daysPassed <= comm[2]) { // Comparar con DaysSinceDue
-                        if (comm[3] == 1) { // Si la comisión está activa
+                    if (daysPassed <= comm[2]) {
+                        if (comm[3] == 1) {
+                            // Solo el monto pagado NO cubierto por retención genera comisión
+                            console.log("invoice.amountPaid: ", invoice.amountPaid);
+                            console.log("invoice.retentionApplied: ", invoice.retentionApplied);
+                            let amountForCommission = invoice.amountPaid - invoice.retentionApplied;
+                            if (amountForCommission < 0) amountForCommission = 0;
+                            console.log("amountForCommission: ", amountForCommission);
                             // Commisión = (Base Imponible - Descuentos) * reglaNegocio 
                             // Base Imponible = MontoPagado / 1.16
                             // Los descuentos ya se restan del monto total, debido a que en los cálculos se muestra el
                             // importe adeudado actualizado y con base en eso se toma el monto pagado de esa factura.
-                            commission = receipt.amountPaid/1.16 * (comm[1] / 100);
+                            commission = amountForCommission/1.16 * (comm[1] / 100);
+                            console.log("commission: ", commission);
                             commissionApplied = true;
                         }
                     }
                 }
             });
-            
-            commissionFields[index].textContent = formatSpanishNumber(commission);
+            commissionFields[idx].textContent = formatSpanishNumber(commission);
             totalCommission += commission;
         });
-        
         document.getElementById('commission_note').textContent = formatSpanishNumber(totalCommission);
     }
     
