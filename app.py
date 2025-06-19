@@ -30,7 +30,7 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount,
     get_customers_admin, get_count_customers_with_accountsReceivable_admin, get_receiptStores_DebtAccount_admin, get_invoices_by_customer_admin)
 
-from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepEmail)
+from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepNameAndEmail)
 
 from onedrive import get_onedrive_headers
 
@@ -426,7 +426,7 @@ def receiptDetails(customer_id, store_id, pagination=1):
     receipt_id = paginated_receipts[0][0]
     invoices = get_invoices_by_receipt(receipt_id)
     salesRep_id = invoices[0][7]
-    salesRep_email = get_salesRepEmail(salesRep_id)
+    salesRep_NameEmail = get_salesRepNameAndEmail(salesRep_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
     salesRepComm = get_SalesRepCommission(receipt_id)
 
@@ -442,7 +442,7 @@ def receiptDetails(customer_id, store_id, pagination=1):
                            store=store,
                            customer=customer,
                            invoices=invoices,
-                           salesRep_email=salesRep_email,
+                           salesRep_NameEmail=salesRep_NameEmail,
                            paymentEntries=paymentEntries,
                            salesRepComm = salesRepComm,
                            pagination=pagination,
@@ -648,6 +648,7 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
         <body>
             <p>Se ha registrado una nueva cobranza con los siguientes detalles:</p>
             <ul>
+                <li><strong>Vendedor:</strong> {session['salesRep_id']} | {session['user_firstName']} {session['user_lastName']}</li>
                 <li><strong>Número de Recibo:</strong> {receipt_id}</li>
                 <li><strong>Tienda:</strong> {store_name}</li>
                 <li><strong>Cliente:</strong> {customer_name}</li>
@@ -688,6 +689,7 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
             <p>Hola, vendedor(a) {session['user_firstName']} {session['user_lastName']}.</p>
             <p>Usted ha registrado una nueva cobranza con los siguientes detalles:</p>
             <ul>
+                <li><strong>Vendedor:</strong> {session['salesRep_id']} | {session['user_firstName']} {session['user_lastName']}</li>
                 <li><strong>Número de Recibo:</strong> {receipt_id}</li>
                 <li><strong>Tienda:</strong> {store_name}</li>
                 <li><strong>Cliente:</strong> {customer_name}</li>
@@ -744,6 +746,7 @@ def send_rejectionEmail():
     currency = request.form.get('currency', '')
     totalPaid = request.form.get('total_paid', '')
     totalCommission = request.form.get('total_commission', '')
+    salesRep_fullname = request.form.get('salesRep_fullname', '')
     salesRep_email = request.form.get('salesRep_email', '')
 
     if store_id == '904' or store_id == '905':
@@ -762,6 +765,7 @@ def send_rejectionEmail():
             <p>El recibo de cobranza con los siguientes datos:</p>
 
             <ul style="list-style-type: disc; margin-left: 5px; padding-left: 5px;">
+                <li><strong>Vendedor:</strong> {salesRep_fullname}</li>
                 <li><strong>Empresa:</strong> {store_name}</li>
                 <li><strong>Cliente:</strong> {customer}</li>
                 <li><strong>Moneda:</strong> {currency}</li>
@@ -794,6 +798,8 @@ def send_validationEmail():
     customer_id = request.form.get('customer_id', '')
     pagination = int(request.form.get('pagination', ''))
     receipt_id = int(request.form.get('receipt_id', ''))
+    salesRep_NameEmail = request.form.get('salesRep_NameEmail', '')
+    salesRep_fullname = request.form.get('salesRep_fullname', '')
     salesRep_email = request.form.get('salesRep_email', '')
 
     receipts_per_page = 1
@@ -832,6 +838,7 @@ def send_validationEmail():
                                  store=store,
                                  customer=customer,
                                  invoices=invoices,
+                                 salesRep_NameEmail=salesRep_NameEmail,
                                  paymentEntries=paymentEntries,
                                  salesRepComm=salesRepComm,
                                  pagination=pagination,
@@ -962,7 +969,8 @@ def send_validationEmail():
                 <div class="header">
                     <h2>Reporte de Cobranza al Mayor</h2>
                     <p><strong>{store_name}</strong></p>
-                    <p><strong>{customer_name}</strong></p>
+                    <p><strong>Vendedor:</strong> {salesRep_fullname}</p>
+                    <p><strong>Cliente:</strong> {customer_name}</p>
                 </div>
                 {html_content}
                 <br>

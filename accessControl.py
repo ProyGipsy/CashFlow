@@ -61,14 +61,14 @@ def get_userEmail(user_id):
     conn.close()
     return userEmail
 
-def get_salesRepEmail(salesRep_id):
+def get_salesRepNameAndEmail(salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-                    SELECT email
+                    SELECT firstName, lastName, email
                     FROM AccessControl.Users
                     WHERE salesRepId = %s
                    ''', (salesRep_id,))
-    salesRepEmail = cursor.fetchone()[0]
+    salesRepEmail = cursor.fetchone()
     conn.close()
     return salesRepEmail
