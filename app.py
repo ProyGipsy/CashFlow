@@ -634,10 +634,18 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
     subject = f"Recibo {receipt_id}: Se ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
     app_url = os.environ.get('APP_URL')
 
+    app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER_RECEIPT')
+    print("app.config['MAIL_SERVER']: ", app.config['MAIL_SERVER'])
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
+        app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
     else:
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
+        app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
+    mail = Mail(app)
+
+    print("app.config['MAIL_USERNAME']: ", app.config['MAIL_USERNAME'])
+    print("app.config['MAIL_PASSWORD']: ", app.config['MAIL_PASSWORD'])
 
     msg = Message(subject=subject,
                 sender=app.config['MAIL_USERNAME'],
@@ -672,12 +680,20 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
     subject = f"Recibo {receipt_id}: Usted ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
     app_url = os.environ.get('APP_URL')
 
+    app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER_RECEIPT')
+    print("app.config['MAIL_SERVER']: ", app.config['MAIL_SERVER'])
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
+        app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
     else:
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
+        app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
+    mail = Mail(app)
 
     salesRep_Recipient = get_userEmail(session['user_id'])
+
+    print("app.config['MAIL_USERNAME']: ", app.config['MAIL_USERNAME'])
+    print("app.config['MAIL_PASSWORD']: ", app.config['MAIL_PASSWORD'])
 
     msg = Message(subject=subject,
                 sender=app.config['MAIL_USERNAME'],
@@ -749,10 +765,18 @@ def send_rejectionEmail():
     salesRep_fullname = request.form.get('salesRep_fullname', '')
     salesRep_email = request.form.get('salesRep_email', '')
 
+    app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER_RECEIPT')
+    print("app.config['MAIL_SERVER']: ", app.config['MAIL_SERVER'])
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
+        app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
     else:
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
+        app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
+    mail = Mail(app)
+
+    print("app.config['MAIL_USERNAME']: ", app.config['MAIL_USERNAME'])
+    print("app.config['MAIL_PASSWORD']: ", app.config['MAIL_PASSWORD'])
 
     subject = f"Recibo de Cobranza #{ receipt_id }: Rechazado"
     msg = Message(subject=subject,
@@ -819,6 +843,7 @@ def send_validationEmail():
     OJO: El JS primero llama a la función de enviar el correo y luego la del PDF.
     Si se valida el recibo aquí, al renderizar la interfaz para el PDF, no tendrá acceso a los campos.
     Al implementar el pdf en producción, realizar la validación luego de este último renderizado.
+    NOTA: Actualmente, el PDF se descarga directamente del correo, así que no ha sido solicitado
     """
     set_isReviewedReceipt(receipt_id)
     set_isApprovedReceipt(receipt_id)
@@ -979,10 +1004,18 @@ def send_validationEmail():
             </html>
             """
     
+    app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER_RECEIPT')
+    print("app.config['MAIL_SERVER']: ", app.config['MAIL_SERVER'])
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
+        app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
     else:
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
+        app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
+    mail = Mail(app)
+
+    print("app.config['MAIL_USERNAME']: ", app.config['MAIL_USERNAME'])
+    print("app.config['MAIL_PASSWORD']: ", app.config['MAIL_PASSWORD'])
 
     # Lógica para enviar el correo
     subject = f"Recibo de Cobranza #{ receipt_id }: Validado"
