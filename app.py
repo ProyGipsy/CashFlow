@@ -609,13 +609,18 @@ def submit_receipt():
         # Confirmación la transacción
         conn.commit()
 
+        # Obtención de N_CTAs (para especificar en el correo)
+        invoices = get_invoices_by_receipt(receipt_id)
+        ncta_list = [str(invoice[0]) for invoice in invoices]
+        ncta_str = ", ".join(ncta_list)
+
         # Envío de correo electrónico de notificación
         store_id = request.form.get('store_id', '')
         store_name = request.form.get('store_name', '')
         customer_name = request.form.get('customer_name', '')
         currency = request.form.get('currency', '')
-        send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency)
-        send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency)
+        send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency, ncta_str)
+        send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency, ncta_str)
         
 
         return redirect(url_for('accountsReceivable'))
@@ -629,13 +634,12 @@ def submit_receipt():
         cursor.close()
         conn.close()
 
-def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_amount, currency):
+def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_amount, currency, ncta_str):
 
     subject = f"Recibo {receipt_id}: Se ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
     app_url = os.environ.get('APP_URL')
 
     app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER_RECEIPT')
-    print("app.config['MAIL_SERVER']: ", app.config['MAIL_SERVER'])
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
@@ -643,9 +647,6 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
     mail = Mail(app)
-
-    print("app.config['MAIL_USERNAME']: ", app.config['MAIL_USERNAME'])
-    print("app.config['MAIL_PASSWORD']: ", app.config['MAIL_PASSWORD'])
 
     msg = Message(subject=subject,
                 sender=app.config['MAIL_USERNAME'],
@@ -660,6 +661,7 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
                 <li><strong>Número de Recibo:</strong> {receipt_id}</li>
                 <li><strong>Tienda:</strong> {store_name}</li>
                 <li><strong>Cliente:</strong> {customer_name}</li>
+                <li><strong>N_CTA Factura(s):</strong> {ncta_str}</li>
                 <li><strong>Monto Total:</strong> {currency} {total_receipt_amount}</li>
                 <li><strong>Comisión a Recibir:</strong> {currency} {commission_amount}</li>
             </ul>
@@ -675,13 +677,12 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
 
     return jsonify({'success': True})
 
-def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_amount, currency):
+def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_amount, currency, ncta_str):
 
     subject = f"Recibo {receipt_id}: Usted ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
     app_url = os.environ.get('APP_URL')
 
     app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER_RECEIPT')
-    print("app.config['MAIL_SERVER']: ", app.config['MAIL_SERVER'])
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
@@ -691,9 +692,6 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
     mail = Mail(app)
 
     salesRep_Recipient = get_userEmail(session['user_id'])
-
-    print("app.config['MAIL_USERNAME']: ", app.config['MAIL_USERNAME'])
-    print("app.config['MAIL_PASSWORD']: ", app.config['MAIL_PASSWORD'])
 
     msg = Message(subject=subject,
                 sender=app.config['MAIL_USERNAME'],
@@ -709,6 +707,7 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
                 <li><strong>Número de Recibo:</strong> {receipt_id}</li>
                 <li><strong>Tienda:</strong> {store_name}</li>
                 <li><strong>Cliente:</strong> {customer_name}</li>
+                <li><strong>N_CTA Factura(s):</strong> {ncta_str}</li>
                 <li><strong>Monto Total:</strong> {currency} {total_receipt_amount}</li>
                 <li><strong>Comisión a Recibir:</strong> {currency} {commission_amount}</li>
             </ul>
@@ -729,6 +728,11 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
 def send_rejectionEmail():
 
     receipt_id = int(request.form.get('receipt_id', ''))
+
+    invoices = get_invoices_by_receipt(receipt_id)
+    ncta_list = [str(invoice[0]) for invoice in invoices]
+    ncta_str = ", ".join(ncta_list)
+
     set_isReviewedReceipt(receipt_id)
 
     # Revirtiendo monto abonado
@@ -766,7 +770,6 @@ def send_rejectionEmail():
     salesRep_email = request.form.get('salesRep_email', '')
 
     app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER_RECEIPT')
-    print("app.config['MAIL_SERVER']: ", app.config['MAIL_SERVER'])
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
@@ -774,9 +777,6 @@ def send_rejectionEmail():
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
     mail = Mail(app)
-
-    print("app.config['MAIL_USERNAME']: ", app.config['MAIL_USERNAME'])
-    print("app.config['MAIL_PASSWORD']: ", app.config['MAIL_PASSWORD'])
 
     subject = f"Recibo de Cobranza #{ receipt_id }: Rechazado"
     msg = Message(subject=subject,
@@ -792,6 +792,7 @@ def send_rejectionEmail():
                 <li><strong>Vendedor:</strong> {salesRep_fullname}</li>
                 <li><strong>Empresa:</strong> {store_name}</li>
                 <li><strong>Cliente:</strong> {customer}</li>
+                <li><strong>N_CTA Factura(s):</strong> {ncta_str}</li>
                 <li><strong>Moneda:</strong> {currency}</li>
                 <li><strong>Monto total:</strong> {currency} {totalPaid}</li>
                 <li><strong>Comisión a recibir:</strong> {currency} {totalCommission}</li>
@@ -834,6 +835,8 @@ def send_validationEmail():
     customer_name = f"{customer[1]} {customer[2]}" if customer else ''
     total_receipts = len(receipts)
     invoices = get_invoices_by_receipt(receipt_id)
+    ncta_list = [str(invoice[0]) for invoice in invoices]
+    ncta_str = ", ".join(ncta_list)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
     paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
     salesRepComm = get_SalesRepCommission(receipt_id)
@@ -884,47 +887,9 @@ def send_validationEmail():
                     }}
 
                     .header {{
-                        display: flex;
                         align-items: center;
                         margin-bottom: 20px;
                         position: relative;
-                    }}
-
-                    .logo-left {{
-                        margin-right: 20px;
-                        height: 60px;
-                        display: flex;
-                        align-items: center;
-                    }}
-
-                    .logo-left img {{
-                        height: 100%;
-                        width: auto;
-                        max-height: 60px;
-                    }}
-
-                    .logo-right {{
-                        margin-left: 20px;
-                        width: 20px;
-                        display: flex;
-                        align-items: center;
-                    }}
-
-                    .logo-right img {{
-                        height: 100%;
-                        width: auto;
-                        max-height: 60px;
-                    }}
-
-                    .header h2 {{
-                        position: absolute;
-                        left: 50%; /* Centrado horizontal */
-                        transform: translateX(-50%);
-                        margin: 0;
-                        width: 100%;
-                        text-align: center;
-                        line-height: 60px;
-                        pointer-events: none;
                     }}
 
                     .header-text p {{
@@ -996,6 +961,7 @@ def send_validationEmail():
                     <p><strong>{store_name}</strong></p>
                     <p><strong>Vendedor:</strong> {salesRep_fullname}</p>
                     <p><strong>Cliente:</strong> {customer_name}</p>
+                    <p><strong>N_CTA Factura(s):</strong> {ncta_str}</p>
                 </div>
                 {html_content}
                 <br>
@@ -1005,7 +971,6 @@ def send_validationEmail():
             """
     
     app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER_RECEIPT')
-    print("app.config['MAIL_SERVER']: ", app.config['MAIL_SERVER'])
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
@@ -1013,9 +978,6 @@ def send_validationEmail():
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
     mail = Mail(app)
-
-    print("app.config['MAIL_USERNAME']: ", app.config['MAIL_USERNAME'])
-    print("app.config['MAIL_PASSWORD']: ", app.config['MAIL_PASSWORD'])
 
     # Lógica para enviar el correo
     subject = f"Recibo de Cobranza #{ receipt_id }: Validado"
