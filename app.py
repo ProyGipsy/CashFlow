@@ -127,9 +127,6 @@ def loginReceipt():
 # CASHFLOW - RUTAS
 
 # Configuración de correo SMTP para Flujo de Caja
-#app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW') #Correo por defecto
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW')
-mail = Mail(app)
 
 @app.route('/cashier')
 def homeCashier():
@@ -297,8 +294,11 @@ def operations():
 
         if store_id == '4':
             app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW_REMBD')
+            app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW_REMBD')
         else: 
             app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW')
+            app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW')
+        mail = Mail(app)
 
         msg = Message(subject=subject,
                     sender=app.config['MAIL_USERNAME'],
