@@ -542,7 +542,8 @@
                 paymentDate: null,
                 amountPaid: 0.00,
                 retentionApplied: 0.00, // Retención aplicada a esta factura
-                docType: docType // Guardar tipo de documento
+                docType: docType,
+                payments: [] // Arreglo de pagos aplicados a la factura
             };
         });
         // Distribuir pagos y retenciones a facturas en orden
@@ -558,12 +559,20 @@
             }
             let amountToApply = Math.min(payment.amount, invoiceRemaining);
             if (amountToApply > 0) {
+                // Registrar pago aplicado a la factura
+                let daysElapsed = 0;
+                if (payment.dateObj && !isNaN(invoice.dueDate.getTime())){
+                    const difference = payment.dateObj - invoice.dueDate;
+                    daysElapsed = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
+                }
+                invoice.payments.push({
+                    amount: amountToApply,
+                    paymentDate: payment.dateObj,
+                    daysElapsed: isNaN(daysElapsed) ? 0 : daysElapsed
+                })
                 invoice.amountPaid = parseFloat((invoice.amountPaid + amountToApply).toFixed(2));
                 invoice.remaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
-                // Si es la primera vez que se paga esta factura, asignar la fecha de pago
-                if (!invoice.paymentDate && payment.dateObj) {
-                    invoice.paymentDate = payment.dateObj;
-                }
+
                 // Si es retención, registrar cuánto de la retención se aplicó a esta factura
                 if (payment.isRetention) {
                     invoice.retentionApplied = parseFloat((invoice.retentionApplied + amountToApply).toFixed(2));
@@ -586,40 +595,45 @@
             // Mostrar saldo pendiente
             balanceCalculationFields[idx].textContent = formatSpanishNumber(invoice.remaining);
             invoice.element.dataset.invoicePaidAmount = invoice.amountPaid.toFixed(2);
-            // Calcular días transcurridos
-            let daysElapsed = 0;
-            if (invoice.paymentDate && !isNaN(invoice.dueDate.getTime())) {
-                const difference = invoice.paymentDate - invoice.dueDate;
-                daysElapsed = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
-            }
-            daysPassedFields[idx].textContent = isNaN(daysElapsed) ? "0" : daysElapsed;
+            // Mostrar todos los días transcurridos de los pagos aplicados
+            let daysElapsedList = invoice.payments.map(p => p.daysElapsed);
+            daysPassedFields[idx].textContent = daysElapsedList.length > 0 ? daysElapsedList.join(" / ") : "0";
+        
             // Calcular comisión
             let commission = 0;
-            let commissionApplied = false;
-            const daysPassed = parseInt(daysPassedFields[idx].textContent) || 0;
-            businessRules.forEach(comm => {
-                if (!commissionApplied) {
-                    if (daysPassed <= comm[2]) {
-                        if (comm[3] == 1) {
-                            let amountForCommission = invoice.amountPaid - invoice.retentionApplied;
-                            if (amountForCommission < 0) amountForCommission = 0;
-                            // Commisión = (Base Imponible - Descuentos) * reglaNegocio 
-                            // Base Imponible = MontoPagado / 1.16
-                            // Los descuentos ya se restan del monto total, debido a que en los cálculos se muestra el
-                            // importe adeudado actualizado y con base en eso se toma el monto pagado de esa factura.
-                            // OJO: Las N/E no tienen IVA, por tanto no se divide entre 1.16
-                            if (invoice.docType === 'FAC') {
-                                commission = amountForCommission / 1.16 * (comm[1] / 100);
-                            } else if (invoice.docType === 'N/E') {
-                                commission = amountForCommission * (comm[1] / 100);
+            invoice.payments.forEach(payment => {
+                let paymentCommission = 0;
+                let commissionApplied = false;
+                businessRules.forEach(comm => {
+                    if (!commissionApplied) {
+                        console.log("payment.daysElapsed: ", payment.daysElapsed)
+                        if (payment.daysElapsed <= comm[2]) {
+                            if (comm[3] == 1) {
+                                let amountForCommission = invoice.amountPaid - invoice.retentionApplied;
+                                console.log("amountForCommission: ", amountForCommission)
+                                if (amountForCommission < 0) amountForCommission = 0;
+                                // Commisión = (Base Imponible - Descuentos) * reglaNegocio 
+                                // Base Imponible = MontoPagado / 1.16
+                                // Los descuentos ya se restan del monto total, debido a que en los cálculos se muestra el
+                                // importe adeudado actualizado y con base en eso se toma el monto pagado de esa factura.
+                                // OJO: Las N/E no tienen IVA, por tanto no se divide entre 1.16
+                                if (invoice.docType === 'FAC') {
+                                    paymentCommission = amountForCommission / 1.16 * (comm[1] / 100);
+                                } else if (invoice.docType === 'N/E') {
+                                    paymentCommission = amountForCommission * (comm[1] / 100);
+                                }
+                                console.log("paymentCommission: ", paymentCommission)
+                                commissionApplied = true;
                             }
-                            commissionApplied = true;
                         }
                     }
-                }
+                });
+                commission += paymentCommission;
+                console.log("commission: ", commission)
             });
             commissionFields[idx].textContent = formatSpanishNumber(commission);
             totalCommission += commission;
+            console.log("totalCommission: ", totalCommission)
         });
         document.getElementById('commission_note').textContent = formatSpanishNumber(totalCommission);
     }
