@@ -597,7 +597,10 @@
             invoice.element.dataset.invoicePaidAmount = invoice.amountPaid.toFixed(2);
             // Mostrar todos los días transcurridos de los pagos aplicados
             let daysElapsedList = invoice.payments.map(p => p.daysElapsed);
+            // Tooltip explicativo para el usuario
+            const tooltipText = 'Si la factura fue pagada con varias formas de pago, aquí se mostrarán los días transcurridos de cada pago, separados por "/".';
             daysPassedFields[idx].textContent = daysElapsedList.length > 0 ? daysElapsedList.join(" / ") : "0";
+            daysPassedFields[idx].setAttribute('title', tooltipText);
         
             // Calcular comisión
             let commission = 0;
