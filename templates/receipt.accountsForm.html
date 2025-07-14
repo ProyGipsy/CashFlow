@@ -625,7 +625,7 @@
                             console.log("comm[2]: ", comm[2])
                             if (comm[3] == 1) {
                                 console.log("comm[3]: ", comm[3])
-                                let amountForCommission = invoice.amountPaid - invoice.retentionApplied;
+                                let amountForCommission = payment.amount; // - invoice.retentionApplied;
                                 console.log("amountForCommission: ", amountForCommission)
                                 if (amountForCommission < 0) amountForCommission = 0;
                                 // Commisión = (Base Imponible - Descuentos) * reglaNegocio 
@@ -633,13 +633,16 @@
                                 // Los descuentos ya se restan del monto total, debido a que en los cálculos se muestra el
                                 // importe adeudado actualizado y con base en eso se toma el monto pagado de esa factura.
                                 // OJO: Las N/E no tienen IVA, por tanto no se divide entre 1.16
-                                if (invoice.docType === 'FAC') {
-                                    paymentCommission = amountForCommission / 1.16 * (comm[1] / 100);
-                                } else if (invoice.docType === 'N/E') {
-                                    paymentCommission = amountForCommission * (comm[1] / 100);
-                                }
                                 console.log("comm[1]: ", comm[1])
                                 console.log("paymentCommission: ", paymentCommission)
+                                if (invoice.docType === 'FAC') {
+                                    paymentCommission = amountForCommission / 1.16 * (comm[1] / 100);
+                                    console.log("Cálculo: ", paymentCommission, " = ", amountForCommission, " / 1.16 * (", comm[1], " / 100)")
+                                } else if (invoice.docType === 'N/E') {
+                                    paymentCommission = amountForCommission * (comm[1] / 100);
+                                    console.log("Cálculo: ", paymentCommission, " = ", amountForCommission, " / 1.16 * (", comm[1], " / 100)")
+                                }
+                                
                                 commissionId = comm[0];
                                 console.log("commissionId: ", commissionId)
                                 commissionApplied = true;
