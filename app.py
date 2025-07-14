@@ -566,7 +566,6 @@ def submit_receipt():
 
         # Obtención de los detalles de las formas de pago (relacionando facturas)
         payment_invoice_details = json.loads(request.form.get('payment_invoice_details', '[]'))
-        print("payment_invoice_details: ", payment_invoice_details)
 
         # Procesar cada forma de pago
         payment_entry_ids = []
@@ -588,25 +587,16 @@ def submit_receipt():
                 file_path = ""
 
             payment_entry_id = set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
-            print("payment_entry_id: ", payment_entry_id)
             payment_entry_ids.append(payment_entry_id)
-            print("payment_entry_ids:  ", payment_entry_ids)
         
         for detail in payment_invoice_details:
             paymentReceiptEntry_id = payment_entry_ids[detail['paymentReceiptEntryIdx']]
-            print("paymentReceiptEntry_id: ", paymentReceiptEntry_id)
             debtaccount_id = detail['debtAccountId']
-            print("debtaccount_id: ", debtaccount_id)
             payment_date = detail['paymentDate']
-            print("payment_date: ", payment_date)
             amount = detail['amount']
-            print("amount: ", amount)
             days_elapsed = detail['daysElapsed']
-            print("days_elapsed: ", days_elapsed)
             commission_id = detail['commissionId']
-            print("commission_id: ", commission_id)
             commission_amount = detail['commissionAmount']
-            print("commission_amount: ", commission_amount)
             set_paymentEntryCommission(cursor, receipt_id, paymentReceiptEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, commission_amount)
 
 
