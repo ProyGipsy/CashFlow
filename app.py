@@ -49,6 +49,10 @@ app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    return render_template('newIndex.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
     if request.method == 'POST':
         username = request.form.get('User')
         password = request.form.get('Password')
