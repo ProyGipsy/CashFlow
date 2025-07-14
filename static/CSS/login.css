@@ -75,6 +75,10 @@ body{
     cursor: pointer;
 }
 
+.form input[type="submit"]:hover{
+    background-color: #7da69f;
+}
+
 /*
 .password-container input[type="password"]{
     padding-right: 40px;

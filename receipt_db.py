@@ -366,6 +366,20 @@ def get_salesRep_isRetail(account_id):
 def get_SalesRepCommission(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute('''SELECT D.N_CTA, C.AmountOwed, STRING_AGG(CAST(P.DaysElapsed AS NVARCHAR(MAX)), ' / ') AS DaysElapsed, C.CommissionAmount, P.DebtAccountID
+                    FROM Commission_Receipt.SalesRepCommission C
+                    JOIN Commission_Receipt.DebtAccount D ON C.AccountID = D.AccountID
+					JOIN Commission_Receipt.PaymentEntryCommission P ON C.AccountID = P.DebtAccountID AND C.ReceiptID = P.ReceiptID
+                    WHERE C.ReceiptID = %s
+					GROUP BY D.N_CTA, C.AmountOwed, C.CommissionAmount, P.DebtAccountID
+                    ''', (receipt_id,))
+    salesRepComm = cursor.fetchall()
+    conn.close()
+    return salesRepComm
+
+def get_SalesRepCommission_OLD(receipt_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
     cursor.execute('''SELECT D.N_CTA, C.AmountOwed, C.DaysElapsed, C.CommissionAmount
                     FROM Commission_Receipt.SalesRepCommission C
                     JOIN Commission_Receipt.DebtAccount D ON C.AccountID = D.AccountID
@@ -374,7 +388,6 @@ def get_SalesRepCommission(receipt_id):
     salesRepComm = cursor.fetchall()
     conn.close()
     return salesRepComm
-
 
 def get_onedriveProofsOfPayments(paymentEntries):
     headers = get_onedrive_headers()
@@ -527,12 +540,28 @@ def set_paymentReceipt(cursor, total_receipt_amount, commission_note):
     return receipt_id
 
 
-def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, proof_path):
+def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, proof_path): 
     cursor.execute('''
         INSERT INTO Commission_Receipt.PaymentReceiptEntry
         (ReceiptID, PaymentDate, Amount, Discount, Reference, PaymentDestinationID, TenderID, isRetail, ProofOfPaymentPath)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, 0, proof_path))
+    
+    #Obtención del PaymentReceiptID generado
+    cursor.execute("SELECT SCOPE_IDENTITY()")
+    paymentEntry_id = cursor.fetchone()[0]
+    print(f"Payment Entry ID: {paymentEntry_id}")
+
+    return paymentEntry_id
+    
+
+def set_paymentEntryCommission(cursor, receipt_id, paymentEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, commission_amount):
+    cursor.execute('''
+        INSERT INTO Commission_Receipt.PaymentEntryCommission
+        (ReceiptID, PaymentReceiptEntryID, DebtAccountID, PaymentDate, Amount, DaysElapsed, CommissionID, CommissionAmount)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (receipt_id, paymentEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, commission_amount))
+
 
 """
 # Guardado de Comprobantes de Pago en el Servidor

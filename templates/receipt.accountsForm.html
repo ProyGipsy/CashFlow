@@ -509,7 +509,8 @@
         const paymentRows = document.querySelectorAll('.payment-row');
         const receiptCurrency = "{{ receiptStoreCustomer[6] }}";
         // Preparar datos de pagos
-        const paymentData = Array.from(paymentRows).map(row => {
+        // Agregar paymentRowIdx para rastrear el índice de la forma de pago
+        const paymentData = Array.from(paymentRows).map((row, idx) => {
             const currencySelect = row.querySelector('select[name="currency"]');
             let entryAmount = row.querySelector('input[name="payment_amount"]').value;
             let convertedAmount = entryAmount;
@@ -523,7 +524,8 @@
                 date: row.querySelector('input[name="date_operation"]').value,
                 dateObj: row.querySelector('input[name="date_operation"]').value ? new Date(row.querySelector('input[name="date_operation"]').value) : null,
                 isRetention: paymentMethodText.toUpperCase().includes('RETENCIONES'),
-                row: row
+                row: row,
+                paymentRowIdx: idx // Índice de la forma de pago
             };
         });
         // Preparar datos de facturas
@@ -559,7 +561,7 @@
             }
             let amountToApply = Math.min(payment.amount, invoiceRemaining);
             if (amountToApply > 0) {
-                // Registrar pago aplicado a la factura
+                // Registrar pago aplicado a la factura, agregando el índice de la forma de pago
                 let daysElapsed = 0;
                 if (payment.dateObj && !isNaN(invoice.dueDate.getTime())){
                     const difference = payment.dateObj - invoice.dueDate;
@@ -568,8 +570,9 @@
                 invoice.payments.push({
                     amount: amountToApply,
                     paymentDate: payment.dateObj,
-                    daysElapsed: isNaN(daysElapsed) ? 0 : daysElapsed
-                })
+                    daysElapsed: isNaN(daysElapsed) ? 0 : daysElapsed,
+                    paymentRowIdx: payment.paymentRowIdx // Relación con la forma de pago
+                });
                 invoice.amountPaid = parseFloat((invoice.amountPaid + amountToApply).toFixed(2));
                 invoice.remaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
 
@@ -607,11 +610,21 @@
             invoice.payments.forEach(payment => {
                 let paymentCommission = 0;
                 let commissionApplied = false;
-                businessRules.forEach(comm => {
+                console.log("businessRules: ", businessRules);
+
+                for (let i=0; i<businessRules.length; i++){
+                    const comm = businessRules[i];
                     if (!commissionApplied) {
                         console.log("payment.daysElapsed: ", payment.daysElapsed)
-                        if (payment.daysElapsed <= comm[2]) {
+                        const isLastRule = (i === businessRules.length - 1);
+                        const conditionMet = isLastRule 
+                            ? payment.daysElapsed >= comm[2]
+                            : payment.daysElapsed <= comm[2];
+
+                        if (conditionMet) {
+                            console.log("comm[2]: ", comm[2])
                             if (comm[3] == 1) {
+                                console.log("comm[3]: ", comm[3])
                                 let amountForCommission = invoice.amountPaid - invoice.retentionApplied;
                                 console.log("amountForCommission: ", amountForCommission)
                                 if (amountForCommission < 0) amountForCommission = 0;
@@ -625,12 +638,16 @@
                                 } else if (invoice.docType === 'N/E') {
                                     paymentCommission = amountForCommission * (comm[1] / 100);
                                 }
+                                console.log("comm[1]: ", comm[1])
                                 console.log("paymentCommission: ", paymentCommission)
+                                commissionId = comm[0];
+                                console.log("commissionId: ", commissionId)
                                 commissionApplied = true;
                             }
                         }
                     }
-                });
+
+                }
                 commission += paymentCommission;
                 console.log("commission: ", commission)
             });
@@ -851,6 +868,148 @@
             });
         });
         formData.append('commission_data', JSON.stringify(commissionData));
+
+        // --- Construcción y envío de paymentInvoiceDetails ---
+        // Obtener receiptData y paymentData igual que en distributeBalanceAcrossReceipts
+        const balanceCalculationFields = document.querySelectorAll('#balance_calculation');
+        const generalDiscount = parseFloat(document.getElementById('general_discount').value) || 0;
+        const paymentRowsSend = document.querySelectorAll('.payment-row');
+        const receiptCurrency = "{{ receiptStoreCustomer[6] }}";
+        const paymentData = Array.from(paymentRowsSend).map((row, idx) => {
+            const currencySelect = row.querySelector('select[name="currency"]');
+            let entryAmount = row.querySelector('input[name="payment_amount"]').value;
+            let convertedAmount = entryAmount;
+            const paymentMethodSelect = row.querySelector('select[name="payment_method"]');
+            const paymentMethodText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex]?.text || '';
+            if(currencySelect.value != receiptCurrency){
+                convertedAmount = convertAmount(receiptCurrency, entryAmount);
+            }
+            return {
+                amount: parseFloat(convertedAmount) || 0,
+                date: row.querySelector('input[name="date_operation"]').value,
+                dateObj: row.querySelector('input[name="date_operation"]').value ? new Date(row.querySelector('input[name="date_operation"]').value) : null,
+                isRetention: paymentMethodText.toUpperCase().includes('RETENCIONES'),
+                row: row,
+                paymentRowIdx: idx // Índice de la forma de pago
+            };
+        });
+        const receiptData = Array.from(balanceCalculationFields).map((field, index) => {
+            const originalValue = parseFloat(field.getAttribute('data-original-value')) || 0;
+            const discountedValue = originalValue * (1 - generalDiscount / 100);
+            // Obtener tipo de documento desde la tabla de facturas
+            const docTypeCell = document.querySelectorAll('.heading-table tr')[index + 1]?.children[1];
+            const docType = docTypeCell ? docTypeCell.textContent.trim() : '';
+            return {
+                element: field,
+                originalValue: originalValue,
+                discountedValue: discountedValue,
+                dueDate: new Date(field.getAttribute('data-due-date')),
+                remaining: discountedValue,
+                paymentDate: null,
+                amountPaid: 0.00,
+                retentionApplied: 0.00, // Retención aplicada a esta factura
+                docType: docType,
+                payments: [] // Arreglo de pagos aplicados a la factura
+            };
+        });
+        // Reconstruir los pagos aplicados a cada factura usando la misma lógica
+        let paymentIndex = 0;
+        let invoiceIndex = 0;
+        while (paymentIndex < paymentData.length && invoiceIndex < receiptData.length) {
+            let payment = paymentData[paymentIndex];
+            let invoice = receiptData[invoiceIndex];
+            let invoiceRemaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+            if (invoiceRemaining <= 0) {
+                invoiceIndex++;
+                continue;
+            }
+            let amountToApply = Math.min(payment.amount, invoiceRemaining);
+            if (amountToApply > 0) {
+                let daysElapsed = 0;
+                if (payment.dateObj && !isNaN(invoice.dueDate.getTime())){
+                    const difference = payment.dateObj - invoice.dueDate;
+                    daysElapsed = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
+                }
+                invoice.payments.push({
+                    amount: amountToApply,
+                    paymentDate: payment.dateObj,
+                    daysElapsed: isNaN(daysElapsed) ? 0 : daysElapsed,
+                    paymentRowIdx: payment.paymentRowIdx
+                });
+                invoice.amountPaid = parseFloat((invoice.amountPaid + amountToApply).toFixed(2));
+                invoice.remaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+                if (payment.isRetention) {
+                    invoice.retentionApplied = parseFloat((invoice.retentionApplied + amountToApply).toFixed(2));
+                }
+                payment.amount = parseFloat((payment.amount - amountToApply).toFixed(2));
+            }
+            if (payment.amount <= 0.001) {
+                paymentIndex++;
+            }
+            if (invoice.remaining <= 0.001) {
+                invoiceIndex++;
+            }
+        }
+        // Obtener businessRules
+        const businessRules = JSON.parse('{{ commissions | tojson | safe }}');
+        // Construir el array para backend
+        let paymentInvoiceDetails = [];
+        receiptData.forEach((invoice, invoiceIdx) => {
+            invoice.payments.forEach((payment, paymentIdx) => {
+                let paymentRowIdx = payment.paymentRowIdx;
+                let tenderId = paymentData[paymentRowIdx]?.row.querySelector('select[name="payment_method"]').value;
+                let debtAccountId = allAccountIds[invoiceIdx];
+                let commissionId = null;
+                let commissionAmount = 0;
+                let commissionApplied = false;
+
+                for (let i=0; i<businessRules.length; i++){
+                    const comm = businessRules[i];
+                    if (!commissionApplied) {
+                        console.log("payment.daysElapsed: ", payment.daysElapsed)
+                        const isLastRule = (i === businessRules.length - 1);
+                        const conditionMet = isLastRule 
+                            ? payment.daysElapsed >= comm[2]
+                            : payment.daysElapsed <= comm[2];
+
+                        if (conditionMet) {
+                            console.log("comm[2]: ", comm[2])
+                            if (comm[3] == 1) {
+                                console.log("comm[3]: ", comm[3])
+                                let amountForCommission = invoice.amountPaid - invoice.retentionApplied;
+                                console.log("amountForCommission: ", amountForCommission)
+                                if (amountForCommission < 0) amountForCommission = 0;
+                                if (invoice.docType === 'FAC') {
+                                    paymentCommission = amountForCommission / 1.16 * (comm[1] / 100);
+                                } else if (invoice.docType === 'N/E') {
+                                    paymentCommission = amountForCommission * (comm[1] / 100);
+                                }
+                                console.log("comm[1]: ", comm[1])
+                                console.log("paymentCommission: ", paymentCommission)
+                                commissionId = comm[0];
+                                console.log("commissionId: ", commissionId)
+                                commissionApplied = true;
+                            }
+                        }
+                    }
+
+                }
+
+                console.log("commissionId: ", commissionId)
+                paymentInvoiceDetails.push({
+                    paymentReceiptEntryIdx: paymentRowIdx,
+                    tenderId: tenderId,
+                    debtAccountId: debtAccountId,
+                    paymentDate: payment.paymentDate,
+                    amount: payment.amount,
+                    daysElapsed: payment.daysElapsed,
+                    commissionId: commissionId,
+                    commissionAmount: paymentCommission
+                });
+            });
+        });
+        formData.append('payment_invoice_details', JSON.stringify(paymentInvoiceDetails));
+        console.log('paymentInvoiceDetails:', paymentInvoiceDetails);
 
         // Adición de Comprobantes de Pago
         const proofOfPayments = document.querySelector('input[type="file"][name="proof_of_payment[]"]');

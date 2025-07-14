@@ -27,8 +27,9 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission, get_SalesRepCommission,
     set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoicePaidAmount, set_DebtPaymentRelation,
     set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
-    get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount,
-    get_customers_admin, get_count_customers_with_accountsReceivable_admin, get_receiptStores_DebtAccount_admin, get_invoices_by_customer_admin)
+    get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount, get_customers_admin,
+    get_count_customers_with_accountsReceivable_admin, get_receiptStores_DebtAccount_admin, get_invoices_by_customer_admin, 
+    set_paymentEntryCommission, get_SalesRepCommission_OLD)
 
 from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepNameAndEmail)
 
@@ -428,7 +429,12 @@ def receiptDetails(customer_id, store_id, pagination=1):
     salesRep_id = invoices[0][7]
     salesRep_NameEmail = get_salesRepNameAndEmail(salesRep_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
-    salesRepComm = get_SalesRepCommission(receipt_id)
+
+    # Cambio en la app, agregando tabla PaymentEntryCommission
+    if receipt_id <= 250:
+        salesRepComm = get_SalesRepCommission_OLD(receipt_id)
+    else:
+        salesRepComm = get_SalesRepCommission(receipt_id)
 
     # Obtención de comprobantes de pago desde OneDrive, actualización de paymentEntries
     paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
@@ -558,7 +564,13 @@ def submit_receipt():
         # Obtener TODOS los account_ids de las facturas (no solo los de payment_entries)
         all_account_ids = json.loads(request.form.get('all_account_ids', '[]'))
 
+        # Obtención de los detalles de las formas de pago (relacionando facturas)
+        payment_invoice_details = json.loads(request.form.get('payment_invoice_details', '[]'))
+        print("payment_invoice_details: ", payment_invoice_details)
+
         # Procesar cada forma de pago
+        payment_entry_ids = []
+
         for entry in payment_entries:
             payment_date = datetime.strptime(entry['date'], '%Y-%m-%d').date()
             amount = float(entry['amount'])
@@ -575,7 +587,28 @@ def submit_receipt():
             else:
                 file_path = ""
 
-            set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
+            payment_entry_id = set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
+            print("payment_entry_id: ", payment_entry_id)
+            payment_entry_ids.append(payment_entry_id)
+            print("payment_entry_ids:  ", payment_entry_ids)
+        
+        for detail in payment_invoice_details:
+            paymentReceiptEntry_id = payment_entry_ids[detail['paymentReceiptEntryIdx']]
+            print("paymentReceiptEntry_id: ", paymentReceiptEntry_id)
+            debtaccount_id = detail['debtAccountId']
+            print("debtaccount_id: ", debtaccount_id)
+            payment_date = detail['paymentDate']
+            print("payment_date: ", payment_date)
+            amount = detail['amount']
+            print("amount: ", amount)
+            days_elapsed = detail['daysElapsed']
+            print("days_elapsed: ", days_elapsed)
+            commission_id = detail['commissionId']
+            print("commission_id: ", commission_id)
+            commission_amount = detail['commissionAmount']
+            print("commission_amount: ", commission_amount)
+            set_paymentEntryCommission(cursor, receipt_id, paymentReceiptEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, commission_amount)
+
 
         # Actualización de Monto Abonado
         original_amounts = request.form.getlist('original_amount[]')
@@ -839,7 +872,11 @@ def send_validationEmail():
     ncta_str = ", ".join(ncta_list)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
     paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
-    salesRepComm = get_SalesRepCommission(receipt_id)
+
+    if receipt_id <= 250:
+        salesRepComm = get_SalesRepCommission_OLD(receipt_id)
+    else:
+        salesRepComm = get_SalesRepCommission(receipt_id)
 
     # Validación de Recibo de Pago
     """
@@ -1034,7 +1071,11 @@ def generate_pdf():
     invoices = get_invoices_by_receipt(receipt_id)
     paymentEntries = get_paymentEntries_by_receipt(receipt_id)
     paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
-    salesRepComm = get_SalesRepCommission(receipt_id)
+    
+    if receipt_id <= 250:
+        salesRepComm = get_SalesRepCommission_OLD(receipt_id)
+    else:
+        salesRepComm = get_SalesRepCommission(receipt_id)
     
     # Logo Store (dinámico desde store[2])
     logo_store_path = store[2] if store and len(store) > 2 else None
