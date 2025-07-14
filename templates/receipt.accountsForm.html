@@ -608,50 +608,55 @@
             // Calcular comisión
             let commission = 0;
             invoice.payments.forEach(payment => {
-                let paymentCommission = 0;
+                let paymentRowIdx = payment.paymentRowIdx;
+                let commissionAmount = 0;
                 let commissionApplied = false;
                 console.log("businessRules: ", businessRules);
 
-                for (let i=0; i<businessRules.length; i++){
-                    const comm = businessRules[i];
-                    if (!commissionApplied) {
-                        console.log("payment.daysElapsed: ", payment.daysElapsed)
-                        const isLastRule = (i === businessRules.length - 1);
-                        const conditionMet = isLastRule 
-                            ? payment.daysElapsed >= comm[2]
-                            : payment.daysElapsed <= comm[2];
+                console.log("paymentData[paymentRowIdx]?.isRetention: ", paymentData[paymentRowIdx]?.isRetention);
+                if (paymentData[paymentRowIdx]?.isRetention) {
+                    commissionAmount = 0;
+                } else {
+                    for (let i=0; i<businessRules.length; i++){
+                        const comm = businessRules[i];
+                        if (!commissionApplied) {
+                            console.log("payment.daysElapsed: ", payment.daysElapsed)
+                            const isLastRule = (i === businessRules.length - 1);
+                            const conditionMet = isLastRule 
+                                ? payment.daysElapsed >= comm[2]
+                                : payment.daysElapsed <= comm[2];
 
-                        if (conditionMet) {
-                            console.log("comm[2]: ", comm[2])
-                            if (comm[3] == 1) {
-                                console.log("comm[3]: ", comm[3])
-                                let amountForCommission = payment.amount; // - invoice.retentionApplied;
-                                console.log("amountForCommission: ", amountForCommission)
-                                if (amountForCommission < 0) amountForCommission = 0;
-                                // Commisión = (Base Imponible - Descuentos) * reglaNegocio 
-                                // Base Imponible = MontoPagado / 1.16
-                                // Los descuentos ya se restan del monto total, debido a que en los cálculos se muestra el
-                                // importe adeudado actualizado y con base en eso se toma el monto pagado de esa factura.
-                                // OJO: Las N/E no tienen IVA, por tanto no se divide entre 1.16
-                                console.log("comm[1]: ", comm[1])
-                                console.log("paymentCommission: ", paymentCommission)
-                                if (invoice.docType === 'FAC') {
-                                    paymentCommission = amountForCommission / 1.16 * (comm[1] / 100);
-                                    console.log("Cálculo: ", paymentCommission, " = ", amountForCommission, " / 1.16 * (", comm[1], " / 100)")
-                                } else if (invoice.docType === 'N/E') {
-                                    paymentCommission = amountForCommission * (comm[1] / 100);
-                                    console.log("Cálculo: ", paymentCommission, " = ", amountForCommission, " / 1.16 * (", comm[1], " / 100)")
+                            if (conditionMet) {
+                                console.log("comm[2]: ", comm[2])
+                                if (comm[3] == 1) {
+                                    console.log("comm[3]: ", comm[3])
+                                    let amountForCommission = payment.amount;
+                                    console.log("amountForCommission: ", amountForCommission)
+                                    if (amountForCommission < 0) amountForCommission = 0;
+                                    // Commisión = (Base Imponible - Descuentos) * reglaNegocio 
+                                    // Base Imponible = MontoPagado / 1.16
+                                    // Los descuentos ya se restan del monto total, debido a que en los cálculos se muestra el
+                                    // importe adeudado actualizado y con base en eso se toma el monto pagado de esa factura.
+                                    // OJO: Las N/E no tienen IVA, por tanto no se divide entre 1.16
+                                    console.log("comm[1]: ", comm[1])
+                                    console.log("commissionAmount: ", commissionAmount)
+                                    if (invoice.docType === 'FAC') {
+                                        commissionAmount = amountForCommission / 1.16 * (comm[1] / 100);
+                                        console.log("Cálculo: ", commissionAmount, " = ", amountForCommission, " / 1.16 * (", comm[1], " / 100)")
+                                    } else if (invoice.docType === 'N/E') {
+                                        commissionAmount = amountForCommission * (comm[1] / 100);
+                                        console.log("Cálculo: ", commissionAmount, " = ", amountForCommission, " / 1.16 * (", comm[1], " / 100)")
+                                    }
+                                    
+                                    commissionId = comm[0];
+                                    console.log("commissionId: ", commissionId)
+                                    commissionApplied = true;
                                 }
-                                
-                                commissionId = comm[0];
-                                console.log("commissionId: ", commissionId)
-                                commissionApplied = true;
                             }
                         }
                     }
-
                 }
-                commission += paymentCommission;
+                commission += commissionAmount;
                 console.log("commission: ", commission)
             });
             commissionFields[idx].textContent = formatSpanishNumber(commission);
@@ -966,39 +971,32 @@
                 let commissionAmount = 0;
                 let commissionApplied = false;
 
-                for (let i=0; i<businessRules.length; i++){
-                    const comm = businessRules[i];
-                    if (!commissionApplied) {
-                        console.log("payment.daysElapsed: ", payment.daysElapsed)
-                        const isLastRule = (i === businessRules.length - 1);
-                        const conditionMet = isLastRule 
-                            ? payment.daysElapsed >= comm[2]
-                            : payment.daysElapsed <= comm[2];
-
-                        if (conditionMet) {
-                            console.log("comm[2]: ", comm[2])
-                            if (comm[3] == 1) {
-                                console.log("comm[3]: ", comm[3])
-                                let amountForCommission = invoice.amountPaid - invoice.retentionApplied;
-                                console.log("amountForCommission: ", amountForCommission)
+                // Si la forma de pago es retención, la comisión es 0
+                if (paymentData[paymentRowIdx]?.isRetention) {
+                    commissionAmount = 0;
+                } else {
+                    for (let i=0; i<businessRules.length; i++){
+                        const comm = businessRules[i];
+                        if (!commissionApplied) {
+                            const isLastRule = (i === businessRules.length - 1);
+                            const conditionMet = isLastRule 
+                                ? payment.daysElapsed >= comm[2]
+                                : payment.daysElapsed <= comm[2];
+                            if (conditionMet && comm[3] == 1) {
+                                let amountForCommission = payment.amount;
                                 if (amountForCommission < 0) amountForCommission = 0;
                                 if (invoice.docType === 'FAC') {
-                                    paymentCommission = amountForCommission / 1.16 * (comm[1] / 100);
+                                    commissionAmount = amountForCommission / 1.16 * (comm[1] / 100);
                                 } else if (invoice.docType === 'N/E') {
-                                    paymentCommission = amountForCommission * (comm[1] / 100);
+                                    commissionAmount = amountForCommission * (comm[1] / 100);
                                 }
-                                console.log("comm[1]: ", comm[1])
-                                console.log("paymentCommission: ", paymentCommission)
                                 commissionId = comm[0];
-                                console.log("commissionId: ", commissionId)
                                 commissionApplied = true;
                             }
                         }
                     }
-
                 }
 
-                console.log("commissionId: ", commissionId)
                 paymentInvoiceDetails.push({
                     paymentReceiptEntryIdx: paymentRowIdx,
                     tenderId: tenderId,
@@ -1007,7 +1005,7 @@
                     amount: payment.amount,
                     daysElapsed: payment.daysElapsed,
                     commissionId: commissionId,
-                    commissionAmount: paymentCommission
+                    commissionAmount: commissionAmount
                 });
             });
         });
