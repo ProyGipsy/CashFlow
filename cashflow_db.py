@@ -98,7 +98,11 @@ def get_motion_id(MotionType):
     return motion_id
 
 
-def get_operations():
+def get_operations(page=1, page_size=500):
+    """
+    Devuelve las operaciones paginadas. page inicia en 1.
+    """
+    offset = (page - 1) * page_size
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -125,12 +129,13 @@ def get_operations():
             JOIN cashflow.Store S ON O.StoreID = S.StoreID 
             JOIN cashflow.Concept C ON O.ConceptID = C.ConceptID 
             JOIN cashflow.Beneficiary B ON O.BeneficiaryID = B.BeneficiaryID
-        ORDER BY O.OperationDate 
-    ''')
+        ORDER BY O.OperationDate DESC, O.OperationID DESC
+        OFFSET %s ROWS FETCH NEXT %s ROWS ONLY
+    ''', (offset, page_size))
     operations = cursor.fetchall()
     conn.close()
 
-    # Calcular el saldo acumulado
+    # Calcular el saldo acumulado solo para la página actual
     balance = 0
     operations_with_balance = []
     for operation in operations:
@@ -149,6 +154,15 @@ def get_operations():
         operations_with_balance.append(tuple(operation_list))
 
     return operations_with_balance
+
+# Para obtener el total de operaciones (para la paginación en el frontend)
+def get_operations_count():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM cashflow.Operation')
+    total = cursor.fetchone()[0]
+    conn.close()
+    return total
 
 
 

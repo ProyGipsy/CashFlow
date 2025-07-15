@@ -156,7 +156,7 @@
 
     {% if not is_pdf %}
     <br><br>
-        <div class="pagination" style="text-align: right;">
+    <div class="pagination" style="text-align: right;">
         {% if pagination > 1 %}
             <a href="{{ url_for('receiptDetails', customer_id=customer_id, store_id=store_id, pagination=pagination - 1) }}" class="add-button">Anterior</a>
         {% else %}

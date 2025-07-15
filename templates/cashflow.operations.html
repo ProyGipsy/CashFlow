@@ -46,7 +46,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for operation in operations | reverse %}
+            {% for operation in operations %}
             <tr>
                 <td>{{ operation[0] }}</td>
                 <td>{{ operation[1] }}</td>
@@ -78,7 +78,35 @@
         </tbody> 
     </table>
 
+
     <br>
+    <!-- Barra de paginación -->
+    <div class="pagination">
+        {% if pagination > 1 %}
+            <a href="{{ url_for('operations', pagination=pagination-1) }}" class="add-button">Anterior</a>
+        {% else %}
+            <span class="disabled-button">Anterior</span>
+        {% endif %}
+
+        {# Enlaces a páginas intermedias #}
+        {% for page_num in range(1, total_pages + 1) %}
+            {% if page_num == pagination %}
+                <span class="current-page">{{ page_num }}</span>
+            {% elif page_num <= 2 or page_num > total_pages - 2 or (page_num >= pagination-5 and page_num <= pagination+5) %}
+                <a href="{{ url_for('operations', pagination=page_num) }}" class="page-link">{{ page_num }}</a>
+            {% elif page_num == 3 and pagination > 7 %}
+                . . .
+            {% elif page_num == total_pages - 2 and pagination < total_pages - 6 %}
+                . . .
+            {% endif %}
+        {% endfor %}
+
+        {% if pagination < total_pages %}
+            <a href="{{ url_for('operations', pagination=pagination+1) }}" class="add-button">Siguiente</a>
+        {% else %}
+            <span class="disabled-button">Siguiente</span>
+        {% endif %}
+    </div>
 </div>
 
 <div id="modalOperation" class="modal">

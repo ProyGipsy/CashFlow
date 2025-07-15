@@ -17,7 +17,7 @@ from flask_mail import Mail, Message
 
 from cashflow_db import (get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts,
     get_operations, get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id,
-    set_beneficiaries, set_concepts, set_stores, set_operations)
+    set_beneficiaries, set_concepts, set_stores, set_operations, get_operations_count)
 
 # OJO: Variables balance corresponden a PaidAmount
 from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_receiptStores_Receipts, get_receiptStores_Sellers,
@@ -138,7 +138,20 @@ def homeCashier():
 
 @app.route('/operations', methods=['GET', 'POST'])
 def operations():
-    operations = get_operations()
+
+    # Obtención del número de página
+    try:
+        pagination = int(request.args.get('pagination', 1))
+    except Exception:
+        pagination = 1
+
+    results_per_page = 500
+
+    #operations = get_operations()
+    operations = get_operations(page=pagination, page_size=results_per_page)
+    total_operations = get_operations_count()
+    total_pages = (total_operations // results_per_page) + (1 if total_operations % results_per_page > 0 else 0)
+
     stores = get_cashflowStores()
     concepts = get_concepts()
     creditConcepts = get_creditConcepts()
@@ -337,7 +350,11 @@ def operations():
         debitConcepts=debitConcepts,
         stores=stores,
         beneficiaries=beneficiaries,
-        current_year=current_year
+        current_year=current_year,
+        pagination=pagination,
+        results_per_page=results_per_page,
+        total_operations=total_operations,
+        total_pages=total_pages
         #current_yearMonth=current_yearMonth,
         #previous_yearMonth=previous_yearMonth
     )
