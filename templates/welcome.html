@@ -17,7 +17,7 @@
         <br><br>
         <div class="grid">
             {% if 1 in session['modules'] %}
-            <a href="{{ url_for('homeCashier') }}" class="card disabled">
+            <a href="{{ url_for('homeCashier') }}" class="card">
                 <img src="{{ url_for('static', filename='IMG/cash-flow.png') }}" alt="Flujo de Caja" class="card-img">
                 <h3>Flujo de Caja</h3>
                 <span>Sistema en revisión. <br> Por favor, vuelva más tarde.</span>

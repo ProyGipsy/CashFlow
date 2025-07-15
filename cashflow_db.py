@@ -1,13 +1,23 @@
 import os
 import pymssql
+from dbutils.pooled_db import PooledDB
+
+# Configuración del pool de conexiones
+
+pool = PooledDB(
+    creator=pymssql,
+    maxconnections = 15,
+    mincached = 3,
+    maxcached = 6,
+    blocking = True,
+    host = os.environ.get('DB_SERVER'),
+    user = os.environ.get('DB_USER'),
+    password = os.environ.get('DB_PASSWORD'),
+    database = os.environ.get('DB_NAME')
+)
 
 def get_db_connection():
-    server = os.environ.get('DB_SERVER')
-    user = os.environ.get('DB_USER')
-    password = os.environ.get('DB_PASSWORD')
-    database = os.environ.get('DB_NAME')
-    conn = pymssql.connect(server, user, password, database)
-    return conn
+    return pool.connection()
 
 
 # Obtención de Data en la Interfaz

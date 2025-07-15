@@ -43,7 +43,6 @@ app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
 # Configuración del servidor SMTP
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')
 app.config['MAIL_PORT'] = os.environ.get('MAIL_PORT')
 app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
 
@@ -252,6 +251,7 @@ def operations():
                     </style>
                 </head>
                 <body>
+                    <br>
                     <div class="header">
                         <h2>{"Comprobante de Entrada" if motion_type == "1" else "Comprobante de Salida"}</h2>
                     </div>
@@ -297,6 +297,7 @@ def operations():
 
         subject = f'Operación {operation_id}: {"Ingreso" if motion_type == "1" else "Egreso"} Agregado'
 
+        app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')   
         if store_id == '4':
             app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW_REMBD')
             app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW_REMBD')
@@ -304,6 +305,12 @@ def operations():
             app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW')
             app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW')
         mail = Mail(app)
+
+        print("app.config['MAIL_PORT']: ", app.config['MAIL_PORT'])
+        print("app.config['MAIL_USE_SSL']: ", app.config['MAIL_USE_SSL'])
+        print("app.config['MAIL_SERVER']: ", app.config['MAIL_SERVER'])
+        print("app.config['MAIL_USERNAME']: ", app.config['MAIL_USERNAME'])
+        print("app.config['MAIL_PASSWORD']: ", app.config['MAIL_PASSWORD'])
 
         msg = Message(subject=subject,
                     sender=app.config['MAIL_USERNAME'],
