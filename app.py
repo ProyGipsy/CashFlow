@@ -694,14 +694,16 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
+        recipient_receipt = os.environ.get('MAIL_RECIPIENT_RECEIPT_REMBD')
     else:
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
+        recipient_receipt = os.environ.get('MAIL_RECIPIENT_RECEIPT')
     mail = Mail(app)
 
     msg = Message(subject=subject,
                 sender=app.config['MAIL_USERNAME'],
-                recipients=[app.config['MAIL_USERNAME']])
+                recipients=[app.config['MAIL_USERNAME'], recipient_receipt])
 
     body = f"""
     <html>
@@ -824,15 +826,17 @@ def send_rejectionEmail():
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
+        recipient_receipt = os.environ.get('MAIL_RECIPIENT_RECEIPT_REMBD')
     else:
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
+        recipient_receipt = os.environ.get('MAIL_RECIPIENT_RECEIPT')
     mail = Mail(app)
 
     subject = f"Recibo de Cobranza #{ receipt_id }: Rechazado"
     msg = Message(subject=subject,
                   sender=app.config['MAIL_USERNAME'],
-                  recipients=[app.config['MAIL_USERNAME'], salesRep_email])
+                  recipients=[app.config['MAIL_USERNAME'], salesRep_email, recipient_receipt])
 
     html_body = f"""
     <html>
@@ -1024,21 +1028,23 @@ def send_validationEmail():
             </body>
             </html>
             """
-    
+
     app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER_RECEIPT')
     if store_id == '904' or store_id == '905':
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
+        recipient_receipt = os.environ.get('MAIL_RECIPIENT_RECEIPT_REMBD')
     else:
         app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
         app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
+        recipient_receipt = os.environ.get('MAIL_RECIPIENT_RECEIPT')
     mail = Mail(app)
 
     # Lógica para enviar el correo
     subject = f"Recibo de Cobranza #{ receipt_id }: Validado"
     msg = Message(subject=subject,
                   sender=app.config['MAIL_USERNAME'],
-                  recipients=[app.config['MAIL_USERNAME'], salesRep_email])
+                  recipients=[app.config['MAIL_USERNAME'], salesRep_email, recipient_receipt])
     
     msg.html = html_body
 
