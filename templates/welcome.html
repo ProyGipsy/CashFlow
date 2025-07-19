@@ -29,12 +29,10 @@
                 <!--<span>Sistema en mantenimiento. <br> Por favor, vuelva más tarde.</span>-->
             </a>
             {% endif %}
-            <!--
-            <a href="{{ url_for('welcome') }}" class="card disabled">
-                <img src="{{ url_for('static', filename='IMG/document.png') }}" alt="Gestión de Documentos" class="card-img">
-                <h3>Gestión de Documentos</h3>
+            <a href="{{ url_for('reports.homeReports') }}" class="card">
+                <img src="{{ url_for('static', filename='IMG/dashboard.png') }}" alt="Reportes" class="card-img">
+                <h3>Visualización de Reportes</h3>
             </a>
-            -->
             <!--
             <a href="{{ url_for('welcome') }}" class="card disabled">
                 <img src="{{ url_for('static', filename='IMG/padlock.png') }}" alt="Gestión de Credenciales" class="card-img">

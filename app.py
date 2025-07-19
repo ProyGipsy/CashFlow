@@ -14,6 +14,8 @@ from datetime import datetime
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response, current_app, session)
 from flask_session import Session
 from flask_mail import Mail, Message
+from reports import reports_bp
+
 
 from cashflow_db import (get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts,
     get_operations, get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id,
@@ -36,6 +38,7 @@ from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_sales
 from onedrive import get_onedrive_headers
 
 app = Flask(__name__)
+app.register_blueprint(reports_bp)
 
 # Configuración de sesión para usuarios
 app.config["SESSION_PERMANENT"] = False
