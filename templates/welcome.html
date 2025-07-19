@@ -15,24 +15,38 @@
             <h2>Bienvenido(a), {{session['user_firstName']}}</h2>
         </div>
         <br><br>
-        <div class="grid">
+
+        {% set num_cards = 0 %}
+        {% if 1 in session['modules'] %}
+            {% set num_cards = num_cards + 1 %}
+        {% endif %}
+        {% if 0 in session['modules'] %}
+            {% set num_cards = num_cards + 1 %}
+        {% endif %}
+        {% if 2 in session['modules'] %}
+            {% set num_cards = num_cards + 1 %}
+        {% endif %}
+
+        <div class="grid {% if num_cards == 2 %}two-column-grid{% endif %}">
             {% if 1 in session['modules'] %}
-            <a href="{{ url_for('homeCashier') }}" class="card">
+            <a href="{{ url_for('homeCashier') }}" class="card {% if num_cards == 1 %}center-single-card{% endif %}">
                 <img src="{{ url_for('static', filename='IMG/cash-flow.png') }}" alt="Flujo de Caja" class="card-img">
                 <h3>Flujo de Caja</h3>
             </a>
             {% endif %}
             {% if 0 in session['modules'] %}
-            <a onclick="handleReceiptRole()" class="card">
+            <a onclick="handleReceiptRole()" class="card {% if num_cards == 1 %}center-single-card{% endif %}">
                 <img src="{{ url_for('static', filename='IMG/receipt.png') }}" alt="Registro de Cobranza al Mayor" class="card-img">
                 <h3>Registro de Cobranza al Mayor</h3>
                 <!--<span>Sistema en mantenimiento. <br> Por favor, vuelva más tarde.</span>-->
             </a>
             {% endif %}
-            <a href="{{ url_for('reports.homeReports') }}" class="card">
+            {% if 2 in session['modules'] %}
+            <a href="{{ url_for('reports.homeReports') }}" class="card {% if num_cards == 1 %}center-single-card{% endif %}">
                 <img src="{{ url_for('static', filename='IMG/dashboard.png') }}" alt="Reportes" class="card-img">
                 <h3>Visualización de Reportes</h3>
             </a>
+            {% endif %}
             <!--
             <a href="{{ url_for('welcome') }}" class="card disabled">
                 <img src="{{ url_for('static', filename='IMG/padlock.png') }}" alt="Gestión de Credenciales" class="card-img">
@@ -52,11 +66,13 @@
             
             <div class="grid role-grid">
                 {% for role in roles_info %}
+                {% if role.name != 'Supervisor' %}
                 <div class="role-card card" onclick="selectRole({{ role.id }})">
                     <img src="{{ url_for('static', filename='IMG/' + ('admin2.png' if role.id == 1 else 'seller2.png')) }}" 
                         alt="{{ role.name }}" class="role-card-img">
                     <h4>{{ role.name }}</h4>
                 </div>
+                {% endif %}
                 {% endfor %}
             </div>
         </div>

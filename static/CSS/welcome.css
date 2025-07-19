@@ -69,6 +69,12 @@ body::after {
     padding: 0 20px;
     margin: 0 auto;
 }
+.center-single-card {
+    grid-column: 2;
+}
+.two-column-grid {
+    grid-template-columns: repeat(2, 250px);
+}
 
 .card {
     background-color: #f1efef;

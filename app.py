@@ -502,7 +502,7 @@ def homeSeller():
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
-    if (session['salesRep_id'] == '99'):
+    if (session['salesRep_id'] == '99' or session['user_id'] == 20):
         stores = get_receiptStores_DebtAccount_admin()
         customers_by_store = {store[0]: get_customers_admin(store[0]) for store in stores}
         count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable_admin(store[0]) for store in stores}
