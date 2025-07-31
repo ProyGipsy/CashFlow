@@ -646,7 +646,7 @@ def set_isReviewedReceipt(receipt_id):
     cursor = conn.cursor()
     cursor.execute('''
                    UPDATE Commission_Receipt.PaymentReceipt
-                   SET IsReviewed = 1
+                   SET IsReviewed = 1, ReviewedDate = GETDATE()
                    WHERE ReceiptID = %s
                    ''', (receipt_id))
     conn.commit()
