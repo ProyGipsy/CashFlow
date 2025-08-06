@@ -71,7 +71,8 @@ def login():
                 'user_firstName': user_data['firstName'],
                 'user_lastName': user_data['lastName'],
                 'roles': user_data['roles_id'],
-                'modules': user_data['modules_id']
+                'modules': user_data['modules_id'],
+                'permissions': user_data['permissions_id']
             })
             return redirect(url_for('welcome'))
         else: 

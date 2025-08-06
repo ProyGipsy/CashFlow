@@ -17,10 +17,10 @@
         <br><br>
 
         {% set num_cards = 0 %}
-        {% if 1 in session['modules'] %}
+        {% if 0 in session['modules'] %}
             {% set num_cards = num_cards + 1 %}
         {% endif %}
-        {% if 0 in session['modules'] %}
+        {% if 1 in session['modules'] %}
             {% set num_cards = num_cards + 1 %}
         {% endif %}
         {% if 2 in session['modules'] %}

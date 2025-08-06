@@ -15,7 +15,7 @@ def get_user_data(username, password):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-                    SELECT U.userId, U.salesRepId, U.firstName, U.lastName, R.roleId, P.moduleId
+                    SELECT U.userId, U.salesRepId, U.firstName, U.lastName, R.roleId, P.moduleId, P.permissionId
                     FROM AccessControl.Users U
                     JOIN AccessControl.UserRoles R ON U.userId = R.userId
                     JOIN AccessControl.RolePermissions P ON R.roleId = P.roleId
@@ -31,7 +31,8 @@ def get_user_data(username, password):
             'firstName': results[0][2],
             'lastName': results[0][3],
             'roles_id': [row[4] for row in results],
-            'modules_id': [row[5] for row in results]
+            'modules_id': [row[5] for row in results],
+            'permissions_id': [row[6] for row in results]
         }
         return user_data
         

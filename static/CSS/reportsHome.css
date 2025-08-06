@@ -77,6 +77,18 @@ body::after {
     padding: 0 20px;
     margin: 0 auto;
 }
+.grid-one-card {
+    grid-template-columns: repeat(1, 250px);
+}
+.grid-two-cards {
+    grid-template-columns: repeat(2, 250px);
+}
+.grid-three-cards {
+    grid-template-columns: repeat(3, 250px);
+}
+.grid-four-cards {
+    grid-template-columns: repeat(3, 250px);
+}
 
 .card {
     background-color: #f1efef;
