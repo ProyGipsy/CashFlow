@@ -78,16 +78,16 @@ body::after {
     margin: 0 auto;
 }
 .grid-one-card {
-    grid-template-columns: repeat(1, 250px);
+    grid-template-columns: repeat(1, 200px);
 }
 .grid-two-cards {
-    grid-template-columns: repeat(2, 250px);
+    grid-template-columns: repeat(2, 200px);
 }
 .grid-three-cards {
-    grid-template-columns: repeat(3, 250px);
+    grid-template-columns: repeat(3, 200px);
 }
 .grid-four-cards {
-    grid-template-columns: repeat(3, 250px);
+    grid-template-columns: repeat(3, 200px);
 }
 
 .card {
