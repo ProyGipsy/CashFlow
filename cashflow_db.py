@@ -162,9 +162,9 @@ def get_operations(page=1, page_size=500):
         operation_list = list(operation)
         
         # Formatear el crédito y el débito
-        credit = operation_list[9]
-        debit = operation_list[10]
-        balance_val = operation_list[11]
+        credit = operation_list[9] if operation_list[9] is not None else 0
+        debit = operation_list[10] if operation_list[10] is not None else 0
+        balance_val = operation_list[11] if operation_list[11] is not None else 0
 
         formattedCredit = "{:,.2f}".format(credit).replace(".", "X").replace(",", ".").replace("X", ",")
         formattedDebit = "{:,.2f}".format(debit).replace(".", "X").replace(",", ".").replace("X", ",")
