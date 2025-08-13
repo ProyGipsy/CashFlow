@@ -330,7 +330,7 @@ def operations():
         msg.html = html_content
 
         try:
-            #mail.send(msg)
+            mail.send(msg)
             print("Correo enviado exitosamente.")
         except Exception as e:
             print(f"Error al enviar correo: {e}")

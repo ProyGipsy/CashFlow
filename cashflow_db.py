@@ -143,7 +143,8 @@ def get_operations(page=1, page_size=500):
         credit = operation[9] if operation[9] is not None else 0
         debit = operation[10] if operation[10] is not None else 0
         
-        balance += credit - debit
+        if operation[4] != 79: # Las operaciones con concepto 79 (Shajor) no afectan el saldo
+            balance += credit - debit
         
         operation_list = list(operation)
         operation_list.append(balance)
