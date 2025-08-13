@@ -97,14 +97,15 @@ def get_motion_id(MotionType):
     conn.close()
     return motion_id
 
-
+#anterior casi
 def get_operations(page=1, page_size=500):
     """
-    Devuelve las operaciones paginadas. page inicia en 1.
+    Devuelve las operaciones paginadas con un saldo acumulado correcto.
     """
-    offset = (page - 1) * page_size
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    # Se obtienen todas las operaciones en el orden correcto para calcular el saldo acumulado
     cursor.execute('''
         SELECT 
             O.OperationID, 
@@ -129,31 +130,53 @@ def get_operations(page=1, page_size=500):
             JOIN cashflow.Store S ON O.StoreID = S.StoreID 
             JOIN cashflow.Concept C ON O.ConceptID = C.ConceptID 
             JOIN cashflow.Beneficiary B ON O.BeneficiaryID = B.BeneficiaryID
-        ORDER BY O.OperationDate DESC, O.OperationID DESC
-        OFFSET %s ROWS FETCH NEXT %s ROWS ONLY
-    ''', (offset, page_size))
-    operations = cursor.fetchall()
+        ORDER BY O.OperationDate ASC, O.OperationID ASC
+    ''')
+    all_operations = cursor.fetchall()
     conn.close()
 
-    # Calcular el saldo acumulado solo para la página actual
+    # Calcular el saldo acumulado para todas las operaciones de forma secuencial
     balance = 0
-    operations_with_balance = []
-    for operation in operations:
+    operations_with_balance_chronological = []
+    
+    for operation in all_operations:
         credit = operation[9] if operation[9] is not None else 0
         debit = operation[10] if operation[10] is not None else 0
+        
         balance += credit - debit
+        
+        operation_list = list(operation)
+        operation_list.append(balance)
+        operations_with_balance_chronological.append(tuple(operation_list))
+
+    # Invertir el orden para que la operación más reciente esté primero para la interfaz
+    operations_with_balance = operations_with_balance_chronological[::-1]
+    
+    # Aplicar la paginación a la lista ya invertida
+    final_operations = []
+    start_index = (page - 1) * page_size
+    end_index = start_index + page_size
+    
+    for operation in operations_with_balance[start_index:end_index]:
+        operation_list = list(operation)
+        
+        # Formatear el crédito y el débito
+        credit = operation_list[9]
+        debit = operation_list[10]
+        balance_val = operation_list[11]
 
         formattedCredit = "{:,.2f}".format(credit).replace(".", "X").replace(",", ".").replace("X", ",")
         formattedDebit = "{:,.2f}".format(debit).replace(".", "X").replace(",", ".").replace("X", ",")
-        formattedBalance = "{:,.2f}".format(balance).replace(".", "X").replace(",", ".").replace("X", ",")
+        formattedBalance = "{:,.2f}".format(balance_val).replace(".", "X").replace(",", ".").replace("X", ",")
         
-        operation_list = list(operation)
         operation_list[9] = formattedCredit
         operation_list[10] = formattedDebit
-        operation_list.append(formattedBalance)
-        operations_with_balance.append(tuple(operation_list))
+        operation_list[11] = formattedBalance
+        
+        final_operations.append(tuple(operation_list))
 
-    return operations_with_balance
+    return final_operations
+
 
 # Para obtener el total de operaciones (para la paginación en el frontend)
 def get_operations_count():

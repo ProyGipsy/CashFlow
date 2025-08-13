@@ -323,12 +323,6 @@ def operations():
             app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW')
         mail = Mail(app)
 
-        print("app.config['MAIL_PORT']: ", app.config['MAIL_PORT'])
-        print("app.config['MAIL_USE_SSL']: ", app.config['MAIL_USE_SSL'])
-        print("app.config['MAIL_SERVER']: ", app.config['MAIL_SERVER'])
-        print("app.config['MAIL_USERNAME']: ", app.config['MAIL_USERNAME'])
-        print("app.config['MAIL_PASSWORD']: ", app.config['MAIL_PASSWORD'])
-
         msg = Message(subject=subject,
                     sender=app.config['MAIL_USERNAME'],
                     recipients=[app.config['MAIL_USERNAME']])
@@ -336,7 +330,7 @@ def operations():
         msg.html = html_content
 
         try:
-            mail.send(msg)
+            #mail.send(msg)
             print("Correo enviado exitosamente.")
         except Exception as e:
             print(f"Error al enviar correo: {e}")

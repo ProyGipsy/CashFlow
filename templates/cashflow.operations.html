@@ -64,7 +64,13 @@
                         {{ operation[10] }}
                     {% endif %}
                 </td>
-                <td>{{ operation[11] }}</td>
+                <td>
+                    {% if operation[4] == 79 %}
+                        <span style="color: #959498;">{{ operation[11] }}</span>
+                    {% else %}
+                        {{ operation[11] }}
+                    {% endif %}
+                </td>
                 <!--{% if operation[12] == current_yearMonth or operation[12] == previous_yearMonth %} {% endif %}-->
                 {% if operation[12] == current_year %}
                 <td class="no-border">
