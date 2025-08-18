@@ -514,7 +514,7 @@ def accountsReceivable():
 
 @app.route('/get_invoices/<customer_id>/<store_id>')
 def get_invoices(customer_id, store_id):
-    if (session['salesRep_id'] == '99'):
+    if (session['salesRep_id'] == '99' or session['user_id'] == 20):
         invoices = get_invoices_by_customer_admin(customer_id, store_id)
     else: 
         invoices = get_invoices_by_customer(customer_id, store_id, session['salesRep_id'])
