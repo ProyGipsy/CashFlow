@@ -37,6 +37,7 @@
         <table class="styled-table"> 
             <tr> 
                 <th>N_CTA</th>
+                <th>Tipo de Documento</th>
                 <th>Total Deuda (T/D)</th>
                 <th>Fecha Emisión</th>
                 <th>Fecha Vencimiento</th>
@@ -44,7 +45,8 @@
             </tr> 
             {% for invoice in invoices %}
             <tr>
-                <td>{{ invoice[0] }}</td>  
+                <td>{{ invoice[0] }}</td>
+                <td>{{ invoice[8] }}</td>  
                 <td>{{ invoices[0][6] }} {{ "{:,.2f}".format(invoice[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td> 
                 <td>{{ invoice[2].strftime('%d-%m-%Y') }}</td> 
                 <td>{{ invoice[3].strftime('%d-%m-%Y') }}</td> 
