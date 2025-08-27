@@ -72,10 +72,15 @@
             </a>
             {% endif %}
             {% if 6 in session['permissions'] %}
-            <a href="https://app.powerbi.com/groups/920fcaa2-7242-4819-802f-0c793802870f/reports/2edf6a46-ed10-41d7-bad0-30b62ae41af9/23e142ba8c234a14a24c?experience=power-bi&chromeless=1" class="card disabled">
+            <a href="https://app.powerbi.com/groups/me/reports/ed426e0b-b944-4e92-b7ef-4fa60ccfb45a/55efc92a71b9cc82d80a?ctid=e28fcd45-30d5-4919-b266-27bca9760759&chromeless=1&experience=power-bi" class="card">
                 <img src="{{ url_for('static', filename='IMG/comision.png') }}" alt="Reportes de Comisiones de Vendedores" class="card-img">
                 <h3>5. Comisiones de Vendedores</h3>
-                <span>Próximamente</span>
+            </a>
+            {% endif %}
+            {% if 7 in session['permissions'] %}
+            <a href="https://app.powerbi.com/groups/920fcaa2-7242-4819-802f-0c793802870f/reports/5472a8a9-ea83-4c35-8db2-2140f37ba5ce/6c909a1291bed90d75c3?experience=power-bi&chromeless=1" class="card">
+                <img src="{{ url_for('static', filename='IMG/ventas.png') }}" alt="Reportes de Ventas" class="card-img">
+                <h3>6. Ventas</h3>
             </a>
             {% endif %}
         </div>

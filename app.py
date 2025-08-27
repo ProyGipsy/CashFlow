@@ -74,6 +74,9 @@ def login():
                 'modules': user_data['modules_id'],
                 'permissions': user_data['permissions_id']
             })
+
+            print(session)
+
             return redirect(url_for('welcome'))
         else: 
             return render_template('indexLogin.html', error="Credenciales incorrectas, por favor intente de nuevo.")
