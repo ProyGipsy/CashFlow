@@ -74,10 +74,10 @@ def get_REMBD_Report():
                     WHERE
                         PR.IsApproved = 1
                         AND DA.StoreID IN (904, 905)
-                        AND PR.ReviewedDate >= DATEADD(month, DATEDIFF(month, 0, GETDATE()) - 1, 0)
-                        AND PR.ReviewedDate < DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0)
-                        --AND SRC.CreatedAt >= DATEADD(month, DATEDIFF(month, 0, GETDATE())-1, 0)
-                        --AND SRC.CreatedAt < DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0)
+                        --AND PR.ReviewedDate >= DATEADD(month, DATEDIFF(month, 0, GETDATE()) - 1, 0)
+                        --AND PR.ReviewedDate < DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0)
+                        AND SRC.CreatedAt >= DATEADD(month, DATEDIFF(month, 0, GETDATE())-1, 0)
+                        AND SRC.CreatedAt < DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0)
                     ORDER BY SRC.CreatedAt
                     ''')
     info = cursor.fetchall()
@@ -128,10 +128,10 @@ def get_GipsyCorp_Report():
                     WHERE
                         PR.IsApproved = 1
                         AND DA.StoreID NOT IN (904, 905)
-                        AND PR.ReviewedDate >= DATEADD(month, DATEDIFF(month, 0, GETDATE()) - 1, 0)
-                        AND PR.ReviewedDate < DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0)
-                        --AND SRC.CreatedAt >= DATEADD(month, DATEDIFF(month, 0, GETDATE())-1, 0)
-                        --AND SRC.CreatedAt < DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0)
+                        --AND PR.ReviewedDate >= DATEADD(month, DATEDIFF(month, 0, GETDATE()) - 1, 0)
+                        --AND PR.ReviewedDate < DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0)
+                        AND SRC.CreatedAt >= DATEADD(month, DATEDIFF(month, 0, GETDATE())-1, 0)
+                        AND SRC.CreatedAt < DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0)
                     ORDER BY SRC.CreatedAt
                     ''')
     info = cursor.fetchall()
@@ -623,8 +623,8 @@ def create_summary_html(grouped_data, store_type):
 
 if __name__ == "__main__":
     print("Iniciando la generación del reporte mensual de comisiones...")
-    #receiver_email_test = os.environ.get("MAIL_RECIPIENT_TEST") #RECEPTOR DE PRUEBA, ACTIVAR ENVÍO A VENDEDOR AL CULMINAR
-    #receiver_email_test2 = os.environ.get("MAIL_RECIPIENT_TEST2") #RECEPTOR DE PRUEBA, ACTIVAR ENVÍO A OFICINA AL CULMINAR
+    receiver_email_test = os.environ.get("MAIL_RECIPIENT_TEST") #RECEPTOR DE PRUEBA, ACTIVAR ENVÍO A VENDEDOR AL CULMINAR
+    receiver_email_test2 = os.environ.get("MAIL_RECIPIENT_TEST2") #RECEPTOR DE PRUEBA, ACTIVAR ENVÍO A OFICINA AL CULMINAR
 
     # -- Reportes REMBD (Tiendas 904, 905) --
     print("\n--- Procesando datos para tiendas REMBD (904, 905) ---")
@@ -643,16 +643,16 @@ if __name__ == "__main__":
             print(f"\n  Generando y enviando reporte REMBD para: {salesrep_data['name']} ({salesrep_data['email']})")
             html_content = format_html_for_single_salesrep(salesrep_data, "REMBD")
             subject = f"Reporte Mensual de Comisiones - REMBD - {salesrep_data['name']}"
-            recipient_list = [salesrep_data['email'], receiver_email_rembd]  #ACTIVAR PARA ENVÍO A VENDEDOR Y OFICINA
-            #recipient_list = [receiver_email_test, receiver_email_test2] #TESTING
+            #recipient_list = [salesrep_data['email'], receiver_email_rembd]  #ACTIVAR PARA ENVÍO A VENDEDOR Y OFICINA
+            recipient_list = [receiver_email_test, receiver_email_test2] #TESTING
             send_email(subject, html_content, sender_email, email_password, recipient_list)
 
         # Correo resumen para la oficina
         print(f"\n  Generando y enviando resumen REMBD para la oficina")
         html_summary = create_summary_html(grouped_data_by_salesrep_rembd, "REMBD")
         summary_subject = "Resumen Mensual de Comisiones - REMBD"
-        summary_recipient_list = [receiver_email_rembd]  #ACTIVAR PARA ENVÍO A OFICINA
-        #summary_recipient_list = [receiver_email_test] #TESTING
+        #summary_recipient_list = [receiver_email_rembd]  #ACTIVAR PARA ENVÍO A OFICINA
+        summary_recipient_list = [receiver_email_test] #TESTING
         send_email(summary_subject, html_summary, sender_email, email_password, summary_recipient_list)
     else:
         print("No se encontraron datos de comisiones para tiendas REMBD.")
@@ -675,16 +675,16 @@ if __name__ == "__main__":
             print(f"\n  Generando y enviando reporte GipsyCorp para: {salesrep_data['name']} ({salesrep_data['email']})")
             html_content = format_html_for_single_salesrep(salesrep_data, "GipsyCorp")
             subject = f"Reporte Mensual de Comisiones - GipsyCorp - {salesrep_data['name']}"
-            recipient_list = [salesrep_data['email'], receiver_email_gipsycorp]  #ACTIVAR PARA ENVÍO A VENDEDOR Y OFICINA
-            #recipient_list = [receiver_email_test, receiver_email_test2] #TESTING
+            #recipient_list = [salesrep_data['email'], receiver_email_gipsycorp]  #ACTIVAR PARA ENVÍO A VENDEDOR Y OFICINA
+            recipient_list = [receiver_email_test, receiver_email_test2] #TESTING
             send_email(subject, html_content, sender_email, email_password, recipient_list)
 
         # Correo resumen para la oficina
         print(f"\n  Generando y enviando resumen GipsyCorp para la oficina")
         html_summary = create_summary_html(grouped_data_by_salesrep_gipsycorp, "GipsyCorp")
         summary_subject = "Resumen Mensual de Comisiones - GipsyCorp"
-        summary_recipient_list = [receiver_email_gipsycorp]  #ACTIVAR PARA ENVÍO A OFICINA
-        #summary_recipient_list = [receiver_email_test] #TESTING
+        #summary_recipient_list = [receiver_email_gipsycorp]  #ACTIVAR PARA ENVÍO A OFICINA
+        summary_recipient_list = [receiver_email_test] #TESTING
         send_email(summary_subject, html_summary, sender_email, email_password, summary_recipient_list)
     else:
         print("No se encontraron datos de comisiones para tiendas GipsyCorp.")
