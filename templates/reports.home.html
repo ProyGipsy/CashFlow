@@ -34,6 +34,12 @@
         {% if 6 in session['permissions'] %}
             {% set num_cards = num_cards + 1 %}
         {% endif %}
+        {% if 7 in session['permissions'] %}
+            {% set num_cards = num_cards + 1 %}
+        {% endif %}
+        {% if 8 in session['permissions'] %}
+            {% set num_cards = num_cards + 1 %}
+        {% endif %}
 
         {% set grid_class = '' %}
         {% if num_cards == 1 %}
@@ -81,6 +87,13 @@
             <a href="https://app.powerbi.com/groups/me/reports/8abea94e-e65a-4a91-82f4-22cdb80714a8/6c909a1291bed90d75c3?ctid=e28fcd45-30d5-4919-b266-27bca9760759&experience=power-bi&chromeless=1" class="card">
                 <img src="{{ url_for('static', filename='IMG/ventas.png') }}" alt="Reportes de Ventas" class="card-img">
                 <h3>6. Ventas</h3>
+            </a>
+            {% endif %}
+            {% if 8 in session['permissions'] %}
+            <a href="" class="card disabled">
+                <img src="{{ url_for('static', filename='IMG/warranty.png') }}" alt="Reportes de Garantías" class="card-img">
+                <h3>7. Garantías</h3>
+                <span>Próximamente</span>
             </a>
             {% endif %}
         </div>
