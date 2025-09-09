@@ -437,12 +437,12 @@ def receipts():
         customers_with_unvalidated_receipts=customers_with_unvalidated_receipts, 
         customer_counts=customer_counts)
 
-@app.route('/receiptDetails/<int:customer_id>/<int:store_id>/<int:pagination>')
-def receiptDetails(customer_id, store_id, pagination=1):
+@app.route('/receiptDetails/<int:customer_id>/<int:customer_isRembd>/<int:store_id>/<int:pagination>')
+def receiptDetails(customer_id, customer_isRembd, store_id, pagination=1):
     receipts_per_page = 1
-    receipts = get_unvalidated_receipts_by_customer(customer_id)
+    receipts = get_unvalidated_receipts_by_customer(customer_id, customer_isRembd)
     store = get_receiptStore_by_id(store_id)
-    customer = get_customer_by_id(customer_id)
+    customer = get_customer_by_id(customer_id, customer_isRembd)
 
     # Paginación
     total_receipts = len(receipts)
@@ -513,12 +513,12 @@ def accountsReceivable():
                            customers_by_store=customers_by_store,
                            count_customers_by_store=count_customers_by_store)
 
-@app.route('/get_invoices/<customer_id>/<store_id>')
-def get_invoices(customer_id, store_id):
+@app.route('/get_invoices/<customer_id>/<customer_isRembd>/<store_id>')
+def get_invoices(customer_id, customer_isRembd, store_id):
     if (session['salesRep_id'] == '99' or session['user_id'] == 20):
-        invoices = get_invoices_by_customer_admin(customer_id, store_id)
+        invoices = get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id)
     else: 
-        invoices = get_invoices_by_customer(customer_id, store_id, session['salesRep_id'])
+        invoices = get_invoices_by_customer(customer_id, customer_isRembd, store_id, session['salesRep_id'])
     # Formatear datos para JSON
     formatted_invoices = [
         {

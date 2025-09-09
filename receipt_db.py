@@ -112,12 +112,12 @@ def get_seller_details(seller_id):
     conn.close()
     return seller
 
-def get_customer_by_id(customer_id):
+def get_customer_by_id(customer_id, customer_isRembd):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT C.ID, C.FirstName, C.LastName
+    cursor.execute('''SELECT C.ID, C.FirstName, C.LastName, C.isRembd
                     FROM Commission_Receipt.Customer C
-                    WHERE C.ID = %s''', (customer_id,))
+                    WHERE C.ID = %s AND C.isRembd = %s''', (customer_id, customer_isRembd))
     sellers = cursor.fetchone()
     conn.close()
     return sellers
@@ -125,10 +125,11 @@ def get_customer_by_id(customer_id):
 def get_customers(store_id, salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT (C.ID), C.FirstName, C.LastName
+    cursor.execute('''  SELECT DISTINCT (C.ID), C.FirstName, C.LastName, C.isRembd
                     FROM Commission_Receipt.Customer C
-                    JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID
-                    WHERE C.isRetail = 0 AND (Amount-PaidAmount) > 0 AND D.StoreID = %s AND D.SalesRepID = %s
+                    JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
+                    WHERE C.isRetail = 0 AND (Amount-PaidAmount) > 0
+						AND D.StoreID = %s AND D.SalesRepID = %s
                    ''', (store_id, salesRep_id))
     sellers = cursor.fetchall()
     conn.close()
@@ -137,9 +138,9 @@ def get_customers(store_id, salesRep_id):
 def get_customers_admin(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT (C.ID), C.FirstName, C.LastName
+    cursor.execute('''SELECT DISTINCT (C.ID), C.FirstName, C.LastName, C.isRembd
                     FROM Commission_Receipt.Customer C
-                    JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID
+                    JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
                     WHERE C.isRetail = 0 AND (Amount-PaidAmount) > 0 AND D.StoreID = %s
                    ''', (store_id))
     sellers = cursor.fetchall()
@@ -150,15 +151,15 @@ def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''  SELECT DISTINCT T.CountCustomers, T.Balance, M.Code AS Currency
-                    FROM (
-                        SELECT D.CurrencyID, 
-                            COUNT(DISTINCT D.CustomerID) AS CountCustomers,
-                            SUM(D.Amount - D.PaidAmount) AS Balance
-                        FROM Commission_Receipt.DebtAccount D
-                        WHERE (D.Amount - D.PaidAmount) > 0 AND D.StoreID = %s AND D.SalesRepID = %s
-                        GROUP BY D.CurrencyID
-                    ) AS T
-                    JOIN Main.Currency M ON T.CurrencyID = M.ID;''', (store_id, salesRep_id))
+                        FROM (
+                            SELECT D.CurrencyID,
+                                COUNT(DISTINCT CONCAT(CAST(D.CustomerID AS NVARCHAR), CAST(D.isRembd AS NVARCHAR))) AS CountCustomers,
+                                SUM(D.Amount - D.PaidAmount) AS Balance
+                            FROM Commission_Receipt.DebtAccount D
+                            WHERE (D.Amount - D.PaidAmount) > 0 AND D.StoreID = %s AND D.SalesRepID = %s
+                            GROUP BY D.CurrencyID
+                        ) AS T
+                        JOIN Main.Currency M ON T.CurrencyID = M.ID;''', (store_id, salesRep_id))
     sellers = list(cursor.fetchone())
     formattedSum = "{:,.2f}".format(sellers[1]).replace(".", "X").replace(",", ".").replace("X", ",")
     sellers[1] = formattedSum
@@ -171,7 +172,7 @@ def get_count_customers_with_accountsReceivable_admin(store_id):
     cursor.execute('''SELECT DISTINCT T.CountCustomers, T.Balance, M.Code AS Currency
                     FROM (
                         SELECT D.CurrencyID, 
-                            COUNT(DISTINCT D.CustomerID) AS CountCustomers,
+                            COUNT(DISTINCT CONCAT(CAST(D.CustomerID AS NVARCHAR), CAST(D.isRembd AS NVARCHAR))) AS CountCustomers,
                             SUM(D.Amount - D.PaidAmount) AS Balance
                         FROM Commission_Receipt.DebtAccount D
                         WHERE (D.Amount - D.PaidAmount) > 0 AND D.StoreID = %s
@@ -188,12 +189,13 @@ def get_customers_with_unvalidated_receipts(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-            SELECT DISTINCT (C.ID), C.FirstName, C.LastName
+            SELECT DISTINCT C.ID, C.FirstName, C.LastName, C.isRembd
             FROM Commission_Receipt.Customer C
-            JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID
+            JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
             JOIN Commission_Receipt.DebtPaymentRelation P ON D.AccountID = P.DebtAccountID
             JOIN Commission_Receipt.PaymentReceipt R ON P.PaymentReceiptID = R.ReceiptID
             WHERE  C.isRetail = 0 AND R.IsReviewed = 0 AND D.StoreID = %s
+			ORDER BY C.ID, C.isRembd
             ''', (store_id,))
     customers = cursor.fetchall()
     conn.close()
@@ -203,9 +205,9 @@ def get_count_customers_with_unvalidated_receipts(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT COUNT(DISTINCT C.ID) AS CustomerCount
+        SELECT COUNT(DISTINCT CONCAT(CAST(C.ID AS NVARCHAR), CAST(C.isRembd AS NVARCHAR))) AS CustomerCount
         FROM Commission_Receipt.Customer C
-        JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID
+        JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
         JOIN Commission_Receipt.DebtPaymentRelation P ON D.AccountID = P.DebtAccountID
         JOIN Commission_Receipt.PaymentReceipt R ON P.PaymentReceiptID = R.ReceiptID
         WHERE C.isRetail = 0 AND R.IsReviewed = 0 AND D.StoreID = %s
@@ -249,28 +251,30 @@ def get_commissionsRules():
     conn.close()
     return rules
 
-def get_invoices_by_customer(customer_id, store_id, salesRep_id):
+
+def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.PaidAmount, C.Description, D.DocumentType
                    FROM Commission_Receipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = %s AND StoreID = %s AND D.Amount-D.PaidAmount > 0 AND D.SalesRepID = %s
+                   WHERE CustomerID = %s AND isRembd = %s AND StoreID = %s
+						AND D.Amount-D.PaidAmount > 0 AND D.SalesRepID = %s
                    ORDER BY D.N_CTA''',
-                   (customer_id, store_id, salesRep_id))
+                   (customer_id, customer_isRembd, store_id, salesRep_id))
     invoices = cursor.fetchall()    
     conn.close()
     return invoices
 
-def get_invoices_by_customer_admin(customer_id, store_id):
+def get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.PaidAmount, C.Description, D.DocumentType
                    FROM Commission_Receipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = %s AND StoreID = %s AND D.Amount-D.PaidAmount > 0
+                   WHERE CustomerID = %s AND isRembd = %s AND StoreID = %s AND D.Amount-D.PaidAmount > 0
                    ORDER BY D.N_CTA''',
-                   (customer_id, store_id))
+                   (customer_id, customer_isRembd, store_id))
     invoices = cursor.fetchall()    
     conn.close()
     return invoices
@@ -282,7 +286,7 @@ def get_receiptsStoreCustomer(account_ids):
     cursor.execute('''SELECT TOP (1) S.ID, S.Name, C.ID, C.FirstName, C.LastName, Y.Description, Y.ID
                    FROM Commission_Receipt.DebtAccount D
                    JOIN Main.Store S ON D.StoreID = S.ID
-                   JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID
+                   JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd
                    JOIN Main.Currency Y ON D.CurrencyID = Y.ID
                    WHERE AccountID IN %s''',
                    (account_ids_tuple,))
@@ -311,15 +315,15 @@ def get_commissions():
     conn.close()
     return commissions
 
-def get_unvalidated_receipts_by_customer(customer_id):
+def get_unvalidated_receipts_by_customer(customer_id, customer_isRembd):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT(R.ReceiptID), R.Amount, R.CommissionAmount, R.IsReviewed, R.FilePath
         FROM Commission_Receipt.PaymentReceipt R
         JOIN Commission_Receipt.DebtPaymentRelation P ON R.ReceiptID = P.PaymentReceiptID
         JOIN Commission_Receipt.DebtAccount D ON P.DebtAccountID = D.AccountID
-        WHERE R.IsReviewed = 0 AND D.CustomerID = %s
-        ''', (customer_id,))
+        WHERE R.IsReviewed = 0 AND D.CustomerID = %s AND D.isRembd = %s
+        ''', (customer_id, customer_isRembd))
     receipts = cursor.fetchall()
     conn.close()
     return receipts
