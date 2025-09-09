@@ -289,6 +289,7 @@
         const formData = new FormData(document.getElementById('pdfForm'));
         const store_id = "{{ store[0] }}";
         const customer_id = "{{ customer[0] }}";
+        const customer_isRembd = "{{ customer[3] }}";
         const pagination = "{{ pagination }}";
         const receipt_id = "{{ receipts[ pagination - 1 ][0] }} ";
         const salesRep_NameEmail = "{{ salesRep_NameEmail }}";
@@ -296,6 +297,7 @@
         const salesRep_email = "{{ salesRep_NameEmail[2]}}";
         formData.append('store_id', store_id);
         formData.append('customer_id', customer_id);
+        formData.append('customer_isRembd', customer_isRembd);
         formData.append('pagination', pagination);
         formData.append('receipt_id', receipt_id);
         formData.append('salesRep_fullname', salesRep_fullname);

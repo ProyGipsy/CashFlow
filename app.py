@@ -331,7 +331,7 @@ def operations():
         msg.html = html_content
 
         try:
-            mail.send(msg)
+            #mail.send(msg)
             print("Correo enviado exitosamente.")
         except Exception as e:
             print(f"Error al enviar correo: {e}")
@@ -725,7 +725,7 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
 
     msg.html = body
 
-    mail.send(msg)
+    #mail.send(msg)
 
     return jsonify({'success': True})
 
@@ -770,7 +770,7 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
 
     msg.html = body
 
-    mail.send(msg)
+    #mail.send(msg)
 
     return jsonify({'success': True})
 
@@ -864,7 +864,7 @@ def send_rejectionEmail():
     """
     msg.html = html_body
 
-    mail.send(msg)
+    #mail.send(msg)
 
     return jsonify({'success': True})
 
@@ -875,6 +875,7 @@ def send_validationEmail():
     # Datos iniciales para la interfaz
     store_id = request.form.get('store_id', '')
     customer_id = request.form.get('customer_id', '')
+    customer_isRembd = request.form.get('customer_isRembd', '')
     pagination = int(request.form.get('pagination', ''))
     receipt_id = int(request.form.get('receipt_id', ''))
     salesRep_NameEmail = request.form.get('salesRep_NameEmail', '')
@@ -882,9 +883,9 @@ def send_validationEmail():
     salesRep_email = request.form.get('salesRep_email', '')
 
     receipts_per_page = 1
-    receipts = get_unvalidated_receipts_by_customer(customer_id)
+    receipts = get_unvalidated_receipts_by_customer(customer_id, customer_isRembd)
     store = get_receiptStore_by_id(store_id)
-    customer = get_customer_by_id(customer_id)
+    customer = get_customer_by_id(customer_id, customer_isRembd)
     store_name = store[1] if store else ''
     customer_name = f"{customer[1]} {customer[2]}" if customer else ''
     total_receipts = len(receipts)
@@ -1069,7 +1070,7 @@ def send_validationEmail():
 
     # Envío del correo
     try:
-        mail.send(msg)
+        #mail.send(msg)
         return jsonify({'success': True})
     except Exception as e:
         print(f"Error enviando correo: {e}")
