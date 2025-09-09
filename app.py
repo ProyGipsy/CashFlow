@@ -331,7 +331,7 @@ def operations():
         msg.html = html_content
 
         try:
-            #mail.send(msg)
+            mail.send(msg)
             print("Correo enviado exitosamente.")
         except Exception as e:
             print(f"Error al enviar correo: {e}")
@@ -725,7 +725,7 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
 
     msg.html = body
 
-    #mail.send(msg)
+    mail.send(msg)
 
     return jsonify({'success': True})
 
@@ -770,7 +770,7 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
 
     msg.html = body
 
-    #mail.send(msg)
+    mail.send(msg)
 
     return jsonify({'success': True})
 
@@ -864,7 +864,7 @@ def send_rejectionEmail():
     """
     msg.html = html_body
 
-    #mail.send(msg)
+    mail.send(msg)
 
     return jsonify({'success': True})
 
@@ -1070,7 +1070,7 @@ def send_validationEmail():
 
     # Envío del correo
     try:
-        #mail.send(msg)
+        mail.send(msg)
         return jsonify({'success': True})
     except Exception as e:
         print(f"Error enviando correo: {e}")
