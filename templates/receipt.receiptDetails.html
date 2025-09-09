@@ -160,13 +160,13 @@
     <br><br>
     <div class="pagination" style="text-align: right;">
         {% if pagination > 1 %}
-            <a href="{{ url_for('receiptDetails', customer_id=customer_id, store_id=store_id, pagination=pagination - 1) }}" class="add-button">Anterior</a>
+            <a href="{{ url_for('receiptDetails', customer_id=customer_id, customer_isRembd=customer[3], store_id=store_id, pagination=pagination - 1) }}" class="add-button">Anterior</a>
         {% else %}
             <span class="disabled-button">Anterior</span>
         {% endif %}
         <span>Página {{ pagination }} de {{ (total_receipts // receipts_per_page) + (1 if total_receipts % receipts_per_page > 0 else 0) }}</span>
         {% if pagination < (total_receipts // receipts_per_page) + (1 if total_receipts % receipts_per_page > 0 else 0) %}
-            <a href="{{ url_for('receiptDetails', customer_id=customer_id, store_id=store_id, pagination=pagination + 1) }}" class="add-button">Siguiente</a>
+            <a href="{{ url_for('receiptDetails', customer_id=customer_id, customer_isRembd=customer[3], store_id=store_id, pagination=pagination + 1) }}" class="add-button">Siguiente</a>
         {% else %}
             <span class="disabled-button">Siguiente</span>
         {% endif %}
