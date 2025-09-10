@@ -54,43 +54,43 @@
 
         <div class="grid {{ grid_class }}">
             {% if 2 in session['permissions'] %}
-            <a href="https://app.powerbi.com/groups/920fcaa2-7242-4819-802f-0c793802870f/reports/e5266c55-0d2f-48d0-9d09-c1bfb4e92d63/b9ba0fbdf11f183f2609?experience=power-bi&chromeless=1" class="card">
+            <a target="_blank" href="https://app.powerbi.com/groups/920fcaa2-7242-4819-802f-0c793802870f/reports/e5266c55-0d2f-48d0-9d09-c1bfb4e92d63/b9ba0fbdf11f183f2609?experience=power-bi&chromeless=1" class="card">
                 <img src="{{ url_for('static', filename='IMG/barras.png') }}" alt="Reportes de Ingresos y Egresos" class="card-img">
                 <h3>1. Reportes Flujo de Caja</h3>
             </a>
             {% endif %}
             {% if 3 in session['permissions'] %}
-            <a href="https://app.powerbi.com/groups/920fcaa2-7242-4819-802f-0c793802870f/reports/76a10860-8ae8-4102-9444-346c85e7a88a/ea10fb55520ad1df2cf2?experience=power-bi&chromeless=1" class="card">
+            <a target="_blank" href="https://app.powerbi.com/groups/920fcaa2-7242-4819-802f-0c793802870f/reports/76a10860-8ae8-4102-9444-346c85e7a88a/ea10fb55520ad1df2cf2?experience=power-bi&chromeless=1" class="card">
                 <img src="{{ url_for('static', filename='IMG/contabilidad.png') }}" alt="Gráficos de Flujo de Caja" class="card-img">
                 <h3>2. Gráficos de Flujo de Caja</h3>
             </a>
             {% endif %}
             {% if 4 in session['permissions'] %}
-            <a href="https://app.powerbi.com/groups/me/reports/7f29be1f-9ca8-4781-aeec-8d7f290831de/97d75c5dd5d963c0ec18?ctid=e28fcd45-30d5-4919-b266-27bca9760759&chromeless=1&experience=power-bi&bookmarkGuid=45e32c76-802c-4f69-a93d-3fd174ee345f" class="card">
+            <a target="_blank" href="https://app.powerbi.com/groups/me/reports/7f29be1f-9ca8-4781-aeec-8d7f290831de/97d75c5dd5d963c0ec18?ctid=e28fcd45-30d5-4919-b266-27bca9760759&chromeless=1&experience=power-bi&bookmarkGuid=45e32c76-802c-4f69-a93d-3fd174ee345f" class="card">
                 <img src="{{ url_for('static', filename='IMG/impuestos.png') }}" alt="Gráficos de Flujo de Caja" class="card-img">
                 <h3>3. Resumen <br> de IVA</h3>
             </a>
             {% endif %}
             {% if 5 in session['permissions'] %}
-            <a href="https://app.powerbi.com/groups/920fcaa2-7242-4819-802f-0c793802870f/reports/55660ebe-73f8-4ec2-9368-f257e5a1eb0f/f5c65ff20e653a73d65e?experience=power-bi&chromeless=1" class="card">
+            <a target="_blank" href="https://app.powerbi.com/groups/920fcaa2-7242-4819-802f-0c793802870f/reports/55660ebe-73f8-4ec2-9368-f257e5a1eb0f/f5c65ff20e653a73d65e?experience=power-bi&chromeless=1" class="card">
                 <img src="{{ url_for('static', filename='IMG/saldar.png') }}" alt="Reportes de Saldos de Cuentas" class="card-img">
                 <h3>4. Saldos de Cuentas</h3>
             </a>
             {% endif %}
             {% if 6 in session['permissions'] %}
-            <a href="https://app.powerbi.com/groups/me/reports/ed426e0b-b944-4e92-b7ef-4fa60ccfb45a/55efc92a71b9cc82d80a?ctid=e28fcd45-30d5-4919-b266-27bca9760759&chromeless=1&experience=power-bi" class="card">
+            <a target="_blank" href="https://app.powerbi.com/groups/me/reports/2edf6a46-ed10-41d7-bad0-30b62ae41af9/55efc92a71b9cc82d80a?ctid=e28fcd45-30d5-4919-b266-27bca9760759&experience=power-bi&chromeless=1" class="card">
                 <img src="{{ url_for('static', filename='IMG/comision.png') }}" alt="Reportes de Comisiones de Vendedores" class="card-img">
                 <h3>5. Comisiones de Vendedores</h3>
             </a>
             {% endif %}
             {% if 7 in session['permissions'] %}
-            <a href="https://app.powerbi.com/groups/me/reports/8abea94e-e65a-4a91-82f4-22cdb80714a8/6c909a1291bed90d75c3?ctid=e28fcd45-30d5-4919-b266-27bca9760759&experience=power-bi&chromeless=1" class="card">
+            <a target="_blank" href="https://app.powerbi.com/groups/me/reports/8abea94e-e65a-4a91-82f4-22cdb80714a8/6c909a1291bed90d75c3?ctid=e28fcd45-30d5-4919-b266-27bca9760759&experience=power-bi&chromeless=1" class="card">
                 <img src="{{ url_for('static', filename='IMG/ventas.png') }}" alt="Reportes de Ventas" class="card-img">
                 <h3>6. Ventas</h3>
             </a>
             {% endif %}
             {% if 8 in session['permissions'] %}
-            <a href="" class="card disabled">
+            <a target="_blank" href="" class="card disabled">
                 <img src="{{ url_for('static', filename='IMG/warranty.png') }}" alt="Reportes de Garantías" class="card-img">
                 <h3>7. Garantías</h3>
                 <span>Próximamente</span>
