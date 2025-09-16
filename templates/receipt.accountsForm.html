@@ -59,12 +59,12 @@
     <br> 
     <div id="formas-de-pago"> 
         <h3>Formas de Pago</h3> 
-        <span>
+        <span class="hidden-discount" aria-hidden="true">
             <b>Descuento a aplicar (%):</b>
             <input id="general_discount" type="number" name="discount" step="0.01" class="input-field small-input" value="0.00"  onchange="applyDiscount()">
         </span>
         <div class="inline-label">
-            <label for="total_balance">Total a pagar después del descuento:</label>
+            <label for="total_balance">Total a pagar:</label>
             {{ receiptStoreCustomer[5] }}
             <span id="total_balance" class="small-input">
                 {{ "{:,.2f}".format(receiptDetails | sum(attribute=1)).replace(".", "X").replace(",", ".").replace("X", ",") }}

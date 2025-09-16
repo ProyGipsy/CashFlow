@@ -348,3 +348,9 @@ input[type="submit"]:hover {
     border: 1px solid #ff0000 !important;
     box-shadow: 0 0 3px rgba(255, 0, 0, 0.5);
 }
+
+/* Deshabilitando el Descuento, pero manteniéndolo en el DOM */
+.hidden-discount,
+.hidden-discount-input {
+    display: none !important;
+}
