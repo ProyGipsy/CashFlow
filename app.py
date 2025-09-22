@@ -316,17 +316,17 @@ def operations():
         subject = f'Operación {operation_id}: {"Ingreso" if motion_type == "1" else "Egreso"} Agregado'
 
         app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')   
+        app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW')
+        app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW')
         if store_id == '4':
-            app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW_REMBD')
-            app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW_REMBD')
-        else: 
-            app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_CASHFLOW')
-            app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_CASHFLOW')
+            recipient_cashflow = os.environ.get('MAIL_RECIPIENT_CASHFLOW_REMBD')
+        else:
+            recipient_cashflow = os.environ.get('MAIL_RECIPIENT_CASHFLOW_GIPSYCORP')
         mail = Mail(app)
 
         msg = Message(subject=subject,
                     sender=app.config['MAIL_USERNAME'],
-                    recipients=[app.config['MAIL_USERNAME']])
+                    recipients=[recipient_cashflow])
         
         msg.html = html_content
 
