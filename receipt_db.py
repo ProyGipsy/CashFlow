@@ -219,7 +219,7 @@ def get_count_customers_with_unvalidated_receipts(store_id):
 def get_currency():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT DISTINCT(ID), Code, OficialExchangeRate FROM Main.Currency WHERE ID != 0 AND isRetail = 0')
+    cursor.execute('SELECT DISTINCT(ID), Code, OficialExchangeRate FROM Main.Currency WHERE ID != 0 AND isRetail = 0 AND ID IN (1, 2)')
     currencies = cursor.fetchall()
     conn.close()
     return currencies
