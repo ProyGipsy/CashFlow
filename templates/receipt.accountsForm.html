@@ -156,7 +156,6 @@
     <br><br>
     <div class="inline-label">
         <label for="commission_note">Comisión Total:</label>
-        {{ receiptStoreCustomer[5] }}
         <span id="commission_note" class="small-input">0,00</span> 
     </div>
 
@@ -508,6 +507,14 @@
         const generalDiscount = parseFloat(document.getElementById('general_discount').value) || 0;
         const paymentRows = document.querySelectorAll('.payment-row');
         const receiptCurrency = "{{ receiptStoreCustomer[6] }}";
+        // Cargar lista de monedas desde template
+        const currenciesList = JSON.parse('{{ currencies | tojson | safe }}');
+        const exchangeRate = parseFloat("{{ currencies[0][2] }}");
+        function getCurrencyCodeById(id){
+            if (!currenciesList) return id;
+            const found = currenciesList.find(c => String(c[0]) == String(id));
+            return found ? (found[1] || found[0]) : id;
+        }
         // Preparar datos de pagos
         // Agregar paymentRowIdx para rastrear el índice de la forma de pago
         const paymentData = Array.from(paymentRows).map((row, idx) => {
@@ -520,7 +527,11 @@
                 convertedAmount = convertAmount(receiptCurrency, entryAmount);
             }
             return {
+                // amount: usado para asignación en moneda del recibo (convertido si aplica)
                 amount: parseFloat(convertedAmount) || 0,
+                // originalAmount: monto tal como fue ingresado en la fila (en su moneda)
+                originalAmount: parseFloat(entryAmount) || 0,
+                currencyId: currencySelect.value,
                 date: row.querySelector('input[name="date_operation"]').value,
                 dateObj: row.querySelector('input[name="date_operation"]').value ? new Date(row.querySelector('input[name="date_operation"]').value) : null,
                 isRetention: paymentMethodText.toUpperCase().includes('RETENCIONES'),
@@ -591,8 +602,8 @@
                 invoiceIndex++;
             }
         }
-        // Actualizar la interfaz y calcular comisión por factura
-        let totalCommission = 0;
+        // Actualizar la interfaz y calcular comisión por factura, ahora por moneda
+        let totalCommissionPerCurrency = {}; // { 'Bs': 150.00, 'USD': 50.00 }
         const businessRules = JSON.parse('{{ commissions | tojson | safe }}');
         receiptData.forEach((invoice, idx) => {
             // Mostrar saldo pendiente
@@ -604,16 +615,21 @@
             const tooltipText = 'Si la factura fue pagada con varias formas de pago, aquí se mostrarán los días transcurridos de cada pago, separados por "/".';
             daysPassedFields[idx].textContent = daysElapsedList.length > 0 ? daysElapsedList.join(" / ") : "0";
             daysPassedFields[idx].setAttribute('title', tooltipText);
-        
-            // Calcular comisión
-            let commission = 0;
+
+            // Calcular comisión por moneda para esta factura
+            let commissionPerCurrency = {}; // currencyCode -> amount
+            let commissionId = null;
+
             invoice.payments.forEach(payment => {
                 let paymentRowIdx = payment.paymentRowIdx;
-                let commissionAmount = 0;
                 let commissionApplied = false;
 
+                // determinar moneda y código
+                const payCurrencyId = paymentData[paymentRowIdx]?.currencyId || receiptCurrency;
+                const payCurrencyCode = getCurrencyCodeById(payCurrencyId);
+
                 if (paymentData[paymentRowIdx]?.isRetention) {
-                    commissionAmount = 0;
+                    // Retenciones no generan comisión
                 } else {
                     for (let i=0; i<businessRules.length; i++){
                         const comm = businessRules[i];
@@ -623,33 +639,61 @@
                                 ? payment.daysElapsed >= comm[2]
                                 : payment.daysElapsed <= comm[2];
 
-                            if (conditionMet) {
-                                if (comm[3] == 1) {
-                                    let amountForCommission = payment.amount;
-                                    if (amountForCommission < 0) amountForCommission = 0;
-                                    // Commisión = (Base Imponible - Descuentos) * reglaNegocio 
-                                    // Base Imponible = MontoPagado / 1.16
-                                    // Los descuentos ya se restan del monto total, debido a que en los cálculos se muestra el
-                                    // importe adeudado actualizado y con base en eso se toma el monto pagado de esa factura.
-                                    // OJO: Las N/E no tienen IVA, por tanto no se divide entre 1.16
-                                    if (invoice.docType === 'FAC') {
-                                        commissionAmount = amountForCommission / 1.16 * (comm[1] / 100);
-                                    } else if (invoice.docType === 'N/E') {
-                                        commissionAmount = amountForCommission * (comm[1] / 100);
+                            if (conditionMet && comm[3] == 1) {
+                                // amountApplied is payment.amount (en moneda del recibo)
+                                let amountAppliedInReceiptCurrency = payment.amount;
+                                // Convertir a moneda de pago si corresponde
+                                let amountForCommissionInPayCurrency = amountAppliedInReceiptCurrency;
+                                if (String(payCurrencyId) !== String(receiptCurrency)){
+                                    // Invertir la conversión usada en convertAmount
+                                    if (String(receiptCurrency) === '1'){
+                                        // converted = original * rate  => original = converted / rate
+                                        amountForCommissionInPayCurrency = amountAppliedInReceiptCurrency / (exchangeRate || 1);
+                                    } else if (String(receiptCurrency) === '2'){
+                                        // converted = original / rate => original = converted * rate
+                                        amountForCommissionInPayCurrency = amountAppliedInReceiptCurrency * (exchangeRate || 1);
                                     }
-                                    commissionId = comm[0];
-                                    commissionApplied = true;
                                 }
+
+                                if (amountForCommissionInPayCurrency < 0) amountForCommissionInPayCurrency = 0;
+                                let commissionAmountForPayment = 0;
+                                if (invoice.docType === 'FAC') {
+                                    commissionAmountForPayment = (amountForCommissionInPayCurrency / 1.16) * (comm[1] / 100);
+                                } else if (invoice.docType === 'N/E') {
+                                    commissionAmountForPayment = amountForCommissionInPayCurrency * (comm[1] / 100);
+                                }
+
+                                commissionPerCurrency[payCurrencyCode] = (commissionPerCurrency[payCurrencyCode] || 0) + commissionAmountForPayment;
+                                commissionApplied = true;
+                                commissionId = comm[0];
                             }
                         }
                     }
                 }
-                commission += commissionAmount;
+
+                console.log(`Comisión por moneda para la factura ${invoice.docType} N_CTA ${document.querySelectorAll('.heading-table tr')[idx + 1]?.children[0].textContent.trim()}:`, commissionPerCurrency);
             });
-            commissionFields[idx].textContent = formatSpanishNumber(commission);
-            totalCommission += commission;
+
+            // Formatear y mostrar comisiones por moneda para esta factura
+            const formattedCommissionEntries = Object.keys(commissionPerCurrency).map(code => `${code} ${formatSpanishNumber(commissionPerCurrency[code])}`);
+            commissionFields[idx].textContent = formattedCommissionEntries.length > 0 ? formattedCommissionEntries.join(' / ') : formatSpanishNumber(0);
+            // Guardar detalle en el elemento para que sendReceipt lo pueda leer
+            invoice.element.dataset.commissionPerCurrency = JSON.stringify(commissionPerCurrency);
+            invoice.element.dataset.commissionDisplay = commissionFields[idx].textContent;
+
+            // Acumular en total por moneda
+            Object.keys(commissionPerCurrency).forEach(code => {
+                totalCommissionPerCurrency[code] = (totalCommissionPerCurrency[code] || 0) + commissionPerCurrency[code];
+            });
         });
-        document.getElementById('commission_note').textContent = formatSpanishNumber(totalCommission);
+
+        // Mostrar comisión total por moneda en la nota
+        const totalCommissionDisplayEntries = Object.keys(totalCommissionPerCurrency).map(code => `${code} ${formatSpanishNumber(totalCommissionPerCurrency[code])}`);
+        const commissionNoteEl = document.getElementById('commission_note');
+        commissionNoteEl.textContent = totalCommissionDisplayEntries.length > 0 ? totalCommissionDisplayEntries.join(' / ') : formatSpanishNumber(0);
+        commissionNoteEl.dataset.commissionPerCurrency = JSON.stringify(totalCommissionPerCurrency);
+
+        console.log("Comisión total por moneda:", totalCommissionPerCurrency);
     }
     
 
@@ -854,14 +898,17 @@
         // Datos para SalesRepCommission
         const commissionData = [];
         document.querySelectorAll('#commission_received').forEach((comm, idx) => {
+            // leer detalle por moneda almacenado en el elemento de factura
+            const balanceCalcEls = document.querySelectorAll('#balance_calculation');
+            const commissionPerCurrencyRaw = balanceCalcEls[idx].dataset.commissionPerCurrency ? JSON.parse(balanceCalcEls[idx].dataset.commissionPerCurrency) : {};
             commissionData.push({
                 account_id: accountInputs[idx].value,
                 balance_amount: cleanNumberForServer(document.querySelectorAll('#balance_calculation')[idx].textContent),
                 days_passed: parseInt(document.querySelectorAll('#days_passed')[idx].textContent),
-                commission_amount: cleanNumberForServer(comm.textContent)
+                commission_display: comm.textContent,
+                commission_per_currency: commissionPerCurrencyRaw
             });
         });
-        formData.append('commission_data', JSON.stringify(commissionData));
 
         // --- Construcción y envío de paymentInvoiceDetails ---
         // Obtener receiptData y paymentData igual que en distributeBalanceAcrossReceipts
@@ -995,7 +1042,12 @@
                 });
             });
         });
-        formData.append('payment_invoice_details', JSON.stringify(paymentInvoiceDetails));
+    formData.append('payment_invoice_details', JSON.stringify(paymentInvoiceDetails));
+
+    // Añadir comisión total por moneda calculada en interfaz
+    const commissionNoteEl = document.getElementById('commission_note');
+    const commissionTotalPerCurrency = commissionNoteEl.dataset.commissionPerCurrency ? JSON.parse(commissionNoteEl.dataset.commissionPerCurrency) : {};
+    formData.append('commission_total_per_currency', JSON.stringify(commissionTotalPerCurrency));
 
         // Adición de Comprobantes de Pago
         const proofOfPayments = document.querySelector('input[type="file"][name="proof_of_payment[]"]');

@@ -135,6 +135,22 @@
     margin-left: 5px;
 }
 
+/* Estilo para la Comisión Total en una línea  */
+
+.inline-label {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+#commission_note {
+    white-space: nowrap;
+}
+
+/**/
+
 .small-input {
     width: 100px;
     display: inline-block;
