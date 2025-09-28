@@ -576,12 +576,15 @@ def submit_receipt():
     try:
         # Obtención de datos del formulario
         balance_note = float(request.form['balance_note'])
-        commission_note = float(request.form['commission_note'])
+        commission_total_per_currency_json = request.form.get('commission_total_per_currency', '{}')
+        commission_total_per_currency = json.loads(commission_total_per_currency_json)
+        comision_bs = commission_total_per_currency.get('Bs', 0)
+        comision_usd = commission_total_per_currency.get('USD', 0)
 
         # Inserción de Recibo en BD
-        receipt_id = set_paymentReceipt(cursor, balance_note, commission_note)
+        receipt_id = set_paymentReceipt(cursor, balance_note, comision_bs, comision_usd) # NUEVO, CAMBIO EN COMISIÓN
 
-        # Obtenención de datos de comisiones por factura
+        # Obtención de datos de comisiones por factura
         commission_data = json.loads(request.form.get('commission_data', '[]'))
 
         payment_entries = request.form.getlist('payment_entries[]')
@@ -624,8 +627,10 @@ def submit_receipt():
             days_elapsed = detail['daysElapsed']
             commission_id = detail['commissionId']
             commission_amount = detail['commissionAmount']
-            set_paymentEntryCommission(cursor, receipt_id, paymentReceiptEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, commission_amount)
-
+            commission_per_currency = detail['commission_per_currency']
+            bs_commission = commission_per_currency.get('Bs', 0) if commission_per_currency else 0
+            usd_commission = commission_per_currency.get('USD', 0) if commission_per_currency else 0
+            set_paymentEntryCommission(cursor, receipt_id, paymentReceiptEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, bs_commission, usd_commission) # CAMBIO EN COMISIÓN
 
         # Actualización de Monto Abonado
         original_amounts = request.form.getlist('original_amount[]')
@@ -645,8 +650,10 @@ def submit_receipt():
             commission_info = next((item for item in commission_data if item['account_id'] == account_id), None)
             balance_amount = float(commission_info['balance_amount'])
             days_passed = int(commission_info['days_passed'])
-            commission_amount = float(commission_info['commission_amount'])
-            set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id)
+            commission_per_currency = commission_info['commission_per_currency']
+            bs_commission = commission_per_currency.get('Bs', 0) if commission_per_currency else 0
+            usd_commission = commission_per_currency.get('USD', 0) if commission_per_currency else 0
+            set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission)
 
             # Actualización de factura
             new_amount_paid = float(original_amounts[index]) - balance_amount
@@ -669,8 +676,8 @@ def submit_receipt():
         store_name = request.form.get('store_name', '')
         customer_name = request.form.get('customer_name', '')
         currency = request.form.get('currency', '')
-        send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency, ncta_str)
-        send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency, ncta_str)
+        #send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency, ncta_str)
+        #send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency, ncta_str)
         
 
         return redirect(url_for('accountsReceivable'))

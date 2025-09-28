@@ -318,7 +318,7 @@ def get_commissions():
 def get_unvalidated_receipts_by_customer(customer_id, customer_isRembd):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(R.ReceiptID), R.Amount, R.CommissionAmount, R.IsReviewed, R.FilePath
+    cursor.execute('''SELECT DISTINCT(R.ReceiptID), R.Amount, R.CommissionAmount_Bs, R.CommissionAmount_USD, R.IsReviewed
         FROM Commission_Receipt.PaymentReceipt R
         JOIN Commission_Receipt.DebtPaymentRelation P ON R.ReceiptID = P.PaymentReceiptID
         JOIN Commission_Receipt.DebtAccount D ON P.DebtAccountID = D.AccountID
@@ -370,12 +370,12 @@ def get_salesRep_isRetail(account_id):
 def get_SalesRepCommission(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT D.N_CTA, C.AmountOwed, STRING_AGG(CAST(P.DaysElapsed AS NVARCHAR(MAX)), ' / ') AS DaysElapsed, C.CommissionAmount, P.DebtAccountID
+    cursor.execute('''SELECT D.N_CTA, C.AmountOwed, STRING_AGG(CAST(P.DaysElapsed AS NVARCHAR(MAX)), ' / ') AS DaysElapsed, C.CommissionAmount_Bs, C.CommissionAmount_USD, P.DebtAccountID
                     FROM Commission_Receipt.SalesRepCommission C
                     JOIN Commission_Receipt.DebtAccount D ON C.AccountID = D.AccountID
 					JOIN Commission_Receipt.PaymentEntryCommission P ON C.AccountID = P.DebtAccountID AND C.ReceiptID = P.ReceiptID
                     WHERE C.ReceiptID = %s
-					GROUP BY D.N_CTA, C.AmountOwed, C.CommissionAmount, P.DebtAccountID
+					GROUP BY D.N_CTA, C.AmountOwed, C.CommissionAmount_Bs, C.CommissionAmount_USD, P.DebtAccountID
                     ''', (receipt_id,))
     salesRepComm = cursor.fetchall()
     conn.close()
@@ -530,12 +530,12 @@ def set_commissionsRules(rules):
     conn.close()
 
 
-def set_paymentReceipt(cursor, total_receipt_amount, commission_note):
+def set_paymentReceipt(cursor, total_receipt_amount, commission_bs, commission_usd):
     cursor.execute('''
                    INSERT INTO Commission_Receipt.PaymentReceipt
-                   (Amount, CommissionAmount, IsReviewed, FilePath, isRetail, IsApproved)
-                   VALUES (%s, %s, %s, %s, %s, %s)
-                   ''', (total_receipt_amount, commission_note, 0, '', 0, 0))
+                   (Amount, IsReviewed, FilePath, isRetail, IsApproved, CommissionAmount_Bs, CommissionAmount_USD)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                   ''', (total_receipt_amount, 0, '', 0, 0, commission_bs, commission_usd))
 
     #Obtención del ReceiptID generado
     cursor.execute("SELECT SCOPE_IDENTITY()")
@@ -559,12 +559,12 @@ def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, referen
     return paymentEntry_id
     
 
-def set_paymentEntryCommission(cursor, receipt_id, paymentEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, commission_amount):
+def set_paymentEntryCommission(cursor, receipt_id, paymentEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, bs_commission, usd_commission):
     cursor.execute('''
         INSERT INTO Commission_Receipt.PaymentEntryCommission
-        (ReceiptID, PaymentReceiptEntryID, DebtAccountID, PaymentDate, Amount, DaysElapsed, CommissionID, CommissionAmount)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (receipt_id, paymentEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, commission_amount))
+        (ReceiptID, PaymentReceiptEntryID, DebtAccountID, PaymentDate, Amount, DaysElapsed, CommissionID, CommissionAmount_Bs, CommissionAmount_USD)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (receipt_id, paymentEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, bs_commission, usd_commission))
 
 
 """
@@ -637,12 +637,12 @@ def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount):
                     ''', (account_id, int(receipt_id), 0, invoice_paidAmount))
 
 
-def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id):
+def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission):
     cursor.execute('''
                     INSERT INTO Commission_Receipt.SalesRepCommission
-                    (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CommissionAmount, CreatedAt, ReceiptID)
-                    VALUES (%s, %s, %s, %s, %s, %s, GETDATE(), %s)
-                    ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, commission_amount, receipt_id))
+                    (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CreatedAt, ReceiptID, CommissionAmount_Bs, CommissionAmount_USD)
+                    VALUES (%s, %s, %s, %s, %s, GETDATE(), %s, %s, %s)
+                    ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission))
     
 
 def set_isReviewedReceipt(receipt_id):

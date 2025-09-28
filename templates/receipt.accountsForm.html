@@ -602,8 +602,8 @@
                 invoiceIndex++;
             }
         }
-        // Actualizar la interfaz y calcular comisión por factura, ahora por moneda
-        let totalCommissionPerCurrency = {}; // { 'Bs': 150.00, 'USD': 50.00 }
+        // Actualización de la interfaz y cálculo de comisión por factura y ahora por moneda
+        let totalCommissionPerCurrency = {}; // Ejemplo: { 'Bs': 150.00, 'USD': 50.00 }
         const businessRules = JSON.parse('{{ commissions | tojson | safe }}');
         receiptData.forEach((invoice, idx) => {
             // Mostrar saldo pendiente
@@ -671,7 +671,7 @@
                     }
                 }
 
-                console.log(`Comisión por moneda para la factura ${invoice.docType} N_CTA ${document.querySelectorAll('.heading-table tr')[idx + 1]?.children[0].textContent.trim()}:`, commissionPerCurrency);
+                //console.log(`Comisión por moneda para la factura ${invoice.docType} N_CTA ${document.querySelectorAll('.heading-table tr')[idx + 1]?.children[0].textContent.trim()}:`, commissionPerCurrency);
             });
 
             // Formatear y mostrar comisiones por moneda para esta factura
@@ -693,7 +693,7 @@
         commissionNoteEl.textContent = totalCommissionDisplayEntries.length > 0 ? totalCommissionDisplayEntries.join(' / ') : formatSpanishNumber(0);
         commissionNoteEl.dataset.commissionPerCurrency = JSON.stringify(totalCommissionPerCurrency);
 
-        console.log("Comisión total por moneda:", totalCommissionPerCurrency);
+        //console.log("Comisión total por moneda:", totalCommissionPerCurrency);
     }
     
 
@@ -867,7 +867,7 @@
 
         // Saldo Nota y Comisión Total
         formData.append('balance_note', cleanNumberForServer(document.getElementById('balance_note').textContent));
-        formData.append('commission_note', cleanNumberForServer(document.getElementById('commission_note').textContent));
+        //formData.append('commission_note', cleanNumberForServer(document.getElementById('commission_note').textContent));
 
         // Datos para PaymentReceiptEntry
         const paymentRows = document.querySelectorAll('.payment-row');
@@ -905,10 +905,10 @@
                 account_id: accountInputs[idx].value,
                 balance_amount: cleanNumberForServer(document.querySelectorAll('#balance_calculation')[idx].textContent),
                 days_passed: parseInt(document.querySelectorAll('#days_passed')[idx].textContent),
-                commission_display: comm.textContent,
                 commission_per_currency: commissionPerCurrencyRaw
             });
         });
+        formData.append('commission_data', JSON.stringify(commissionData));
 
         // --- Construcción y envío de paymentInvoiceDetails ---
         // Obtener receiptData y paymentData igual que en distributeBalanceAcrossReceipts
@@ -916,6 +916,15 @@
         const generalDiscount = parseFloat(document.getElementById('general_discount').value) || 0;
         const paymentRowsSend = document.querySelectorAll('.payment-row');
         const receiptCurrency = "{{ receiptStoreCustomer[6] }}";
+        // Cargar lista de monedas para poder identificar códigos y tasa
+        const currenciesList = JSON.parse('{{ currencies | tojson | safe }}');
+        const exchangeRate = parseFloat("{{ currencies[0][2] }}");
+        function getCurrencyCodeById(id){
+            if (!currenciesList) return id;
+            const found = currenciesList.find(c => String(c[0]) == String(id));
+            return found ? (found[1] || found[0]) : id;
+        }
+
         const paymentData = Array.from(paymentRowsSend).map((row, idx) => {
             const currencySelect = row.querySelector('select[name="currency"]');
             let entryAmount = row.querySelector('input[name="payment_amount"]').value;
@@ -927,6 +936,10 @@
             }
             return {
                 amount: parseFloat(convertedAmount) || 0,
+                // originalAmount: monto tal como fue ingresado en la fila (en su moneda)
+                originalAmount: parseFloat(entryAmount) || 0,
+                // currencyId: id de la moneda en la fila
+                currencyId: currencySelect.value,
                 date: row.querySelector('input[name="date_operation"]').value,
                 dateObj: row.querySelector('input[name="date_operation"]').value ? new Date(row.querySelector('input[name="date_operation"]').value) : null,
                 isRetention: paymentMethodText.toUpperCase().includes('RETENCIONES'),
@@ -1030,15 +1043,92 @@
                     }
                 }
 
+                // Cálculo de la comisión aplicada para esta entrada de pago por moneda
+                let commissionPerCurrency = {}; // { 'Bs': 150.00, 'USD': 50.00 }
+                let commissionIdForThisPayment = null;
+
+                if (paymentData[paymentRowIdx]?.isRetention) {
+                    // Las Retenciones no generan comisión
+                    commissionPerCurrency = {};
+                } else {
+                    // Determinación de la moneda y código de la forma de pago
+                    const payCurrencyId = paymentData[paymentRowIdx]?.currencyId || receiptCurrency;
+                    const payCurrencyCode = getCurrencyCodeById(payCurrencyId);
+
+                    // Necesitamos la cantidad correspondiente en la moneda de la forma de pago.
+                    // Si la forma de pago tiene moneda distinta, calculamos la porción proporcional
+                    // del monto original de la forma de pago que corresponde al 'payment.amount' aplicado.
+                    let amountForCommissionInPaymentCurrency = payment.amount; // default (cuando misma moneda)
+                    if (String(payCurrencyId) !== String(receiptCurrency)) {
+                        const originalTotalConverted = convertAmount(receiptCurrency, paymentData[paymentRowIdx].originalAmount);
+                        if (originalTotalConverted > 0) {
+                            const proportion = payment.amount / originalTotalConverted;
+                            amountForCommissionInPaymentCurrency = paymentData[paymentRowIdx].originalAmount * proportion;
+                        } else {
+                            // fallback: invertir usando exchangeRate
+                            amountForCommissionInPaymentCurrency = payment.amount / (exchangeRate || 1);
+                        }
+                    }
+
+                    // Aplicar las reglas de negocio para hallar la comisión sobre amountForCommissionInPaymentCurrency
+                    for (let i=0; i<businessRules.length; i++){
+                        const comm = businessRules[i];
+                        if (!commissionIdForThisPayment) {
+                            const isLastRule = (i === businessRules.length - 1);
+                            const conditionMet = isLastRule ? payment.daysElapsed >= comm[2] : payment.daysElapsed <= comm[2];
+                            if (conditionMet && comm[3] == 1) {
+                                let amountBase = amountForCommissionInPaymentCurrency;
+                                if (amountBase < 0) amountBase = 0;
+                                let commissionCalc = 0;
+                                if (invoice.docType === 'FAC') {
+                                    commissionCalc = amountBase / 1.16 * (comm[1] / 100);
+                                } else if (invoice.docType === 'N/E') {
+                                    commissionCalc = amountBase * (comm[1] / 100);
+                                }
+                                commissionPerCurrency[payCurrencyCode] = (commissionPerCurrency[payCurrencyCode] || 0) + parseFloat(commissionCalc.toFixed(2));
+                                commissionIdForThisPayment = comm[0];
+                            }
+                        }
+                    }
+                }
+
+                // Cálculo de representación en Bs y USD del monto aplicado de esta entrada
+                const payCurrencyIdForLog = paymentData[paymentRowIdx]?.currencyId || receiptCurrency;
+                const payCurrencyCodeForLog = getCurrencyCodeById(payCurrencyIdForLog);
+                // amountAppliedInPaymentCurrency corresponde a la base usada para la comisión
+                let amountAppliedInPaymentCurrency = payment.amount;
+                if (String(payCurrencyIdForLog) !== String(receiptCurrency)) {
+                    const originalTotalConverted = convertAmount(receiptCurrency, paymentData[paymentRowIdx].originalAmount);
+                    if (originalTotalConverted > 0) {
+                        const proportion = payment.amount / originalTotalConverted;
+                        amountAppliedInPaymentCurrency = paymentData[paymentRowIdx].originalAmount * proportion;
+                    } else {
+                        amountAppliedInPaymentCurrency = payment.amount / (exchangeRate || 1);
+                    }
+                }
+                // Derivar Bs y USD asumiendo exchangeRate = Bs por 1 USD
+                let bsApplied = 0;
+                let usdApplied = 0;
+                if ((String(payCurrencyCodeForLog).toUpperCase().indexOf('USD')) !== -1) {
+                    usdApplied = amountAppliedInPaymentCurrency;
+                    //bsApplied = amountAppliedInPaymentCurrency * (exchangeRate || 1);
+                } else {
+                    // asumimos la otra moneda es Bs
+                    bsApplied = amountAppliedInPaymentCurrency;
+                    //usdApplied = (exchangeRate && exchangeRate > 0) ? amountAppliedInPaymentCurrency / exchangeRate : 0;
+                }
+                //console.log(`Aplicado a factura ${debtAccountId} por entrada de pago ${paymentRowIdx}: Bs ${formatSpanishNumber(bsApplied)} / USD ${formatSpanishNumber(usdApplied)}`);
+
                 paymentInvoiceDetails.push({
                     paymentReceiptEntryIdx: paymentRowIdx,
                     tenderId: tenderId,
                     debtAccountId: debtAccountId,
                     paymentDate: payment.paymentDate,
-                    amount: payment.amount,
+                    amount: bsApplied !== 0 ? bsApplied : usdApplied,
                     daysElapsed: payment.daysElapsed,
-                    commissionId: commissionId,
-                    commissionAmount: commissionAmount
+                    commissionId: commissionIdForThisPayment,
+                    commissionAmount: null, // mantener compatibilidad (se puede calcular en backend si es necesario)
+                    commission_per_currency: commissionPerCurrency
                 });
             });
         });

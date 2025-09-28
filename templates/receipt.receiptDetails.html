@@ -103,14 +103,33 @@
                 <td>{{ repComm[0] }}</td>
                 <td>{{ invoices[0][6] }} {{ "{:,.2f}".format(repComm[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
                 <td>{{ repComm[2] }}</td>
-                <td>{{ invoices[0][6] }} {{ "{:,.2f}".format(repComm[3]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
+                <td>
+                    {% if repComm[3] != 0 %}
+                        Bs {{ "{:,.2f}".format(repComm[3]).replace(".", "X").replace(",", ".").replace("X", ",") }}
+                    {% endif %}
+                    {% if repComm[3] != 0 and repComm[4] != 0 %}
+                     / 
+                    {% endif %}
+                    {% if repComm[4] != 0 %}
+                        USD {{ "{:,.2f}".format(repComm[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}
+                    {% endif %}
+                </td>
             </tr> 
             {% endfor %}
         </table>
         <div class="inline-label">
             <label for="total_comm">Comisión Total:</label>
-            {{ invoices[0][6] }}
-            <span id="total_comm" class="small-input">{{ "{:,.2f}".format(receipts[pagination-1][2]).replace(".", "X").replace(",", ".").replace("X", ",") }}</span>  
+            <span id="total_comm" class="small-input">
+                {% if receipts[pagination-1][2] != 0 %}
+                    Bs {{ "{:,.2f}".format(receipts[pagination-1][2]).replace(".", "X").replace(",", ".").replace("X", ",") }}
+                {% endif %}
+                {% if receipts[pagination-1][2] != 0 and receipts[pagination-1][3] != 0 %}
+                    / 
+                {% endif %}
+                {% if receipts[pagination-1][3] != 0 %}
+                    USD {{ "{:,.2f}".format(receipts[pagination-1][3]).replace(".", "X").replace(",", ".").replace("X", ",") }}
+                {% endif %}
+            </span>  
         </div> 
     
         {% if not is_pdf %}
