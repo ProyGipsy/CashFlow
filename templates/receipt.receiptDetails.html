@@ -108,7 +108,7 @@
                         Bs {{ "{:,.2f}".format(repComm[3]).replace(".", "X").replace(",", ".").replace("X", ",") }}
                     {% endif %}
                     {% if repComm[3] != 0 and repComm[4] != 0 %}
-                     / 
+                     y 
                     {% endif %}
                     {% if repComm[4] != 0 %}
                         USD {{ "{:,.2f}".format(repComm[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}
@@ -124,7 +124,7 @@
                     Bs {{ "{:,.2f}".format(receipts[pagination-1][2]).replace(".", "X").replace(",", ".").replace("X", ",") }}
                 {% endif %}
                 {% if receipts[pagination-1][2] != 0 and receipts[pagination-1][3] != 0 %}
-                    / 
+                    y 
                 {% endif %}
                 {% if receipts[pagination-1][3] != 0 %}
                     USD {{ "{:,.2f}".format(receipts[pagination-1][3]).replace(".", "X").replace(",", ".").replace("X", ",") }}

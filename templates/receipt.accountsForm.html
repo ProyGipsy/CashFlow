@@ -676,7 +676,7 @@
 
             // Formatear y mostrar comisiones por moneda para esta factura
             const formattedCommissionEntries = Object.keys(commissionPerCurrency).map(code => `${code} ${formatSpanishNumber(commissionPerCurrency[code])}`);
-            commissionFields[idx].textContent = formattedCommissionEntries.length > 0 ? formattedCommissionEntries.join(' / ') : formatSpanishNumber(0);
+            commissionFields[idx].textContent = formattedCommissionEntries.length > 0 ? formattedCommissionEntries.join(' y ') : formatSpanishNumber(0);
             // Guardar detalle en el elemento para que sendReceipt lo pueda leer
             invoice.element.dataset.commissionPerCurrency = JSON.stringify(commissionPerCurrency);
             invoice.element.dataset.commissionDisplay = commissionFields[idx].textContent;
@@ -690,7 +690,7 @@
         // Mostrar comisión total por moneda en la nota
         const totalCommissionDisplayEntries = Object.keys(totalCommissionPerCurrency).map(code => `${code} ${formatSpanishNumber(totalCommissionPerCurrency[code])}`);
         const commissionNoteEl = document.getElementById('commission_note');
-        commissionNoteEl.textContent = totalCommissionDisplayEntries.length > 0 ? totalCommissionDisplayEntries.join(' / ') : formatSpanishNumber(0);
+        commissionNoteEl.textContent = totalCommissionDisplayEntries.length > 0 ? totalCommissionDisplayEntries.join(' y ') : formatSpanishNumber(0);
         commissionNoteEl.dataset.commissionPerCurrency = JSON.stringify(totalCommissionPerCurrency);
 
         //console.log("Comisión total por moneda:", totalCommissionPerCurrency);
