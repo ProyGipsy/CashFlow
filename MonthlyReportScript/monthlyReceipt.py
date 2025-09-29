@@ -680,11 +680,38 @@ def create_summary_html(grouped_data, store_type):
             </thead>
             <tbody>
     """
-    for salesrep_id, salesrep_data in grouped_data.items():
+    # Ordenando Vendedor por ID
+    def _sort_key(item):
+        key = item[0]
+        try:
+            return int(key)
+        except Exception:
+            try:
+                return int(str(key))
+            except Exception:
+                return str(key)
+
+    for salesrep_id, salesrep_data in sorted(grouped_data.items(), key=_sort_key):
         receipts = ", ".join(str(r_id) for r_id in salesrep_data['receipts'].keys())
+        # Mostrar totales separados por Bs y USD (usar 0.00 si no existen)
         total_commissions = ""
-        for currency, total in salesrep_data['total_monthly_commissions'].items():
-            total_commissions += f"{currency} {format_currency(total)}<br>"
+        tm = salesrep_data.get('total_monthly_commissions', {}) if isinstance(salesrep_data, dict) else {}
+        bs_total = None
+        usd_total = None
+        if isinstance(tm, dict):
+            bs_total = tm.get('Bs')
+            usd_total = tm.get('USD')
+
+        try:
+            bs_total_val = bs_total if bs_total is not None else Decimal('0.00')
+        except Exception:
+            bs_total_val = Decimal('0.00')
+        try:
+            usd_total_val = usd_total if usd_total is not None else Decimal('0.00')
+        except Exception:
+            usd_total_val = Decimal('0.00')
+
+        total_commissions = f"Bs {format_currency(bs_total_val)} y USD {format_currency(usd_total_val)}<br>"
         
         html_summary += f"""
                 <tr>
