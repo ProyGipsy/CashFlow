@@ -61,7 +61,7 @@ body::after {
 } */
 .grid {
     display: grid;
-    grid-template-columns: repeat(3, 250px);
+    grid-template-columns: repeat(4, 250px);
     gap: 20px;
     justify-content: center;
     max-width: 1000px;
@@ -69,11 +69,17 @@ body::after {
     padding: 0 20px;
     margin: 0 auto;
 }
-.center-single-card {
-    grid-column: 2;
+.grid-one-card {
+    grid-template-columns: repeat(1, 250px);
 }
-.two-column-grid {
+.grid-two-cards {
     grid-template-columns: repeat(2, 250px);
+}
+.grid-three-cards {
+    grid-template-columns: repeat(3, 250px);
+}
+.grid-four-cards {
+    grid-template-columns: repeat(4, 250px);
 }
 
 .card {
@@ -90,6 +96,7 @@ body::after {
     align-items: center;
     justify-content: center;
     width: 200px;
+    height: 200px;
 }
 
 .card:hover{

@@ -15,6 +15,7 @@ from flask import (Flask, redirect, render_template, request, send_from_director
 from flask_session import Session
 from flask_mail import Mail, Message
 from reports import reports_bp
+from documents import documents_bp
 
 
 from cashflow_db import (get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts,
@@ -39,6 +40,7 @@ from onedrive import get_onedrive_headers
 
 app = Flask(__name__)
 app.register_blueprint(reports_bp)
+app.register_blueprint(documents_bp)
 
 # Configuración de sesión para usuarios
 app.config["SESSION_PERMANENT"] = False

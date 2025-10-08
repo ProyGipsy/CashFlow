@@ -26,6 +26,20 @@
         {% if 2 in session['modules'] %}
             {% set num_cards = num_cards + 1 %}
         {% endif %}
+        {% if 3 in session['modules'] %}
+            {% set num_cards = num_cards + 1 %}
+        {% endif %}
+
+        {% set grid_class = '' %}
+        {% if num_cards == 1 %}
+            {% set grid_class = 'grid-one-card' %}
+        {% elif num_cards == 2 %}
+            {% set grid_class = 'grid-two-cards' %}
+        {% elif num_cards == 3 %}
+            {% set grid_class = 'grid-three-cards' %}
+        {% elif num_cards == 4 %}
+            {% set grid_class = 'grid-four-cards' %}
+        {% endif %}
 
         <div class="grid {% if num_cards == 2 %}two-column-grid{% endif %}">
             {% if 1 in session['modules'] %}
@@ -47,6 +61,12 @@
                 <h3>Visualización de Reportes</h3>
             </a>
             {% endif %}
+            <!--{% if 2 in session['modules'] %}-->
+            <a href="{{ url_for('documents.serve_react_app') }}" class="card {% if num_cards == 1 %}center-single-card{% endif %}">
+                <img src="{{ url_for('static', filename='IMG/document.png') }}" alt="Documentos" class="card-img">
+                <h3>Gestión de Documentos</h3>
+            </a>
+            <!--{% endif %}-->
             <!--
             <a href="{{ url_for('welcome') }}" class="card disabled">
                 <img src="{{ url_for('static', filename='IMG/padlock.png') }}" alt="Gestión de Credenciales" class="card-img">
