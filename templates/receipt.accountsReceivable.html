@@ -239,7 +239,7 @@
             let selectedCurrencies = new Set();
             for (const accountID of selectedAccountIDs) {
                 const invoice = document.querySelector(`.invoice-checkbox[data-account-id="${accountID}"]`).closest("tr");
-                const currency = invoice.querySelector("td:nth-child(2)").textContent.trim();
+                const currency = invoice.querySelector("td:nth-child(3)").textContent.trim();
                 selectedCurrencies.add(currency);
                 if (selectedCurrencies.size > 1) {
                     alert("Las facturas seleccionadas tienen diferentes monedas. Seleccione facturas de una misma moneda para registrar la cobranza.");
