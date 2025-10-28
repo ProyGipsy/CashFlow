@@ -656,11 +656,12 @@ def submit_receipt():
             set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission)
 
             # Actualización de factura
-            new_amount_paid = float(original_amounts[index]) - balance_amount
-            set_invoicePaidAmount(cursor, account_id, new_amount_paid)
-
-            # Relación factura-recibo
             invoice_paidAmount = float(invoice_paid_amounts[index])
+            # Anteriormente se realizaba el cálculo en Python
+            #new_amount_paid = float(original_amounts[index]) - balance_amount
+            # Ahora se realiza en el mismo query para evitar inconsistencias
+            set_invoicePaidAmount(cursor, account_id, invoice_paidAmount)
+            # Relación factura-recibo
             set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount)
 
         # Confirmación la transacción
@@ -676,8 +677,8 @@ def submit_receipt():
         store_name = request.form.get('store_name', '')
         customer_name = request.form.get('customer_name', '')
         currency = request.form.get('currency', '')
-        send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency, ncta_str)
-        send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency, ncta_str)
+        send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
+        send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
         
 
         return redirect(url_for('accountsReceivable'))
@@ -691,7 +692,21 @@ def submit_receipt():
         cursor.close()
         conn.close()
 
-def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_amount, currency, ncta_str):
+def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_bs, commission_usd, currency, ncta_str):
+
+    # Formateo del monto de comisión según la moneda
+    if commission_bs > 0 and commission_usd > 0:
+        # Caso 1: Ambos montos son mayores a 0
+        commission_text = f"Bs {commission_bs:.2f} y USD {commission_usd:.2f}"
+    elif commission_bs > 0:
+        # Caso 2: Solo hay monto en Bs
+        commission_text = f"Bs {commission_bs:.2f}"
+    elif commission_usd > 0:
+        # Caso 3: Solo hay monto en USD
+        commission_text = f"USD {commission_usd:.2f}"
+    else:
+        # Caso 4: Ninguno de los dos tiene monto (>0)
+        commission_text = "0.00"
 
     subject = f"Recibo {receipt_id}: Se ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
     app_url = os.environ.get('APP_URL')
@@ -722,7 +737,7 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
                 <li><strong>Cliente:</strong> {customer_name}</li>
                 <li><strong>N_CTA Factura(s):</strong> {ncta_str}</li>
                 <li><strong>Monto Total:</strong> {currency} {total_receipt_amount}</li>
-                <li><strong>Comisión a Recibir:</strong> {currency} {commission_amount}</li>
+                <li><strong>Comisión a Recibir:</strong> {commission_text}</li>
             </ul>
                 
             <p>Por favor ingrese a la <a href="{app_url}">aplicación web de GIPSY</a> de <strong>"Registro de Cobranza al Mayor"</strong> y diríjase a la sección de <strong>"Recibos de Cobranza"</strong> para revisar y validar la cobranza registrada.</p>
@@ -736,7 +751,21 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
 
     return jsonify({'success': True})
 
-def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_amount, currency, ncta_str):
+def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_bs, commission_usd, currency, ncta_str):
+
+    # Formateo del monto de comisión según la moneda
+    if commission_bs > 0 and commission_usd > 0:
+        # Caso 1: Ambos montos son mayores a 0
+        commission_text = f"Bs {commission_bs:.2f} y USD {commission_usd:.2f}"
+    elif commission_bs > 0:
+        # Caso 2: Solo hay monto en Bs
+        commission_text = f"Bs {commission_bs:.2f}"
+    elif commission_usd > 0:
+        # Caso 3: Solo hay monto en USD
+        commission_text = f"USD {commission_usd:.2f}"
+    else:
+        # Caso 4: Ninguno de los dos tiene monto (>0)
+        commission_text = "0.00"
 
     subject = f"Recibo {receipt_id}: Usted ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
     app_url = os.environ.get('APP_URL')
@@ -768,7 +797,7 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
                 <li><strong>Cliente:</strong> {customer_name}</li>
                 <li><strong>N_CTA Factura(s):</strong> {ncta_str}</li>
                 <li><strong>Monto Total:</strong> {currency} {total_receipt_amount}</li>
-                <li><strong>Comisión a Recibir:</strong> {currency} {commission_amount}</li>
+                <li><strong>Comisión a Recibir:</strong> {commission_text}</li>
             </ul>
             <p>El equipo administrativo la revisará y validará en breve. Una vez confirmada, recibirá una notificación adicional.</p>
         </body>

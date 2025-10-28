@@ -554,7 +554,6 @@ def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, referen
     #Obtención del PaymentReceiptID generado
     cursor.execute("SELECT SCOPE_IDENTITY()")
     paymentEntry_id = cursor.fetchone()[0]
-    print(f"Payment Entry ID: {paymentEntry_id}")
 
     return paymentEntry_id
     
@@ -610,12 +609,20 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
     return saved_file_paths
 
 
-def set_invoicePaidAmount(cursor, account_id, new_paidAmount):
+def set_invoicePaidAmount(cursor, account_id, amount_to_add):
     cursor.execute('''
                    UPDATE Commission_Receipt.DebtAccount
-                   SET PaidAmount = %s
+                   SET PaidAmount = PaidAmount + %s
                    WHERE AccountID = %s
-                   ''', (new_paidAmount, account_id))
+                   ''', (amount_to_add, account_id))
+    
+# Query anterior (tomando cálculo de Python)
+# def set_invoicePaidAmount(cursor, account_id, new_paidAmount):
+#     cursor.execute('''
+#                    UPDATE Commission_Receipt.DebtAccount
+#                    SET PaidAmount = %s
+#                    WHERE AccountID = %s
+#                    ''', (new_paidAmount, account_id))
     
 def revert_invoicePaidAmount(account_id, new_paidAmount):
     conn = get_db_connection()

@@ -1184,16 +1184,18 @@
                 document.getElementById('loadingModal').style.display = 'none';
                 document.getElementById('finalModal').style.display = 'block';
             } else {
-                alert("Error al enviar los datos.");
+                alert("Error al enviar los datos. Espere un momento.");
                 saveButton.disabled = false;
                 document.getElementById('loadingModal').style.display = 'none';
+                window.location.href = "/accountsReceivable";
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert("Error al enviar los datos.");
+            alert("Error al enviar los datos. Espere un momento.");
             saveButton.disabled = false;
             document.getElementById('loadingModal').style.display = 'none';
+            window.location.href = "/accountsReceivable";
         });
     }
 
