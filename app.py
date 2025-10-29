@@ -32,7 +32,9 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
     get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount, get_customers_admin,
     get_count_customers_with_accountsReceivable_admin, get_receiptStores_DebtAccount_admin, get_invoices_by_customer_admin, 
-    set_paymentEntryCommission, get_SalesRepCommission_OLD)
+    set_paymentEntryCommission, get_SalesRepCommission_OLD, check_already_paid_invoices, check_duplicate_receipt)
+    
+
 
 from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepNameAndEmail)
 
@@ -576,6 +578,18 @@ def submit_receipt():
     cursor = conn.cursor()
 
     try:
+        # Obtener TODOS los account_ids de las facturas (no solo los de payment_entries)
+        all_account_ids = json.loads(request.form.get('all_account_ids', '[]'))
+
+        # Verificación de facturas
+        already_paid_invoices = check_already_paid_invoices(cursor, all_account_ids)
+        if already_paid_invoices:
+            print("Algunas facturas ya han sido pagadas:", already_paid_invoices)
+            return jsonify({
+                'error': 'Algunas facturas ya han sido pagadas. No se pueden registrar cobranzas duplicadas.',
+                'paid_invoices': already_paid_invoices
+            }), 400
+
         # Obtención de datos del formulario
         balance_note = float(request.form['balance_note'])
         commission_total_per_currency_json = request.form.get('commission_total_per_currency', '{}')
@@ -583,21 +597,28 @@ def submit_receipt():
         comision_bs = commission_total_per_currency.get('Bs', 0)
         comision_usd = commission_total_per_currency.get('USD', 0)
 
-        # Inserción de Recibo en BD
-        receipt_id = set_paymentReceipt(cursor, balance_note, comision_bs, comision_usd) # NUEVO, CAMBIO EN COMISIÓN
-
-        # Obtención de datos de comisiones por factura
+        # Leer datos necesarios para validación de duplicados (antes de insertar)
         commission_data = json.loads(request.form.get('commission_data', '[]'))
-
-        payment_entries = request.form.getlist('payment_entries[]')
-        payment_entries = [json.loads(entry) for entry in payment_entries] 
+        payment_entries_raw = request.form.getlist('payment_entries[]')
+        payment_entries = [json.loads(entry) for entry in payment_entries_raw]
         proof_of_payments = request.files.getlist('proof_of_payment[]')
-
-        # Obtener TODOS los account_ids de las facturas (no solo los de payment_entries)
-        all_account_ids = json.loads(request.form.get('all_account_ids', '[]'))
 
         # Obtención de los detalles de las formas de pago (relacionando facturas)
         payment_invoice_details = json.loads(request.form.get('payment_invoice_details', '[]'))
+        original_amounts = request.form.getlist('original_amount[]')
+        invoice_paid_amounts = request.form.getlist('invoice_paid_amounts[]')
+
+        # Verificación de duplicados: mismas facturas + mismos montos + mismas entradas de pago (monto, fecha, referencia)
+        duplicate_receipt_id = check_duplicate_receipt(cursor, all_account_ids, invoice_paid_amounts, payment_entries)
+        if duplicate_receipt_id:
+            print(f"Recibo duplicado detectado: {duplicate_receipt_id}")
+            return jsonify({
+                'error': 'Recibo duplicado: ya existe un recibo con las mismas facturas, montos y entradas de pago.',
+                'duplicate_receipt_id': duplicate_receipt_id
+            }), 409
+
+        # Inserción de Recibo en BD
+        receipt_id = set_paymentReceipt(cursor, balance_note, comision_bs, comision_usd) # NUEVO, CAMBIO EN COMISIÓN
 
         # Procesar cada forma de pago
         payment_entry_ids = []
@@ -658,11 +679,12 @@ def submit_receipt():
             set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission)
 
             # Actualización de factura
-            new_amount_paid = float(original_amounts[index]) - balance_amount
-            set_invoicePaidAmount(cursor, account_id, new_amount_paid)
-
-            # Relación factura-recibo
             invoice_paidAmount = float(invoice_paid_amounts[index])
+            # Anteriormente se realizaba el cálculo en Python
+            #new_amount_paid = float(original_amounts[index]) - balance_amount
+            # Ahora se realiza en el mismo query para evitar inconsistencias
+            set_invoicePaidAmount(cursor, account_id, invoice_paidAmount)
+            # Relación factura-recibo
             set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount)
 
         # Confirmación la transacción
@@ -678,8 +700,8 @@ def submit_receipt():
         store_name = request.form.get('store_name', '')
         customer_name = request.form.get('customer_name', '')
         currency = request.form.get('currency', '')
-        send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency, ncta_str)
-        send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, commission_note, currency, ncta_str)
+        send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
+        send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
         
 
         return redirect(url_for('accountsReceivable'))
@@ -693,7 +715,21 @@ def submit_receipt():
         cursor.close()
         conn.close()
 
-def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_amount, currency, ncta_str):
+def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_bs, commission_usd, currency, ncta_str):
+
+    # Formateo del monto de comisión según la moneda
+    if commission_bs > 0 and commission_usd > 0:
+        # Caso 1: Ambos montos son mayores a 0
+        commission_text = f"Bs {commission_bs:.2f} y USD {commission_usd:.2f}"
+    elif commission_bs > 0:
+        # Caso 2: Solo hay monto en Bs
+        commission_text = f"Bs {commission_bs:.2f}"
+    elif commission_usd > 0:
+        # Caso 3: Solo hay monto en USD
+        commission_text = f"USD {commission_usd:.2f}"
+    else:
+        # Caso 4: Ninguno de los dos tiene monto (>0)
+        commission_text = "0.00"
 
     subject = f"Recibo {receipt_id}: Se ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
     app_url = os.environ.get('APP_URL')
@@ -724,7 +760,7 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
                 <li><strong>Cliente:</strong> {customer_name}</li>
                 <li><strong>N_CTA Factura(s):</strong> {ncta_str}</li>
                 <li><strong>Monto Total:</strong> {currency} {total_receipt_amount}</li>
-                <li><strong>Comisión a Recibir:</strong> {currency} {commission_amount}</li>
+                <li><strong>Comisión a Recibir:</strong> {commission_text}</li>
             </ul>
                 
             <p>Por favor ingrese a la <a href="{app_url}">aplicación web de GIPSY</a> de <strong>"Registro de Cobranza al Mayor"</strong> y diríjase a la sección de <strong>"Recibos de Cobranza"</strong> para revisar y validar la cobranza registrada.</p>
@@ -738,7 +774,21 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
 
     return jsonify({'success': True})
 
-def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_amount, currency, ncta_str):
+def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_bs, commission_usd, currency, ncta_str):
+
+    # Formateo del monto de comisión según la moneda
+    if commission_bs > 0 and commission_usd > 0:
+        # Caso 1: Ambos montos son mayores a 0
+        commission_text = f"Bs {commission_bs:.2f} y USD {commission_usd:.2f}"
+    elif commission_bs > 0:
+        # Caso 2: Solo hay monto en Bs
+        commission_text = f"Bs {commission_bs:.2f}"
+    elif commission_usd > 0:
+        # Caso 3: Solo hay monto en USD
+        commission_text = f"USD {commission_usd:.2f}"
+    else:
+        # Caso 4: Ninguno de los dos tiene monto (>0)
+        commission_text = "0.00"
 
     subject = f"Recibo {receipt_id}: Usted ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
     app_url = os.environ.get('APP_URL')
@@ -770,7 +820,7 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
                 <li><strong>Cliente:</strong> {customer_name}</li>
                 <li><strong>N_CTA Factura(s):</strong> {ncta_str}</li>
                 <li><strong>Monto Total:</strong> {currency} {total_receipt_amount}</li>
-                <li><strong>Comisión a Recibir:</strong> {currency} {commission_amount}</li>
+                <li><strong>Comisión a Recibir:</strong> {commission_text}</li>
             </ul>
             <p>El equipo administrativo la revisará y validará en breve. Una vez confirmada, recibirá una notificación adicional.</p>
         </body>

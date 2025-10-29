@@ -1179,21 +1179,40 @@
             method: 'POST',
             body: formData
         })
-        .then(response => {
+        .then(async response => {
             if (response.ok) {
                 document.getElementById('loadingModal').style.display = 'none';
                 document.getElementById('finalModal').style.display = 'block';
+                return;
             } else {
-                alert("Error al enviar los datos.");
+                let errorMessage = "Error al enviar los datos. Espere un momento.";
+                try {
+                    // parsear correctamente el body JSON devuelto por el servidor
+                    const errorData = await response.json();
+                    if (errorData && errorData.error) {
+                        errorMessage = errorData.error; // Mensaje específico desde submit_receipt
+                        // Si el backend devuelve facturas ya pagadas, las mostramos también
+                        if (errorData.paid_invoices && Array.isArray(errorData.paid_invoices) && errorData.paid_invoices.length > 0) {
+                            errorMessage;
+                        }
+                    }
+                } catch (e) {
+                    // No se pudo parsear JSON, mantener mensaje genérico
+                }
+
+                alert(errorMessage);
                 saveButton.disabled = false;
                 document.getElementById('loadingModal').style.display = 'none';
+                // Redirigir a cuentas por cobrar (comportamiento previo)
+                window.location.href = "{{ url_for('accountsReceivable') }}";
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert("Error al enviar los datos.");
+            alert("Error al enviar los datos. Espere un momento.");
             saveButton.disabled = false;
             document.getElementById('loadingModal').style.display = 'none';
+            window.location.href = "/accountsReceivable";
         });
     }
 
