@@ -31,7 +31,7 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
     get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount, get_customers_admin,
     get_count_customers_with_accountsReceivable_admin, get_receiptStores_DebtAccount_admin, get_invoices_by_customer_admin, 
-    set_paymentEntryCommission, get_SalesRepCommission_OLD)
+    set_paymentEntryCommission, get_SalesRepCommission_OLD, check_already_paid_invoices)
 
 from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepNameAndEmail)
 
@@ -574,6 +574,18 @@ def submit_receipt():
     cursor = conn.cursor()
 
     try:
+        # Obtener TODOS los account_ids de las facturas (no solo los de payment_entries)
+        all_account_ids = json.loads(request.form.get('all_account_ids', '[]'))
+
+        # Verificación de facturas
+        already_paid_invoices = check_already_paid_invoices(cursor, all_account_ids)
+        if already_paid_invoices:
+            print("Algunas facturas ya han sido pagadas:", already_paid_invoices)
+            return jsonify({
+                'error': 'Algunas facturas ya han sido pagadas. No se pueden registrar cobranzas duplicadas.',
+                'paid_invoices': already_paid_invoices
+            }), 400
+
         # Obtención de datos del formulario
         balance_note = float(request.form['balance_note'])
         commission_total_per_currency_json = request.form.get('commission_total_per_currency', '{}')
@@ -590,9 +602,6 @@ def submit_receipt():
         payment_entries = request.form.getlist('payment_entries[]')
         payment_entries = [json.loads(entry) for entry in payment_entries] 
         proof_of_payments = request.files.getlist('proof_of_payment[]')
-
-        # Obtener TODOS los account_ids de las facturas (no solo los de payment_entries)
-        all_account_ids = json.loads(request.form.get('all_account_ids', '[]'))
 
         # Obtención de los detalles de las formas de pago (relacionando facturas)
         payment_invoice_details = json.loads(request.form.get('payment_invoice_details', '[]'))

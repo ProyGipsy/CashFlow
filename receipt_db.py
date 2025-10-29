@@ -673,3 +673,21 @@ def set_isApprovedReceipt(receipt_id):
                    ''', (receipt_id))
     conn.commit()
     conn.close()
+
+
+# VERIFICACIONES
+
+def check_already_paid_invoices(cursor, account_ids):
+    """Verificación de si alguna factura ya se encuentra completamente pagada"""
+    if not account_ids:
+        return []
+    
+    placeholders = ','.join(['%s'] * len(account_ids))
+    query = f'''
+        SELECT da.AccountID, da.PaidAmount, da.Amount
+        FROM Commission_Receipt.DebtAccount da
+        WHERE da.AccountID IN ({placeholders})
+        AND da.PaidAmount >= da.Amount
+    '''
+    cursor.execute(query, account_ids)
+    return cursor.fetchall()
