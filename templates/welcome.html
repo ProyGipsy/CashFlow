@@ -66,7 +66,7 @@
             
             <div class="grid role-grid">
                 {% for role in roles_info %}
-                {% if role.name != 'Supervisor' %}
+                {% if role.name not in ['Supervisor', 'Gerente de Ventas'] %}
                 <div class="role-card card" onclick="selectRole({{ role.id }})">
                     <img src="{{ url_for('static', filename='IMG/' + ('admin2.png' if role.id == 1 else 'seller2.png')) }}" 
                         alt="{{ role.name }}" class="role-card-img">

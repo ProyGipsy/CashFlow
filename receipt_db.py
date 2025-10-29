@@ -691,3 +691,96 @@ def check_already_paid_invoices(cursor, account_ids):
     '''
     cursor.execute(query, account_ids)
     return cursor.fetchall()
+
+
+def find_candidate_receipts_by_amount_and_count(cursor, total_amount, relation_count):
+    """Buscar recibos cuyo monto total coincide y que tengan exactamente relation_count relaciones (número de facturas asociadas)."""
+    cursor.execute('''
+        SELECT R.ReceiptID
+        FROM Commission_Receipt.PaymentReceipt R
+        JOIN Commission_Receipt.DebtPaymentRelation P ON R.ReceiptID = P.PaymentReceiptID
+        WHERE R.Amount = %s
+        GROUP BY R.ReceiptID
+        HAVING COUNT(*) = %s
+    ''', (total_amount, relation_count))
+    rows = cursor.fetchall()
+    print("Candidate receipts query returned rows:", rows)
+    return [r[0] for r in rows]
+
+
+def check_duplicate_receipt(cursor, account_ids, invoice_paid_amounts, payment_entries):
+    """
+    Verifica si ya existe un recibo previamente guardado con:
+      - las mismas facturas (account_ids) y montos abonados por factura (invoice_paid_amounts)
+      - las mismas entradas de pago (payment_entries) en cuanto a monto, fecha y referencia
+
+    Parámetros:
+      account_ids: lista de account_id (str o int)
+      invoice_paid_amounts: lista de strings o números con los montos aplicados por factura (en el mismo orden que account_ids)
+      payment_entries: lista de objetos/dict con {date, amount, reference, payment_destination_id, tender_id}
+
+    Retorna ReceiptID encontrado o None.
+    """
+    print("Estoy en check_duplicate_receipt")
+
+    if not account_ids:
+        return None
+
+    try:
+        # Normalizar datos entrantes
+        # Mapping account_id -> paid amount (2 decimales)
+        target_map = {str(a): round(float(b), 2) for a, b in zip(account_ids, invoice_paid_amounts)}
+
+        # Normalizar payment entries: lista de tuplas (amount, date_iso, reference)
+        def norm_entry(e):
+            amt = round(float(e.get('amount', 0)), 2)
+            date = e.get('date') or ''
+            ref = (e.get('reference') or '').strip()
+            return (amt, date, ref)
+
+        target_payment_entries = [norm_entry(e) for e in payment_entries]
+
+        total_amount = round(sum(target_map.values()), 2)
+        relation_count = len(account_ids)
+
+        # Buscar candidatos por monto total y número de facturas
+        candidate_receipts = find_candidate_receipts_by_amount_and_count(cursor, total_amount, relation_count)
+        print(f"Candidate receipts found: {candidate_receipts}")
+
+        from collections import Counter
+
+        for rid in candidate_receipts:
+            # Obtener relaciones y comparar
+            rels = []
+            cursor.execute('''SELECT DebtAccountID, PaidAmount FROM Commission_Receipt.DebtPaymentRelation WHERE PaymentReceiptID = %s''', (rid,))
+            rel_rows = cursor.fetchall()
+            rel_map = {str(r[0]): round(float(r[1]), 2) for r in rel_rows}
+
+            if set(rel_map.keys()) != set([str(x) for x in account_ids]):
+                continue
+
+            # Comparar montos por factura
+            matches_accounts = all(rel_map[str(a)] == target_map[str(a)] for a in account_ids)
+            if not matches_accounts:
+                continue
+
+            # Obtener payment entries del recibo y normalizar (amount, date, reference)
+            db_payment_entries = []
+            cursor.execute('''SELECT E.Amount, CONVERT(VARCHAR(10), E.PaymentDate, 23) AS PaymentDateISO, E.Reference
+                              FROM Commission_Receipt.PaymentReceiptEntry E
+                              WHERE E.ReceiptID = %s''', (rid,))
+            pe_rows = cursor.fetchall()
+            for p in pe_rows:
+                amt = round(float(p[0]), 2)
+                date_iso = p[1] or ''
+                ref = (p[2] or '').strip()
+                db_payment_entries.append((amt, date_iso, ref))
+
+            # Comparar multiconjuntos (no requerimos mismo orden)
+            if Counter(db_payment_entries) == Counter(target_payment_entries):
+                # Encontrado duplicado exacto
+                return rid
+
+        return None
+    except Exception:
+        return None

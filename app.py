@@ -31,7 +31,9 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
     get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount, get_customers_admin,
     get_count_customers_with_accountsReceivable_admin, get_receiptStores_DebtAccount_admin, get_invoices_by_customer_admin, 
-    set_paymentEntryCommission, get_SalesRepCommission_OLD, check_already_paid_invoices)
+    set_paymentEntryCommission, get_SalesRepCommission_OLD, check_already_paid_invoices, check_duplicate_receipt)
+    
+
 
 from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepNameAndEmail)
 
@@ -593,18 +595,28 @@ def submit_receipt():
         comision_bs = commission_total_per_currency.get('Bs', 0)
         comision_usd = commission_total_per_currency.get('USD', 0)
 
-        # Inserción de Recibo en BD
-        receipt_id = set_paymentReceipt(cursor, balance_note, comision_bs, comision_usd) # NUEVO, CAMBIO EN COMISIÓN
-
-        # Obtención de datos de comisiones por factura
+        # Leer datos necesarios para validación de duplicados (antes de insertar)
         commission_data = json.loads(request.form.get('commission_data', '[]'))
-
-        payment_entries = request.form.getlist('payment_entries[]')
-        payment_entries = [json.loads(entry) for entry in payment_entries] 
+        payment_entries_raw = request.form.getlist('payment_entries[]')
+        payment_entries = [json.loads(entry) for entry in payment_entries_raw]
         proof_of_payments = request.files.getlist('proof_of_payment[]')
 
         # Obtención de los detalles de las formas de pago (relacionando facturas)
         payment_invoice_details = json.loads(request.form.get('payment_invoice_details', '[]'))
+        original_amounts = request.form.getlist('original_amount[]')
+        invoice_paid_amounts = request.form.getlist('invoice_paid_amounts[]')
+
+        # Verificación de duplicados: mismas facturas + mismos montos + mismas entradas de pago (monto, fecha, referencia)
+        duplicate_receipt_id = check_duplicate_receipt(cursor, all_account_ids, invoice_paid_amounts, payment_entries)
+        if duplicate_receipt_id:
+            print(f"Recibo duplicado detectado: {duplicate_receipt_id}")
+            return jsonify({
+                'error': 'Recibo duplicado: ya existe un recibo con las mismas facturas, montos y entradas de pago.',
+                'duplicate_receipt_id': duplicate_receipt_id
+            }), 409
+
+        # Inserción de Recibo en BD
+        receipt_id = set_paymentReceipt(cursor, balance_note, comision_bs, comision_usd) # NUEVO, CAMBIO EN COMISIÓN
 
         # Procesar cada forma de pago
         payment_entry_ids = []
