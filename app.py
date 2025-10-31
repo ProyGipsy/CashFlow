@@ -700,8 +700,8 @@ def submit_receipt():
         currency = request.form.get('currency', '')
         send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
         send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
+        send_receipt_PaymentProofNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
         
-
         return redirect(url_for('accountsReceivable'))
     
     except Exception as e:
@@ -712,6 +712,7 @@ def submit_receipt():
     finally:
         cursor.close()
         conn.close()
+
 
 def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_bs, commission_usd, currency, ncta_str):
 
@@ -772,6 +773,7 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
 
     return jsonify({'success': True})
 
+
 def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_bs, commission_usd, currency, ncta_str):
 
     # Formateo del monto de comisión según la moneda
@@ -830,6 +832,157 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
     mail.send(msg)
 
     return jsonify({'success': True})
+
+
+def send_receipt_PaymentProofNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_bs, commission_usd, currency, ncta_str):
+
+# Formateo del monto de comisión según la moneda
+    if commission_bs > 0 and commission_usd > 0:
+        commission_text = f"Bs {commission_bs:.2f} y USD {commission_usd:.2f}"
+    elif commission_bs > 0:
+        commission_text = f"Bs {commission_bs:.2f}"
+    elif commission_usd > 0:
+        commission_text = f"USD {commission_usd:.2f}"
+    else:
+        commission_text = "0.00"
+
+    subject = f"Recibo {receipt_id}: Se ha registrado una cobranza para el cliente {customer_name} de la tienda {store_name}"
+    app_url = os.environ.get('APP_URL')
+
+    app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER_RECEIPT')
+    if store_id == '904' or store_id == '905':
+        app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT_REMBD')
+        app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT_REMBD')
+    else:
+        app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME_RECEIPT')
+        app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD_RECEIPT')
+    recipient_receipt = os.environ.get('MAIL_RECIPIENT_PAYMENTPROOFNOTIFICATION')
+    mail = Mail(app)
+
+    # Generación de Tabla de Formas de Pago
+    paymentEntries = get_paymentEntries_by_receipt(receipt_id)
+    paymentEntries = get_onedriveProofsOfPayments(paymentEntries)
+
+    table_rows = ""
+    for entry in paymentEntries:
+        table_rows += f"""
+        <tr class="pago-row">
+            <td>{entry[8]}</td>
+            <td>{entry[0]}</td>
+            <td>{entry[1].strftime('%d-%m-%Y')}</td>
+            <td>{"{:,.2f}".format(entry[2]).replace(".", "X").replace(",", ".").replace("X", ",")}</td>
+            <td>{entry[4]}</td>
+            <td>{entry[5]} {entry[6]}</td>
+        </tr>
+        """
+
+    payment_table_html = f"""
+    <table class="styled-table" id="pago-table">
+        <thead>
+            <tr>
+                <th>Moneda</th>
+                <th>Forma de Pago</th>
+                <th>Fecha de Pago</th>
+                <th>Monto</th>
+                <th>Referencia</th>
+                <th>Abono Realizado en</th>
+            </tr>
+        </thead>
+        <tbody>
+            {table_rows}
+        </tbody>
+    </table>
+    """
+
+    # Estilos para tabla del correo
+    styles = """
+    <style>
+        .header { margin-bottom: 8px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+            page-break-inside: avoid;
+            font-size: 10px;
+        }
+        table, th, td { border: 1px solid black !important; }
+        th, td {
+            padding: 4px !important;
+            text-align: left;
+            color: black !important;
+            vertical-align: top;
+        }
+        th {
+            background-color: #f0f0f0 !important;
+            font-weight: bold;
+        }
+        .styled-table th {
+            background-color: #f0f0f0 !important;
+            color: black !important;
+            font-size: 10px;
+        }
+        .styled-table td {
+            color: black !important;
+            font-size: 10px;
+        }
+    </style>
+    """
+
+    msg = Message(subject=subject,
+                sender=app.config['MAIL_USERNAME'],
+                recipients=[app.config['MAIL_USERNAME'], recipient_receipt])
+
+    body = f"""
+    <html>
+        <body>
+            <p>Se ha registrado el Recibo #{receipt_id} con los siguientes detalles:</p>
+            <ul>
+                <li><strong>Vendedor Responsable:</strong> {session['salesRep_id']} | {session['user_firstName']} {session['user_lastName']}</li>
+                <li><strong>Tienda:</strong> {store_name}</li>
+                <li><strong>Cliente:</strong> {customer_name}</li>
+                <li><strong>N_CTA Factura(s):</strong> {ncta_str}</li>
+                <li><strong>Monto Total:</strong> {currency} {total_receipt_amount}</li>
+                <li><strong>Comisión a Recibir:</strong> {commission_text}</li>
+            </ul>
+
+            <p>Formas de Pago Asociadas:</p>
+
+            {payment_table_html}
+            
+            <p> </p>  
+            <p>Se anexan los comprobantes de pago del recibo.</p>    
+            <p>Por favor ingrese a la <a href="{app_url}">aplicación web de GIPSY</a> de <strong>"Registro de Cobranza al Mayor"</strong> y diríjase a la sección de <strong>"Recibos de Cobranza"</strong> para revisar y validar la cobranza registrada.</p>
+        </body>
+    </html>
+    """
+
+    msg.html = body
+
+    headers = get_onedrive_headers()
+    for paymentEntry in paymentEntries:
+        file_info = paymentEntry[7]
+        if file_info:
+            file_url = file_info.get('email_url', '')
+            filename = file_info.get('name', '')
+            mime_type = "application/pdf" if filename.lower().endswith('.pdf') else "image/jpeg"
+                    
+            try:
+                response = requests.get(file_url, headers=headers)
+                if response.status_code == 200:
+                    file_content = response.content
+                    msg.attach(filename, mime_type, file_content)
+                else:
+                    print(f"Error al descargar el archivo desde OneDrive: {filename} - {response.status_code} - {response.text}")
+            except Exception as e:
+                print(f"Excepción al intentar descargar el archivo {filename}: {e}")
+
+    # Envío del correo
+    try:
+        mail.send(msg)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error enviando correo: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 
 # Rechazo de Recibo de Pago
