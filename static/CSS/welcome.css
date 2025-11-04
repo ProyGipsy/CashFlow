@@ -1,5 +1,5 @@
 .back {
-    position: absolute;
+    position: fixed;
     top: 20px;
     left: 20px;
     z-index: 10;
@@ -15,7 +15,8 @@ body {
     font-family: Arial, sans-serif;
     background-color: #ffffff;
     position: relative;
-    overflow: hidden;
+    /* overflow: hidden; */
+    overflow-x: hidden;
 }
 
 /* Curva inferior */
@@ -38,6 +39,7 @@ body::after {
     align-items: center;
     justify-content: center;
     min-height: 100vh;
+    padding: 5px 0 20px 0;
     position: relative;
     z-index: 1;
 }
@@ -186,4 +188,38 @@ body::after {
     margin-top: 10px;
     max-width: 40%;
     height: auto;
+}
+
+
+/* --- Media Query para pantallas pequeñas --- */
+@media (max-width: 768px) {
+
+    .grid {
+        grid-template-columns: 1fr !important;
+        max-width: 400px;
+    }
+
+    .card {
+        width: 100%;
+        max-width: 300px;
+    }
+
+    .role-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .role-card {
+        width: 100%;
+        max-width: 200px;
+    }
+
+    .card-img {
+        max-width: 40%;
+    }
+
+    .role-card-img {
+        margin-top: 10px;
+        max-width: 30%;
+        height: auto;
+    }
 }

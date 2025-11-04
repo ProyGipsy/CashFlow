@@ -75,3 +75,13 @@ body::after {
 .loginButton:hover {
     background-color: #7da69f;
 }
+
+
+/* --- Media Query para pantallas pequeñas --- */
+@media (max-width: 768px) {
+
+    .loginButton {
+        width: 35%;
+    }
+
+}
