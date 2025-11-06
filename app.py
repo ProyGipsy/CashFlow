@@ -47,14 +47,23 @@ app.register_blueprint(documents_bp)
 
 # CORS: permitir sólo el frontend de producción si está configurado
 # Definir FRONTEND_URL en la configuración de App Service
-frontend_url = os.environ.get('FRONTEND_URL')
-if frontend_url:
-    # Aplicar CORS sólo para el origen configurado en producción
-    CORS(app, resources={r"/*": {"origins": frontend_url}}, supports_credentials=True)
+frontend_url_env = os.environ.get('FRONTEND_URL')
+if frontend_url_env:
+    # frontend_url_env may be a full URL (including path, e.g. https://.../documents).
+    # Extract the origin (scheme://host[:port]) for CORS matching.
+    try:
+        parsed = urllib.parse.urlparse(frontend_url_env)
+        if parsed.scheme and parsed.netloc:
+            origins = f"{parsed.scheme}://{parsed.netloc}"
+        else:
+            origins = frontend_url_env
+    except Exception:
+        origins = frontend_url_env
+
+    # Aplicar CORS sólo para el origen (extraído) configurado en producción
+    CORS(app, resources={r"/*": {"origins": origins}}, supports_credentials=True)
 else:
     # En entornos locales o si no se define FRONTEND_URL, no habilitar CORS por defecto
-    # Si se necesita permitir orígenes en local durante desarrollo, definir FRONTEND_URL o
-    # temporalmente usar: CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
     pass
 
 # Configuración de sesión para usuarios
