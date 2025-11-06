@@ -14,6 +14,7 @@ from datetime import datetime
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response, current_app, session)
 from flask_session import Session
 from flask_mail import Mail, Message
+from flask_cors import CORS
 from reports import reports_bp
 from documents import documents_bp
 
@@ -43,6 +44,18 @@ from onedrive import get_onedrive_headers
 app = Flask(__name__)
 app.register_blueprint(reports_bp)
 app.register_blueprint(documents_bp)
+
+# CORS: permitir sólo el frontend de producción si está configurado
+# Definir FRONTEND_URL en la configuración de App Service
+frontend_url = os.environ.get('FRONTEND_URL')
+if frontend_url:
+    # Aplicar CORS sólo para el origen configurado en producción
+    CORS(app, resources={r"/*": {"origins": frontend_url}}, supports_credentials=True)
+else:
+    # En entornos locales o si no se define FRONTEND_URL, no habilitar CORS por defecto
+    # Si se necesita permitir orígenes en local durante desarrollo, definir FRONTEND_URL o
+    # temporalmente usar: CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+    pass
 
 # Configuración de sesión para usuarios
 app.config["SESSION_PERMANENT"] = False
