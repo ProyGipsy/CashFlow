@@ -105,7 +105,7 @@ def welcome():
                     'name': role_name
                 })
 
-    return render_template('welcome.html', roles_info=roles_info, react_app_url=react_origin)
+    return render_template('welcome.html', roles_info=roles_info, react_app_url=f"{react_origin}/documents/")
 
 
 # INICIOS DE SESIÓN INDIVIDUALES (Descartados con el nuevo flujo)
