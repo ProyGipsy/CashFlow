@@ -60,7 +60,7 @@
             </a>
             {% endif %}
             {% if 3 in session['modules'] %}
-            <a href="{{ url_for('documents.serve_react_app') }}" class="card">
+            <a href="{{ react_app_url }}" class="card">
                 <img src="{{ url_for('static', filename='IMG/document.png') }}" alt="Documentos" class="card-img">
                 <h3>Gestión de Documentos</h3>
             </a>
