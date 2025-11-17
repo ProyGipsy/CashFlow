@@ -46,7 +46,7 @@ app.register_blueprint(reports_bp)
 #app.register_blueprint(documents_bp)
 
 #CORS
-react_origin = os.environ.get('VITE_FRONT_API_URL_PROD', 'http://localhost:5173/documents/')
+react_origin = os.environ.get('VITE_FRONT_API_URL_PROD', 'http://localhost:5173')
 CORS(app, resources={r"/*": {"origins": react_origin}}, supports_credentials=True)
 
 # Configuración de sesión para usuarios
