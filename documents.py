@@ -6,8 +6,6 @@ from flask_session import Session
 """
 ---- QUERIES APP DE DOCUMENTOS ---
 
-
-
 -- FLUJO GENERAL --
 
 

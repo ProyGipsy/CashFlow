@@ -14,10 +14,12 @@ from datetime import datetime
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response, current_app, session)
 from flask_session import Session
 from flask_mail import Mail, Message
-from flask_cors import CORS
 from reports import reports_bp
 #from documents import documents_bp
 
+#Imports para módulo de Documentos
+from flask_cors import CORS
+from flask import jsonify
 
 from cashflow_db import (get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts,
     get_operations, get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id,
@@ -1493,7 +1495,6 @@ def generate_pdf():
     safe_filename = secure_filename(filename)
     response.headers['Content-Disposition'] = f'inline; filename="{safe_filename}"'
     return response
-
 
 
 if __name__ == '__main__':
