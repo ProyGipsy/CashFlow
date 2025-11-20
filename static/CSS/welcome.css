@@ -204,22 +204,7 @@ body::after {
         max-width: 300px;
     }
 
-    .role-grid {
-        grid-template-columns: 1fr !important;
-    }
-
-    .role-card {
-        width: 100%;
-        max-width: 200px;
-    }
-
     .card-img {
         max-width: 40%;
-    }
-
-    .role-card-img {
-        margin-top: 10px;
-        max-width: 30%;
-        height: auto;
     }
 }
