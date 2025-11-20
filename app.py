@@ -1656,7 +1656,6 @@ def getRoles():
     try:
         roles = get_roles()
 
-        print(roles)
         if roles == []:
             return jsonify({
                 'error': 'No se encontraron roles',
@@ -1667,6 +1666,14 @@ def getRoles():
     except Exception as e:
         print(f"Error: {e}")
         return "Error al procesar la solicitud", 500
+
+@app.route('/documents/getPermissions', methods=['GET'])
+def getPermission():
+    """
+    Endpoint para obtener los permisos
+    """
+    pass
+
 
 if __name__ == '__main__':
    app.run()
