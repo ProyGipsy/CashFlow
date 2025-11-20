@@ -40,6 +40,9 @@
         {% if 8 in session['permissions'] %}
             {% set num_cards = num_cards + 1 %}
         {% endif %}
+        {% if 10 in session['permissions'] %}
+            {% set num_cards = num_cards + 1 %}
+        {% endif %}
 
         {% set grid_class = '' %}
         {% if num_cards == 1 %}
@@ -95,10 +98,12 @@
                 <h3>7. Garantías</h3>
             </a>
             {% endif %}
-            <a target="_blank" href="" class="card">
+            {% if 10 in session['permissions'] %}
+            <a target="_blank" href="https://app.powerbi.com/groups/me/reports/3c0f7cb5-cf25-4f6a-9404-12dc5f3cd1fe/7569977f5b3aa69deaba?ctid=e28fcd45-30d5-4919-b266-27bca9760759&chromeless=1&experience=power-bi" class="card">
                 <img src="{{ url_for('static', filename='IMG/CxP.png') }}" alt="Reportes de Cuentas por Pagar" class="card-img">
                 <h3>8. Cuentas por Pagar (CxP)</h3>
             </a>
+            {% endif %}
         </div>
     </div>
 
