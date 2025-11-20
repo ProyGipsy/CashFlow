@@ -1,7 +1,233 @@
 import os
-from flask import Blueprint
-from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response, current_app, session, abort)
-from flask_session import Session
+import pymssql
+from dbutils.pooled_db import PooledDB
+
+# Configuración del pool de conexiones
+
+pool = PooledDB(
+    creator=pymssql,
+    maxconnections = 15,
+    mincached = 3,
+    maxcached = 6,
+    blocking = True,
+    host = os.environ.get('DB_SERVER'),
+    user = os.environ.get('DB_USER'),
+    password = os.environ.get('DB_PASSWORD'),
+    database = os.environ.get('DB_NAME')
+)
+
+def get_docs_by_type():
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT TypeID AS id, Name AS name, ShortName AS shortName 
+        FROM Documents.DocumentType
+        """
+
+        cursor.execute(sql)
+        documents = cursor.fetchall()
+        
+        return documents
+    
+    except Exception as e:
+        print(f"Error al obtener los Tipos de Documento: {e}")
+        return []
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def get_docs_companies():
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT CompanyID AS id, Name AS name, RIFtype AS rifType, RIFnumber AS rifNumber
+        FROM Documents.Company
+        """
+
+        cursor.execute(sql)
+        companies = cursor.fetchall()
+        
+        return companies
+    
+    except Exception as e:
+        print(f"Error al obtener las empresas: {e}")
+        return []
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def create_doc_type(data):
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        INSERT INTO Documents.DocumentType (Name, ShortName, Description)
+        OUTPUT INSERTED.TypeID
+        VALUES (%s, %s, %s)
+        """
+        cursor.execute(sql, (data['name'], data['alias'], data.get('description', '')))
+        inserted_id = cursor.fetchone()['TypeID']
+
+        sql_access_control = """
+        INSERT INTO AccessControl.Permissions (name, isDocumentsModule)
+        VALUES (%s, 1)
+        """
+        cursor.execute(sql_access_control, (data['name'],))
+
+        sql_document_fields = """
+        INSERT INTO Documents.TypeFields (DocumentTypeID, Name, DataType, Length, Precision)
+        OUTPUT INSERTED.FieldID
+        VALUES (%d, %s, %s, %d, %d)
+        """
+
+        sql_specific_values = """
+        INSERT INTO Documents.SpecificValue (FieldID, Value)
+        VALUES (%d, %s)
+        """
+
+        for field in data.get('fields', []):
+            cursor.execute(sql_document_fields, (inserted_id, field['name'], field['type'], field.get('length', None), field.get('precision', None)))
+            
+            if field['type'] == 'specificValues':
+                field_id = cursor.fetchone()['FieldID']
+                for value in field.get('specificValues', []):
+                    cursor.execute(sql_specific_values, (field_id, value))
+                
+        connection.commit()
+
+        return inserted_id
+
+    except Exception as e:
+        if connection:
+            connection.rollback()
+
+        print(f"Error creando el Tipo de Documento: {e}")
+        raise e
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close
+
+def create_company(data):
+    connection = None
+    cursor = None
+    
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        INSERT INTO Documents.Company (Name, RIFtype, RIFnumber)
+        VALUES (%s, %s, %s)
+        """
+        cursor.execute(sql, (data['name'], data['rifType'], data['rifNumber']))
+        connection.commit()
+
+        return cursor.rowcount
+
+    except Exception as e:
+        if connection:
+            connection.rollback()
+
+        print(f"Error creando la Empresa: {e}")
+        raise e
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def update_company(data):
+    connection = None
+    cursor = None
+    
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        UPDATE Documents.Company
+        SET Name = %s, RIFtype = %s, RIFnumber = %s
+        WHERE CompanyID = %s
+        """
+        cursor.execute(sql, (data['name'], data['rifType'], data['rifNumber'], data['id']))
+        connection.commit()
+
+        return cursor.rowcount
+
+    except Exception as e:
+        if connection:
+            connection.rollback()
+
+        print(f"Error actualizando la Empresa: {e}")
+        raise e
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def get_roles():
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT R.roleId AS id, R.name AS name, P.name AS permisos, U.userId AS userId, U.firstName + ' ' + U.lastName AS usuarios
+        FROM AccessControl.Roles R
+        JOIN AccessControl.RolePermissions RP ON R.roleId = RP.roleId
+        JOIN AccessControl.Permissions P ON RP.permissionId = P.permissionId
+        JOIN AccessControl.UserRoles UR ON R.roleId = UR.roleId
+        JOIN AccessControl.Users U ON UR.userId = U.userId
+        """
+
+        cursor.execute(sql)
+        roles = cursor.fetchall()
+        
+        return roles
+    
+    except Exception as e:
+        print(f"Error al obtener los Roles: {e}")
+        return []
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def create_role():
+    pass
+
+def update_role():
+    pass
 
 """
 ---- QUERIES APP DE DOCUMENTOS ---

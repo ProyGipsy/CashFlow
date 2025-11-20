@@ -19,7 +19,7 @@ from reports import reports_bp
 
 #Imports para módulo de Documentos
 from flask_cors import CORS
-from flask import jsonify
+from flask import request, jsonify
 
 from cashflow_db import (get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts,
     get_operations, get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id,
@@ -37,11 +37,21 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     get_count_customers_with_accountsReceivable_admin, get_receiptStores_DebtAccount_admin, get_invoices_by_customer_admin, 
     set_paymentEntryCommission, get_SalesRepCommission_OLD, check_already_paid_invoices, check_duplicate_receipt)
     
-
-
 from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepNameAndEmail)
 
 from onedrive import get_onedrive_headers
+
+#Funciones para la obtención de datos desde BD para Documentos
+from documents import (
+    get_docs_by_type,
+    get_docs_companies,
+    create_doc_type,
+    create_company,
+    update_company,
+    get_roles,
+    create_role,
+    update_role
+    )
 
 app = Flask(__name__)
 app.register_blueprint(reports_bp)
@@ -1496,6 +1506,167 @@ def generate_pdf():
     response.headers['Content-Disposition'] = f'inline; filename="{safe_filename}"'
     return response
 
+# Endpoints para el módulo de Documentos
+@app.route('/documents/testing', methods=['GET'])
+def testing():
+    """
+    Endpoint de prueba para verificar la conexión con React.
+    """
+    print("Solicitud recibida desde React")
+
+    return jsonify({
+        "message": "Conexión exitosa desde Flask"
+    })
+
+@app.route('/documents/getDocType', methods=['GET'])
+def getDoctTypes():
+    """
+    Endpoint para obtener los tipos de documentos.
+    """
+    try:
+        documents = get_docs_by_type()
+
+        if documents == []:
+            return jsonify({
+                'error': 'No se encontraron tipos de documentos',
+            }), 404
+        
+        return jsonify(documents), 200
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return "Error al procesar la solicitud", 500
+
+@app.route('/documents/getDocCompanies', methods=['GET'])
+def getDocCompanies():
+    """
+    Endpoint para obtener las compañías asociadas a Documentos
+    """
+    try:
+        companies = get_docs_companies()
+
+        if companies == []:
+            return jsonify({
+                'error': 'No se encontraron compañías',
+            }), 404
+
+        return jsonify(companies), 200
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return "Error al procesar la solicitud", 500
+
+@app.route('/documents/createDocType', methods=['POST'])
+def createDocType():
+    """
+    Endpoint para la creación de un Tipo de Documento
+    """
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'error': 'No se recibieron datos para la creación de Tipo de Documento'
+        }), 400
+
+    try:
+        result_id = create_doc_type(data)
+
+        return jsonify({
+            'message': 'Tipo de Documento creado exitosamente',
+            'docType_id': result_id
+        }), 201
+
+    except Exception as e:
+        return jsonify({
+            'error': 'Error del servidor al crear un Tipo de Documento',
+            'details': str(e)
+        }), 500
+
+@app.route('/documents/createDocCompany', methods=['POST'])
+def createDocCompany():
+    """
+    Endpoint para la creación de Empresas
+    """
+
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'error': 'No se recibieron datos para la creación de Tipo de Documento'
+        }), 400
+
+    try:
+        rowcount = create_company(data)
+
+        if rowcount:
+            return jsonify({
+                'message': 'Compañía creada exitosamente',
+                'rows_affected': rowcount
+            }), 201
+
+        else:
+            return jsonify({
+                'error': 'No se pudo crear la Compañía'
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Error del servidor al crear un Tipo de Documento',
+            'details': str(e)
+        }), 500
+
+@app.route('/documents/updateDocCompany', methods=['PUT'])
+def updateDocCompany():
+    """
+    Endpoint para la actualización de Empresas
+    """
+
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'error': 'No se recibieron datos para la actualización de la Compañía'
+        }), 400
+
+    try:
+        rowcount = update_company(data)
+
+        if rowcount:
+            return jsonify({
+                'message': 'Compañía actualizada exitosamente',
+                'rows_affected': rowcount
+            }), 200
+
+        else:
+            return jsonify({
+                'error': 'No se pudo actualizar la Compañía'
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Error del servidor al actualizar la Compañía',
+            'details': str(e)
+        }), 500
+
+@app.route('/documents/getRoles', methods=['GET'])
+def getRoles():
+    """
+    Endpoint para la obtención de roles
+    """
+    try:
+        roles = get_roles()
+
+        print(roles)
+        if roles == []:
+            return jsonify({
+                'error': 'No se encontraron roles',
+            }), 404
+
+        return jsonify(roles), 200
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return "Error al procesar la solicitud", 500
 
 if __name__ == '__main__':
    app.run()
