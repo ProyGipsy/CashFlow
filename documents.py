@@ -191,6 +191,45 @@ def update_company(data):
         if connection:
             connection.close()
 
+def format_roles(raw_data):
+    # 1. Diccionario temporal para agrupar por ID de rol
+    temp_roles = {}
+
+    for row in raw_data:
+        role_id = row['id']
+        
+        # 2. Si el rol no existe en el diccionario, lo inicializamos
+        if role_id not in temp_roles:
+            temp_roles[role_id] = {
+                'id': role_id,
+                'name': row['name'],
+                'permisos': set(), # Usamos set para evitar duplicados automáticamente
+                'usuarios': set()  # Usamos set aquí también
+            }
+        
+        # 3. Agregamos el permiso y el usuario a sus respectivos sets
+        # Verificamos que no sean None (por si usas LEFT JOIN en el futuro)
+        if row['permisos']:
+            temp_roles[role_id]['permisos'].add(row['permisos'])
+            
+        if row['usuarios']:
+            temp_roles[role_id]['usuarios'].add(row['usuarios'])
+
+    # 4. Convertimos los sets a listas y el diccionario a una lista de objetos
+    formatted_result = []
+    for role in temp_roles.values():
+        # Convertimos los sets a listas para que sean serializables a JSON
+        role['permisos'] = list(role['permisos'])
+        role['usuarios'] = list(role['usuarios'])
+        
+        # Opcional: Ordenar las listas para que se vean bonitas
+        role['permisos'].sort()
+        role['usuarios'].sort()
+        
+        formatted_result.append(role)
+
+    return formatted_result
+
 def get_roles():
     connection = None
     cursor = None
@@ -200,17 +239,23 @@ def get_roles():
         cursor = connection.cursor(as_dict=True)
 
         sql = """
-        SELECT R.roleId AS id, R.name AS name, P.name AS permisos, U.userId AS userId, U.firstName + ' ' + U.lastName AS usuarios
+        SELECT 
+            R.roleId AS id, 
+            R.name AS name, 
+            P.name AS permisos,
+            U.userId AS userId
+            ISNULL(U.firstName + ' ' + U.lastName, NULL) AS usuarios
         FROM AccessControl.Roles R
-        JOIN AccessControl.RolePermissions RP ON R.roleId = RP.roleId
-        JOIN AccessControl.Permissions P ON RP.permissionId = P.permissionId
-        JOIN AccessControl.UserRoles UR ON R.roleId = UR.roleId
-        JOIN AccessControl.Users U ON UR.userId = U.userId
+        LEFT JOIN AccessControl.RolePermissions RP ON R.roleId = RP.roleId
+        LEFT JOIN AccessControl.Permissions P ON RP.permissionId = P.permissionId
+        LEFT JOIN AccessControl.UserRoles UR ON R.roleId = UR.roleId
+        LEFT JOIN AccessControl.Users U ON UR.userId = U.userId
         """
 
         cursor.execute(sql)
         roles = cursor.fetchall()
-        
+        roles = format_roles(roles)
+        print(roles)
         return roles
     
     except Exception as e:
