@@ -121,3 +121,36 @@ body::after {
     filter: grayscale(100%);
     opacity: 0.6;
 }
+
+/* --- Media Query para pantallas pequeñas --- */
+@media (max-width: 768px) {
+
+    .grid {
+        grid-template-columns: 1fr !important;
+        max-width: 400px;
+    }
+
+    .card {
+        width: 100%;
+        max-width: 300px;
+    }
+
+    .role-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .role-card {
+        width: 100%;
+        max-width: 200px;
+    }
+
+    .card-img {
+        max-width: 40%;
+    }
+
+    .role-card-img {
+        margin-top: 10px;
+        max-width: 30%;
+        height: auto;
+    }
+}
