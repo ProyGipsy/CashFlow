@@ -50,7 +50,10 @@ from documents import (
     update_company,
     get_roles,
     create_role,
-    update_role
+    update_role,
+    get_permissions,
+    get_users,
+
     )
 
 app = Flask(__name__)
@@ -1648,6 +1651,44 @@ def updateDocCompany():
             'details': str(e)
         }), 500
 
+@app.route('/documents/getPermissions', methods=['GET'])
+def getPermission():
+    """
+    Endpoint para obtener los permisos
+    """
+    try:
+        permissions = get_permissions()
+
+        if permissions == []:
+            return jsonify({
+                'error': 'No se encontraron permisos',
+            }), 404
+
+        return jsonify(permissions), 200
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return "Error al procesar la solicitud", 500
+
+@app.route('/documents/getUsers', methods=['GET'])
+def getUsers():
+    """
+    Endpoint para la obtención de usuarios
+    """
+    try:
+        users = get_users()
+
+        if users == []:
+            return jsonify({
+                'error': 'No se encontraron usuarios',
+            }), 404
+
+        return jsonify(users), 200
+    
+    except Exception as e:
+        print(f"Error: {e}")
+        return "Error al procesar la solicitud", 500
+
 @app.route('/documents/getRoles', methods=['GET'])
 def getRoles():
     """
@@ -1667,13 +1708,13 @@ def getRoles():
         print(f"Error: {e}")
         return "Error al procesar la solicitud", 500
 
-@app.route('/documents/getPermissions', methods=['GET'])
-def getPermission():
-    """
-    Endpoint para obtener los permisos
-    """
+@app.route('/documents/addRole', methods=['POST'])
+def addRole():
     pass
 
+@app.route('/documents/editRole', methods=['PUT'])
+def editRole():
+    pass
 
 if __name__ == '__main__':
    app.run()

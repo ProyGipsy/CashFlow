@@ -243,7 +243,7 @@ def get_roles():
             R.roleId AS id, 
             R.name AS name, 
             P.name AS permisos,
-            U.userId AS userId
+            U.userId AS userId,
             ISNULL(U.firstName + ' ' + U.lastName, NULL) AS usuarios
         FROM AccessControl.Roles R
         LEFT JOIN AccessControl.RolePermissions RP ON R.roleId = RP.roleId
@@ -255,7 +255,7 @@ def get_roles():
         cursor.execute(sql)
         roles = cursor.fetchall()
         roles = format_roles(roles)
-        print(roles)
+        
         return roles
     
     except Exception as e:
@@ -268,8 +268,112 @@ def get_roles():
         if connection:
             connection.close()
 
-def create_role():
-    pass
+def get_permissions():
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT permissionId AS id, name 
+        FROM AccessControl.Permissions
+        WHERE isDocumentsModule = 1
+        """
+
+        cursor.execute(sql)
+        permissions = cursor.fetchall()
+        print(permissions)
+        return permissions
+
+    except Exception as e:
+        print(f"Error al obtener los Permisos: {e}")
+        return []
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def get_users():
+    connection = None
+    cursor = None
+
+    try: 
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT userId AS id, firstName + ' ' + lastName AS fullName, username 
+        FROM AccessControl.Users
+        WHERE isActive = 1
+        """
+
+        cursor.execute(sql)
+        users = cursor.fetchall()
+
+        return users
+    
+    except Exception as e:
+        print(f"Error al obtener los Usuarios: {e}")
+        return []
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def create_role(data):
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        INSERT INTO AccessControl.Roles (name)
+        OUTPUT INSERTED.roleID
+        VALUES (%s)
+        """
+        cursor.execute(sql, (data['name'],))
+        inserted_id = cursor.fetchone()['roleID']
+
+        sql_role_permissions = """
+        INSERT INTO AccessControl.RolePermissions (roleId, moduleId, permissionId)
+        VALUES (%s, 4, %s)
+        """
+
+        for permiso in data.get('permisos', []):
+            cursor.execute(sql_role_permissions, (inserted_id, permiso))
+
+        sql_user_roles = """
+        INSERT INTO AccessControl.UserRoles (userId, roleId)
+        VALUES (%s, %s)
+        """
+
+        for usuario in data.get('usuarios', []):
+            cursor.execute(sql_user_roles, (usuario, inserted_id))
+                
+        connection.commit()
+
+        return inserted_id
+
+    except Exception as e:
+        if connection:
+            connection.rollback()
+
+        print(f"Error creando el Rol: {e}")
+        raise e
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 def update_role():
     pass
