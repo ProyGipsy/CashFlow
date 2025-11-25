@@ -191,44 +191,65 @@ def update_company(data):
         if connection:
             connection.close()
 
-def format_roles(raw_data):
-    # 1. Diccionario temporal para agrupar por ID de rol
-    temp_roles = {}
+def format_roles(raw_rows):
+    """
+    Toma las filas planas (diccionarios) y las convierte en estructura anidada.
+    """
+    roles_map = {}
 
-    for row in raw_data:
-        role_id = row['id']
+    for row in raw_rows:
+        # CORRECCIÓN: Usamos row['columna'] en lugar de row.columna
+        # Asegúrate de que las claves coincidan EXACTAMENTE con los nombres/alias en tu SELECT
         
-        # 2. Si el rol no existe en el diccionario, lo inicializamos
-        if role_id not in temp_roles:
-            temp_roles[role_id] = {
+        role_id = row['roleId']
+        
+        # 1. Inicializar el rol si no existe
+        if role_id not in roles_map:
+            roles_map[role_id] = {
                 'id': role_id,
-                'name': row['name'],
-                'permisos': set(), # Usamos set para evitar duplicados automáticamente
-                'usuarios': set()  # Usamos set aquí también
+                'name': row['roleName'], # Alias definido en el SQL
+                '_temp_permisos': {}, 
+                '_temp_usuarios': {}
             }
         
-        # 3. Agregamos el permiso y el usuario a sus respectivos sets
-        # Verificamos que no sean None (por si usas LEFT JOIN en el futuro)
-        if row['permisos']:
-            temp_roles[role_id]['permisos'].add(row['permisos'])
-            
-        if row['usuarios']:
-            temp_roles[role_id]['usuarios'].add(row['usuarios'])
+        # 2. Procesar Permisos
+        # Verificamos si permissionId no es None
+        if row['permissionId'] is not None:
+            perm_id = row['permissionId']
+            if perm_id not in roles_map[role_id]['_temp_permisos']:
+                roles_map[role_id]['_temp_permisos'][perm_id] = {
+                    'id': perm_id,
+                    'name': row['permissionName']
+                }
 
-    # 4. Convertimos los sets a listas y el diccionario a una lista de objetos
-    formatted_result = []
-    for role in temp_roles.values():
-        # Convertimos los sets a listas para que sean serializables a JSON
-        role['permisos'] = list(role['permisos'])
-        role['usuarios'] = list(role['usuarios'])
-        
-        # Opcional: Ordenar las listas para que se vean bonitas
-        role['permisos'].sort()
-        role['usuarios'].sort()
-        
-        formatted_result.append(role)
+        # 3. Procesar Usuarios
+        # Verificamos si userId no es None
+        if row['userId'] is not None:
+            user_id = row['userId']
+            if user_id not in roles_map[role_id]['_temp_usuarios']:
+                # Manejo seguro de strings vacíos para el nombre
+                f_name = row['firstName'] if row['firstName'] else ''
+                l_name = row['lastName'] if row['lastName'] else ''
+                full_name = f"{f_name} {l_name}".strip()
+                
+                roles_map[role_id]['_temp_usuarios'][user_id] = {
+                    'userId': user_id, 
+                    'fullName': full_name,
+                    'username': row['username']
+                }
 
-    return formatted_result
+    # 4. Limpieza final y conversión a lista
+    final_list = []
+    for role in roles_map.values():
+        role['permisos'] = list(role['_temp_permisos'].values())
+        role['usuarios'] = list(role['_temp_usuarios'].values())
+        
+        del role['_temp_permisos']
+        del role['_temp_usuarios']
+        
+        final_list.append(role)
+
+    return final_list
 
 def get_roles():
     connection = None
@@ -240,22 +261,26 @@ def get_roles():
 
         sql = """
         SELECT 
-            R.roleId AS id, 
-            R.name AS name, 
-            P.name AS permisos,
-            U.userId AS userId,
-            ISNULL(U.firstName + ' ' + U.lastName, NULL) AS usuarios
+            R.roleId, 
+            R.name AS roleName,
+            P.permissionId, 
+            P.name AS permissionName,
+            U.userId, 
+            U.firstName, 
+            U.lastName, 
+            U.username
         FROM AccessControl.Roles R
         LEFT JOIN AccessControl.RolePermissions RP ON R.roleId = RP.roleId
-        LEFT JOIN AccessControl.Permissions P ON RP.permissionId = P.permissionId
+        LEFT JOIN AccessControl.Permissions P ON RP.permissionId = P.permissionId AND P.isDocumentsModule = 1
         LEFT JOIN AccessControl.UserRoles UR ON R.roleId = UR.roleId
         LEFT JOIN AccessControl.Users U ON UR.userId = U.userId
+        ORDER BY R.roleId;
         """
 
         cursor.execute(sql)
         roles = cursor.fetchall()
         roles = format_roles(roles)
-        
+
         return roles
     
     except Exception as e:
@@ -284,7 +309,7 @@ def get_permissions():
 
         cursor.execute(sql)
         permissions = cursor.fetchall()
-        print(permissions)
+        
         return permissions
 
     except Exception as e:
@@ -344,11 +369,11 @@ def create_role(data):
 
         sql_role_permissions = """
         INSERT INTO AccessControl.RolePermissions (roleId, moduleId, permissionId)
-        VALUES (%s, 4, %s)
+        VALUES (%s, 3, %s)
         """
 
         for permiso in data.get('permisos', []):
-            cursor.execute(sql_role_permissions, (inserted_id, permiso))
+            cursor.execute(sql_role_permissions, (inserted_id, permiso['id']))
 
         sql_user_roles = """
         INSERT INTO AccessControl.UserRoles (userId, roleId)
@@ -356,7 +381,7 @@ def create_role(data):
         """
 
         for usuario in data.get('usuarios', []):
-            cursor.execute(sql_user_roles, (usuario, inserted_id))
+            cursor.execute(sql_user_roles, (usuario['id'], inserted_id))
                 
         connection.commit()
 
@@ -375,8 +400,34 @@ def create_role(data):
         if connection:
             connection.close()
 
-def update_role():
-    pass
+def update_role(data):
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        UPDATE AccessControl.Roles
+        SET name = ?
+        WHERE roleID = ?
+        """
+        cursor.execute(sql, (data['name'], data['id']))
+        
+
+    except Exception as e:
+        if connection:
+            connection.rollback()
+
+        print(f"Error actualizando el Rol: {e}")
+        raise e
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 """
 ---- QUERIES APP DE DOCUMENTOS ---

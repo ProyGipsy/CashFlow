@@ -1595,7 +1595,7 @@ def createDocCompany():
 
     if not data:
         return jsonify({
-            'error': 'No se recibieron datos para la creación de Tipo de Documento'
+            'error': 'No se recibieron datos para la creación de una nueva empresa'
         }), 400
 
     try:
@@ -1603,18 +1603,18 @@ def createDocCompany():
 
         if rowcount:
             return jsonify({
-                'message': 'Compañía creada exitosamente',
+                'message': 'Empresa creada exitosamente',
                 'rows_affected': rowcount
             }), 201
 
         else:
             return jsonify({
-                'error': 'No se pudo crear la Compañía'
+                'error': 'No se pudo crear la empresa'
             }), 500
         
     except Exception as e:
         return jsonify({
-            'error': 'Error del servidor al crear un Tipo de Documento',
+            'error': 'Error del servidor al crear una empresa',
             'details': str(e)
         }), 500
 
@@ -1628,7 +1628,7 @@ def updateDocCompany():
 
     if not data:
         return jsonify({
-            'error': 'No se recibieron datos para la actualización de la Compañía'
+            'error': 'No se recibieron datos para la actualización de la empresa'
         }), 400
 
     try:
@@ -1636,18 +1636,18 @@ def updateDocCompany():
 
         if rowcount:
             return jsonify({
-                'message': 'Compañía actualizada exitosamente',
+                'message': 'Empresa actualizada exitosamente',
                 'rows_affected': rowcount
             }), 200
 
         else:
             return jsonify({
-                'error': 'No se pudo actualizar la Compañía'
+                'error': 'No se pudo actualizar la empresa'
             }), 500
         
     except Exception as e:
         return jsonify({
-            'error': 'Error del servidor al actualizar la Compañía',
+            'error': 'Error del servidor al actualizar la empresa',
             'details': str(e)
         }), 500
 
@@ -1710,11 +1710,68 @@ def getRoles():
 
 @app.route('/documents/addRole', methods=['POST'])
 def addRole():
-    pass
+    """
+    Endpoint para la creación de un rol
+    """
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'error': 'No se recibieron datos para la creación de un nuevo rol'
+        }), 400
+
+    try:
+        role_id = create_role(data)
+
+        if role_id:
+            return jsonify({
+                'message': 'Rol creado exitosamente',
+                'role_id': role_id
+            }), 201
+
+        else:
+            return jsonify({
+                'error': 'No se pudo crear el rol'
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Error del servidor al crear un nuevo rol',
+            'details': str(e)
+        }), 500
 
 @app.route('/documents/editRole', methods=['PUT'])
 def editRole():
-    pass
+    """
+    Endpoint para la actualización de un Rol
+    """
+
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'error': 'No se recibieron datos para la actualización del rol'
+        }), 400
+
+    try:
+        rowcount = update_role(data)
+
+        if rowcount:
+            return jsonify({
+                'message': 'Rol actualizado exitosamente',
+                'rows_affected': rowcount
+            }), 200
+
+        else:
+            return jsonify({
+                'error': 'No se pudo actualizar el rol'
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Error del servidor al actualizar el rol',
+            'details': str(e)
+        }), 500
 
 if __name__ == '__main__':
    app.run()
