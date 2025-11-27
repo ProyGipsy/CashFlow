@@ -44,8 +44,13 @@ from onedrive import get_onedrive_headers
 #Funciones para la obtención de datos desde BD para Documentos
 from documents import (
     get_docs_by_type,
+    get_doc_type_full,
     get_docs_companies,
     create_doc_type,
+    edit_doc_type,
+    create_document,
+    edit_document,
+    get_documents_lists,
     create_company,
     update_company,
     get_roles,
@@ -53,7 +58,6 @@ from documents import (
     update_role,
     get_permissions,
     get_users,
-
     )
 
 app = Flask(__name__)
@@ -1510,17 +1514,6 @@ def generate_pdf():
     return response
 
 # Endpoints para el módulo de Documentos
-@app.route('/documents/testing', methods=['GET'])
-def testing():
-    """
-    Endpoint de prueba para verificar la conexión con React.
-    """
-    print("Solicitud recibida desde React")
-
-    return jsonify({
-        "message": "Conexión exitosa desde Flask"
-    })
-
 @app.route('/documents/getDocType', methods=['GET'])
 def getDoctTypes():
     """
@@ -1539,6 +1532,30 @@ def getDoctTypes():
     except Exception as e:
         print(f"Error: {e}")
         return "Error al procesar la solicitud", 500
+
+@app.route('/documents/getDocTypeFull', methods=['GET'])
+def getDocTypesFull():
+    """
+    Endpoint para obtener los tipos de documentos con sus campos.
+    """
+    doc_id = request.args.get('id')
+    data = {'id': doc_id}
+
+    try:
+        documents = get_doc_type_full(data)
+        #print(f'Hola desde app.py: {documents}')
+
+        if not documents:
+            return jsonify({
+                'error': 'No se encontraron tipos de documentos con sus campos',
+            }), 404
+
+
+        return jsonify(documents), 200
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return "Error al procesar la solicitud", 500 
 
 @app.route('/documents/getDocCompanies', methods=['GET'])
 def getDocCompanies():
@@ -1582,6 +1599,32 @@ def createDocType():
     except Exception as e:
         return jsonify({
             'error': 'Error del servidor al crear un Tipo de Documento',
+            'details': str(e)
+        }), 500
+
+@app.route('/documents/editDocType', methods=['PUT'])
+def editDocType():
+    """
+    Endpoint para la edición de los Tipos de Documento
+    """
+    data = request.get_json()
+    print(data)
+    # Validación básica
+    if not data or 'id' not in data:
+        return jsonify({'error': 'Faltan datos o el ID del documento'}), 400
+
+    try:
+        # Llamamos a la función. Ya no dependemos del rowcount para validar éxito
+        edit_doc_type(data)
+        
+        return jsonify({
+            'message': 'Tipo de Documento procesado exitosamente'
+        }), 200
+
+    except Exception as e:
+        print(f"Error server: {e}")
+        return jsonify({
+            'error': 'Error al procesar la solicitud',
             'details': str(e)
         }), 500
 
@@ -1772,6 +1815,137 @@ def editRole():
             'error': 'Error del servidor al actualizar el rol',
             'details': str(e)
         }), 500
+
+@app.route('/documents/createDocument', methods=['POST'])
+def createDoc():
+    """
+    Endpoint para la creación de un documento con archivo adjunto.
+    Recibe multipart/form-data.
+    """
+    try:
+        # 1. VALIDAR Y OBTENER EL ARCHIVO
+        if 'file' not in request.files:
+            return jsonify({'error': 'No se envió el archivo anexo (.pdf)'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'El archivo no tiene nombre'}), 400
+
+        # 2. VALIDAR Y OBTENER LOS DATOS JSON
+        json_data_string = request.form.get('data')
+        
+        if not json_data_string:
+            return jsonify({'error': 'No se recibieron los datos del documento'}), 400
+
+        # Convertimos el string a Diccionario Python
+        try:
+            data = json.loads(json_data_string)
+        except json.JSONDecodeError:
+            return jsonify({'error': 'El formato de los datos JSON es inválido'}), 400
+
+        # 3. SUBIR ARCHIVO (Aquí iría tu lógica real de OneDrive)
+        # file_url = upload_to_onedrive(file) <--- Tu función real iría aquí
+        file_url = f"https://onedrive.live.com/anexos/{file.filename}" # Simulación
+
+        # 4. LLAMAR A LA LÓGICA DE BASE DE DATOS
+        document_id = create_document(data, file_url)
+
+        if document_id:
+            return jsonify({
+                'message': 'Documento creado exitosamente',
+                'document_id': document_id,
+                'annex_url': file_url
+            }), 201
+        else:
+            return jsonify({'error': 'No se pudo insertar el documento en la BD'}), 500
+
+    except Exception as e:
+        print(f"Error server: {e}")
+        return jsonify({
+            'error': 'Error del servidor al crear el documento',
+            'details': str(e)
+        }), 500
+
+@app.route('/documents/editDocument', methods=['PUT'])
+def editDoc():
+    """
+    Endpoint para editar un documento existente.
+    Recibe multipart/form-data (JSON en 'data' + Archivo opcional en 'file')
+    """
+    try:
+        # 1. OBTENER Y PARSEAR DATOS JSON
+        json_data_string = request.form.get('data')
+        
+        if not json_data_string:
+            return jsonify({'error': 'No se recibieron los datos del documento'}), 400
+
+        try:
+            data = json.loads(json_data_string)
+        except json.JSONDecodeError:
+            return jsonify({'error': 'JSON inválido'}), 400
+
+        # Validación básica
+        if 'id' not in data:
+            return jsonify({'error': 'Se requiere el ID del documento para editar'}), 400
+
+        # 2. GESTIÓN DEL ARCHIVO (OPCIONAL EN EDICIÓN)
+        new_file_url = None
+        
+        # Verificamos si en la petición viene un archivo llamado 'file'
+        if 'file' in request.files:
+            file = request.files['file']
+            
+            # A veces el navegador envía el campo vacío si no se selecciona nada
+            if file and file.filename != '':
+                # --- LOGICA DE SUBIDA (Simulada) ---
+                # filename = secure_filename(file.filename)
+                # new_file_url = upload_to_onedrive(file) 
+                new_file_url = f"https://onedrive.live.com/anexos/UPDATED_{file.filename}" # Simulación
+
+        # 3. LLAMAR A LA LÓGICA DE ACTUALIZACIÓN
+        success = edit_document(data, new_file_url)
+
+        if success:
+            response = {'message': 'Documento actualizado exitosamente'}
+            
+            # Si hubo cambio de archivo, devolvemos la nueva URL para que el frontend actualice su estado
+            if new_file_url:
+                response['new_annex_url'] = new_file_url
+                
+            return jsonify(response), 200
+        else:
+            return jsonify({'error': 'No se pudo actualizar el documento'}), 500
+
+    except Exception as e:
+        print(f"Error en endpoint editDocument: {e}")
+        return jsonify({'error': 'Error interno del servidor', 'details': str(e)}), 500        
+
+@app.route('/documents/getDocumentsList', methods=['GET'])
+def getDocumentsList():
+    """
+    Endpoint para obtener lista de documentos filtrados por ID del Tipo.
+    Recibe: id (ej: 5)
+    """
+    doc_type_id = request.args.get('id')
+
+    if not doc_type_id:
+        return jsonify({'error': 'Falta el parámetro id'}), 400
+
+    data = {
+        'docType_id': doc_type_id,
+    }
+
+    try:
+        documents = get_documents_lists(data)
+        
+        # Si retorna una lista vacía, es un 200 OK (simplemente no hay documentos aún)
+        print(documents)
+        return jsonify(documents), 200
+
+    except Exception as e:
+        print(f"Error en endpoint getDocumentsList: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 if __name__ == '__main__':
    app.run()

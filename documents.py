@@ -80,6 +80,18 @@ def create_doc_type(data):
         connection = pool.connection()
         cursor = connection.cursor(as_dict=True)
 
+        validation_sql = """
+        SELECT TypeID
+        FROM Documents.DocumentType
+        WHERE (Name = %s OR ShortName = %s)
+        AND TypeID = %s
+        """
+        cursor.execute(validation_sql, (data['name'], data['alias'], data['id']))
+        existing = cursor.fetchone()
+
+        if existing:
+            raise ValueError("Ya existe un Tipo de Documento con ese Nombre o Alias.")
+
         sql = """
         INSERT INTO Documents.DocumentType (Name, ShortName, Description)
         OUTPUT INSERTED.TypeID
@@ -129,6 +141,190 @@ def create_doc_type(data):
             cursor.close()
         if connection:
             connection.close
+
+def get_doc_type_full(data):
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT DT.TypeID AS id, DT.Name AS name, DT.ShortName AS shortName, DT.Description AS description,
+               TF.FieldID AS fieldId, TF.Name AS fieldName, TF.DataType AS fieldType, TF.Length AS fieldLength, TF.Precision AS fieldPrecision,
+               SV.ValueID AS valueId, SV.Value AS value
+        FROM Documents.DocumentType DT
+        LEFT JOIN Documents.TypeFields TF ON DT.TypeID = TF.DocumentTypeID
+        LEFT JOIN Documents.SpecificValue SV ON TF.FieldID = SV.FieldID
+        WHERE DT.TypeID = %s
+        """
+
+        cursor.execute(sql, (data['id'],))
+        rows = cursor.fetchall()
+
+        #print(f'Hola desde documents.py: {rows}')
+        
+        if not rows:
+            return None, 404
+
+        doc_type = {
+            'id': rows[0]['id'],
+            'name': rows[0]['name'],
+            'alias': rows[0]['shortName'],
+            'description': rows[0]['description'],
+            'fields': []
+        }
+
+        fields_map = {}
+
+        for row in rows:
+            field_id = row['fieldId']
+            if field_id and field_id not in fields_map:
+                fields_map[field_id] = {
+                    'id': field_id,
+                    'name': row['fieldName'],
+                    'type': row['fieldType'],
+                    'length': row['fieldLength'],
+                    'precision': row['fieldPrecision'],
+                    'specificValues': []
+                }
+                doc_type['fields'].append(fields_map[field_id])
+
+            if row['valueId']:
+                fields_map[field_id]['specificValues'].append({
+                    'id': row['valueId'],
+                    'value': row['value']
+                })
+
+        
+        return doc_type
+    
+    except Exception as e:
+        print(f"Error al obtener el Tipo de Documento completo: {e}")
+        return None, 500
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def edit_doc_type(data):
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        # --- VALIDACIÓN DE DUPLICADOS ---
+        validation_sql = """
+            SELECT TypeID
+            FROM Documents.DocumentType
+            WHERE (Name = %s OR ShortName = %s) AND TypeID != %s
+        """
+        cursor.execute(validation_sql, (data['name'], data['alias'], data['id']))
+        existing = cursor.fetchone()
+
+        if existing:
+            raise ValueError("Ya existe un Tipo de Documento con ese Nombre o Alias.")
+        
+        # --- PASO CRÍTICO: OBTENER EL NOMBRE VIEJO ANTES DE TOCAR NADA ---
+        # Necesitamos saber cómo se llama AHORA para poder encontrar su permiso correspondiente
+        get_old_name_sql = "SELECT Name FROM Documents.DocumentType WHERE TypeID = %s"
+        cursor.execute(get_old_name_sql, (data['id'],))
+        row_name = cursor.fetchone()
+        
+        old_doc_name = row_name['Name'] if row_name else None
+
+        if not old_doc_name:
+             raise ValueError("El documento que intentas editar no existe.")
+
+        # 1. ACTUALIZAR CABECERA (DocumentType)
+        sql_doc = """
+            UPDATE Documents.DocumentType
+            SET Name = %s, ShortName = %s, Description = %s
+            WHERE TypeID = %s
+        """
+        cursor.execute(sql_doc, (data['name'], data['alias'], data.get('description', ''), data['id']))
+
+        # 2. ACTUALIZAR EL PERMISO (Usando el nombre viejo que guardamos)
+        # Buscamos el permiso que tenga el old_doc_name y le ponemos el nuevo data['name']
+        sql_access_control = """
+            UPDATE AccessControl.Permissions
+            SET name = %s
+            WHERE name = %s
+        """
+        cursor.execute(sql_access_control, (data['name'], old_doc_name))
+
+        # 3. DEFINIR SQLs DE CAMPOS
+        sql_update_field = """
+            UPDATE Documents.TypeFields
+            SET Name = %s, DataType = %s, Length = %s, Precision = %s
+            WHERE FieldID = %s AND DocumentTypeID = %s
+        """
+        
+        sql_insert_field = """
+            INSERT INTO Documents.TypeFields (DocumentTypeID, Name, DataType, Length, Precision)
+            VALUES (%s, %s, %s, %s, %s)
+        """ 
+
+        sql_get_new_id = "SELECT SCOPE_IDENTITY() AS new_id"
+        
+        sql_insert_value = "INSERT INTO Documents.SpecificValue (FieldID, Value) VALUES (%s, %s)"
+        sql_delete_values = "DELETE FROM Documents.SpecificValue WHERE FieldID = %s"
+
+        # 4. PROCESAR CAMPOS
+        for field in data.get('fields', []):
+            field_id = field.get('id')
+
+            if field_id is None:
+                # --- INSERTAR ---
+                cursor.execute(sql_insert_field, (
+                    data['id'], 
+                    field['name'], 
+                    field['type'], 
+                    field.get('length', 0), 
+                    field.get('precision', 0)
+                ))
+
+                cursor.execute(sql_get_new_id)
+                row = cursor.fetchone()
+                current_field_db_id = int(row['new_id'])
+            
+            else:
+                # --- ACTUALIZAR ---
+                current_field_db_id = field_id
+                cursor.execute(sql_update_field, (
+                    field['name'], 
+                    field['type'], 
+                    field.get('length', 0), 
+                    field.get('precision', 0), 
+                    field_id, 
+                    data['id']
+                ))
+
+            # 5. VALORES ESPECÍFICOS
+            if field['type'] == 'specificValues' and 'specificValues' in field:
+                cursor.execute(sql_delete_values, (current_field_db_id,))
+                
+                for val in field['specificValues']:
+                    val_text = val['value'] if isinstance(val, dict) else val
+                    cursor.execute(sql_insert_value, (current_field_db_id, val_text))
+        
+        connection.commit()
+        return True
+
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        print(f"Error en edit_doc_type: {e}")
+        raise e 
+
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
 
 def create_company(data):
     connection = None
@@ -428,6 +624,165 @@ def update_role(data):
             cursor.close()
         if connection:
             connection.close()
+
+def create_document(data, file_url):
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        INSERT INTO Documents.Document (TypeID, CompanyID)
+        OUTPUT INSERTED.DocumentID
+        VALUES (%s, %s)
+        """
+        cursor.execute(sql, (data['docTypeId'], data['companyId']))
+        row = cursor.fetchone()
+
+        if not row:
+            raise Exception('No se pudo obtener el ID del documento creado')
+
+        inserted_id = row['DocumentID']
+
+        # Aquí se deberían agregar las inserciones de FieldValue y DocumentAnnex
+        sql_insert_value = """
+            INSERT INTO Documents.FieldValue (FieldID, DocumentID, Value)
+            VALUES (%s, %s, %s)
+        """
+
+        for field in data.get('fields', []):
+            field_id = field.get('fieldId')
+            value = field.get('value')
+            
+            cursor.execute(sql_insert_value, (field_id, inserted_id, value))
+
+        if file_url:
+            sql_insert_annex = """
+                INSERT INTO Documents.DocumentAnnex (DocumentID, AnnexURL, Date)
+                VALUES (%s, %s, GETDATE())
+            """
+            cursor.execute(sql_insert_annex, (inserted_id, file_url))
+
+        connection.commit()
+        return inserted_id
+
+    except Exception as e:
+        if connection:
+            connection.rollback()
+
+        print(f"Error creando el Documento: {e}")
+        raise e
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def edit_document(data, new_file_url=None):
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        # 1. ACTUALIZAR VALORES DE LOS CAMPOS
+        sql_update_value = """
+            UPDATE Documents.FieldValue
+            SET Value = %s
+            WHERE FieldID = %s AND DocumentID = %s
+        """
+
+        # Iteramos sobre los campos recibidos.
+        # data['fields'] viene como [{'fieldId': 1, 'value': 'Nuevo Valor'}, ...]
+        for field in data.get('fields', []):
+            field_id = field.get('fieldId')
+            new_value = field.get('value')
+            
+            # Ejecutamos update para cada campo
+            cursor.execute(sql_update_value, (new_value, field_id, data['id']))
+
+        # 2. ACTUALIZAR ARCHIVO ADJUNTO (Solo si se subió uno nuevo)
+        if new_file_url:
+            # Opción A: Actualizar el registro existente (si la relación es 1 a 1)
+            sql_update_annex = """
+                UPDATE Documents.DocumentAnnex
+                SET AnnexURL = %s, Date = GETDATE()
+                WHERE DocumentID = %s
+            """
+            cursor.execute(sql_update_annex, (new_file_url, data['id']))
+            
+            # Nota: Si checkeas rowcount y da 0, significa que el documento no tenía anexo previo.
+            # En ese caso podrías necesitar hacer un INSERT de contingencia.
+            if cursor.rowcount == 0:
+                sql_insert_annex = """
+                    INSERT INTO Documents.DocumentAnnex (DocumentID, AnnexURL, Date)
+                    VALUES (%s, %s, GETDATE())
+                """
+                cursor.execute(sql_insert_annex, (data['id'], new_file_url))
+
+        connection.commit()
+        return True
+
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        print(f"Error actualizando el Documento: {e}")
+        raise e
+    
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+def get_documents_lists(data):
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT 
+            D.DocumentID AS id, 
+            D.TypeID AS typeId, 
+            DT.Name AS docTypeName,
+            D.CompanyID AS companyId, 
+            C.Name AS companyName,  
+            -- Fecha del anexo (puede ser null si no se ha subido)
+            A.Date AS annexDate
+        FROM Documents.Document D
+        
+        -- JOIN para obtener el nombre del tipo (útil para el frontend)
+        JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
+        
+        -- JOIN para obtener el nombre de la empresa
+        JOIN Documents.Company C ON D.CompanyID = C.CompanyID
+        
+        -- LEFT JOIN CRÍTICO: Trae el documento aunque no tenga anexo en la tabla DocumentAnnex
+        LEFT JOIN Documents.DocumentAnnex A ON A.DocumentID = D.DocumentID
+        
+        -- FILTRO POR ID (Numérico)
+        WHERE D.TypeID = %s
+        """
+
+        cursor.execute(sql, (data['docType_id'],))
+        documents = cursor.fetchall()
+        
+        return documents
+    
+    except Exception as e:
+        print(f"Error SQL en get_documents_lists: {e}")
+        # Retornamos lista vacía en caso de error para no romper el frontend, 
+        # aunque idealmente se debería propagar la excepción.
+        return []
+    
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
 
 """
 ---- QUERIES APP DE DOCUMENTOS ---
