@@ -571,17 +571,21 @@
                 continue;
             }
             let amountToApply = Math.min(payment.amount, invoiceRemaining);
-            if (amountToApply > 0) {
+                if (amountToApply > 0) {
                 // Registrar pago aplicado a la factura, agregando el índice de la forma de pago
-                let daysElapsed = 0;
+                let realDays = 0;
                 if (payment.dateObj && !isNaN(invoice.dueDate.getTime())){
                     const difference = payment.dateObj - invoice.dueDate;
-                    daysElapsed = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
+                    realDays = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
                 }
+                // Si la forma de pago es retención, los días usados para cálculo se toman siempre como 0
+                const effectiveDays = payment.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays);
+                // Guardar ambos: 'realDays' para mostrar en UI y 'daysElapsed' (effective) para cálculos
                 invoice.payments.push({
                     amount: amountToApply,
                     paymentDate: payment.dateObj,
-                    daysElapsed: isNaN(daysElapsed) ? 0 : daysElapsed,
+                    daysElapsed: effectiveDays,
+                    realDays: isNaN(realDays) ? 0 : realDays,
                     paymentRowIdx: payment.paymentRowIdx // Relación con la forma de pago
                 });
                 invoice.amountPaid = parseFloat((invoice.amountPaid + amountToApply).toFixed(2));
@@ -609,8 +613,10 @@
             // Mostrar saldo pendiente
             balanceCalculationFields[idx].textContent = formatSpanishNumber(invoice.remaining);
             invoice.element.dataset.invoicePaidAmount = invoice.amountPaid.toFixed(2);
-            // Mostrar todos los días transcurridos de los pagos aplicados
-            let daysElapsedList = invoice.payments.map(p => p.daysElapsed);
+            // Mostrar todos los días transcurridos reales de los pagos aplicados (UI)
+            let daysElapsedList = invoice.payments.map(p => p.realDays);
+            // Guardar en el dataset los días efectivos usados para cálculo (para uso interno/envío)
+            invoice.element.dataset.calculatedDays = invoice.payments.length > 0 ? invoice.payments.map(p => p.daysElapsed).join(' / ') : '0';
             // Tooltip explicativo para el usuario
             const tooltipText = 'Si la factura fue pagada con varias formas de pago, aquí se mostrarán los días transcurridos de cada pago, separados por "/".';
             daysPassedFields[idx].textContent = daysElapsedList.length > 0 ? daysElapsedList.join(" / ") : "0";
@@ -628,9 +634,6 @@
                 const payCurrencyId = paymentData[paymentRowIdx]?.currencyId || receiptCurrency;
                 const payCurrencyCode = getCurrencyCodeById(payCurrencyId);
 
-                if (paymentData[paymentRowIdx]?.isRetention) {
-                    // Retenciones no generan comisión
-                } else {
                     for (let i=0; i<businessRules.length; i++){
                         const comm = businessRules[i];
                         if (!commissionApplied) {
@@ -669,7 +672,6 @@
                             }
                         }
                     }
-                }
 
                 //console.log(`Comisión por moneda para la factura ${invoice.docType} N_CTA ${document.querySelectorAll('.heading-table tr')[idx + 1]?.children[0].textContent.trim()}:`, commissionPerCurrency);
             });
@@ -901,10 +903,14 @@
             // leer detalle por moneda almacenado en el elemento de factura
             const balanceCalcEls = document.querySelectorAll('#balance_calculation');
             const commissionPerCurrencyRaw = balanceCalcEls[idx].dataset.commissionPerCurrency ? JSON.parse(balanceCalcEls[idx].dataset.commissionPerCurrency) : {};
+            // Para envío, usar los días efectivos usados en el cálculo (dataset.calculatedDays),
+            // mientras que la UI muestra los días reales.
+            const calculatedDaysRaw = balanceCalcEls[idx].dataset.calculatedDays || '';
+            const daysPassedForSend = calculatedDaysRaw ? parseInt(calculatedDaysRaw.split('/')[0].trim()) : 0;
             commissionData.push({
                 account_id: accountInputs[idx].value,
                 balance_amount: cleanNumberForServer(document.querySelectorAll('#balance_calculation')[idx].textContent),
-                days_passed: parseInt(document.querySelectorAll('#days_passed')[idx].textContent),
+                days_passed: daysPassedForSend,
                 commission_per_currency: commissionPerCurrencyRaw
             });
         });
@@ -979,15 +985,17 @@
             }
             let amountToApply = Math.min(payment.amount, invoiceRemaining);
             if (amountToApply > 0) {
-                let daysElapsed = 0;
+                let realDays = 0;
                 if (payment.dateObj && !isNaN(invoice.dueDate.getTime())){
                     const difference = payment.dateObj - invoice.dueDate;
-                    daysElapsed = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
+                    realDays = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
                 }
+                const effectiveDays = payment.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays);
                 invoice.payments.push({
                     amount: amountToApply,
                     paymentDate: payment.dateObj,
-                    daysElapsed: isNaN(daysElapsed) ? 0 : daysElapsed,
+                    daysElapsed: effectiveDays,
+                    realDays: isNaN(realDays) ? 0 : realDays,
                     paymentRowIdx: payment.paymentRowIdx
                 });
                 invoice.amountPaid = parseFloat((invoice.amountPaid + amountToApply).toFixed(2));
@@ -1017,28 +1025,23 @@
                 let commissionAmount = 0;
                 let commissionApplied = false;
 
-                // Si la forma de pago es retención, la comisión es 0
-                if (paymentData[paymentRowIdx]?.isRetention) {
-                    commissionAmount = 0;
-                } else {
-                    for (let i=0; i<businessRules.length; i++){
-                        const comm = businessRules[i];
-                        if (!commissionApplied) {
-                            const isLastRule = (i === businessRules.length - 1);
-                            const conditionMet = isLastRule 
-                                ? payment.daysElapsed >= comm[2]
-                                : payment.daysElapsed <= comm[2];
-                            if (conditionMet && comm[3] == 1) {
-                                let amountForCommission = payment.amount;
-                                if (amountForCommission < 0) amountForCommission = 0;
-                                if (invoice.docType === 'FAC') {
-                                    commissionAmount = amountForCommission / 1.16 * (comm[1] / 100);
-                                } else if (invoice.docType === 'N/E') {
-                                    commissionAmount = amountForCommission * (comm[1] / 100);
-                                }
-                                commissionId = comm[0];
-                                commissionApplied = true;
+                for (let i=0; i<businessRules.length; i++){
+                    const comm = businessRules[i];
+                    if (!commissionApplied) {
+                        const isLastRule = (i === businessRules.length - 1);
+                        const conditionMet = isLastRule 
+                            ? payment.daysElapsed >= comm[2]
+                            : payment.daysElapsed <= comm[2];
+                        if (conditionMet && comm[3] == 1) {
+                            let amountForCommission = payment.amount;
+                            if (amountForCommission < 0) amountForCommission = 0;
+                            if (invoice.docType === 'FAC') {
+                                commissionAmount = amountForCommission / 1.16 * (comm[1] / 100);
+                            } else if (invoice.docType === 'N/E') {
+                                commissionAmount = amountForCommission * (comm[1] / 100);
                             }
+                            commissionId = comm[0];
+                            commissionApplied = true;
                         }
                     }
                 }
@@ -1047,10 +1050,6 @@
                 let commissionPerCurrency = {}; // { 'Bs': 150.00, 'USD': 50.00 }
                 let commissionIdForThisPayment = null;
 
-                if (paymentData[paymentRowIdx]?.isRetention) {
-                    // Las Retenciones no generan comisión
-                    commissionPerCurrency = {};
-                } else {
                     // Determinación de la moneda y código de la forma de pago
                     const payCurrencyId = paymentData[paymentRowIdx]?.currencyId || receiptCurrency;
                     const payCurrencyCode = getCurrencyCodeById(payCurrencyId);
@@ -1090,7 +1089,6 @@
                             }
                         }
                     }
-                }
 
                 // Cálculo de representación en Bs y USD del monto aplicado de esta entrada
                 const payCurrencyIdForLog = paymentData[paymentRowIdx]?.currencyId || receiptCurrency;
