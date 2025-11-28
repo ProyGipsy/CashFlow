@@ -663,6 +663,17 @@ def set_isReviewedReceipt(receipt_id):
     conn.commit()
     conn.close()
 
+# Marca que un recibo ha pagado una deuda en su totalidad
+def set_DebtSettlement(account_id, receipt_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+                   INSERT INTO Commission_Receipt.DebtSettlement(AccountID, ReceiptID)
+                    VALUES(%, %)
+                   ''', (account_id, receipt_id))
+    conn.commit()
+    conn.close()
+
 def set_isApprovedReceipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
