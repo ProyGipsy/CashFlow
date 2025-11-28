@@ -663,15 +663,41 @@ def set_isReviewedReceipt(receipt_id):
     conn.commit()
     conn.close()
 
+# Obtiene todos los recibos que han abonado a una debt account
+def get_all_related_receipts(account_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT DISTINCT PaymentReceiptID 
+        FROM [Commission_Receipt].[DebtPaymentRelation] 
+        WHERE DebtAccountID = %s
+    ''', (account_id,))
+    
+    # Extraer solo el ID del recibo de los resultados
+    receipt_ids = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return receipt_ids
+
 # Marca que un recibo ha pagado una deuda en su totalidad
 def set_DebtSettlement(account_id, receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    # Verificación de existencia previa
     cursor.execute('''
-                   INSERT INTO Commission_Receipt.DebtSettlement(AccountID, ReceiptID)
-                    VALUES(%, %)
-                   ''', (account_id, receipt_id))
-    conn.commit()
+        SELECT 1
+        FROM Commission_Receipt.DebtSettlement
+        WHERE AccountID = %s AND ReceiptID = %s
+    ''', (account_id, receipt_id))
+    existing_record = cursor.fetchone()
+
+    # Si no existe el registro, insertar (no debería existir)
+    if existing_record is None:
+        cursor.execute('''
+                    INSERT INTO Commission_Receipt.DebtSettlement(AccountID, ReceiptID)
+                        VALUES(%s, %s)
+                    ''', (account_id, receipt_id))
+        conn.commit()
     conn.close()
 
 def set_isApprovedReceipt(receipt_id):

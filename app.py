@@ -35,7 +35,8 @@ from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_re
     set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
     get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount, get_customers_admin,
     get_count_customers_with_accountsReceivable_admin, get_receiptStores_DebtAccount_admin, get_invoices_by_customer_admin, 
-    set_paymentEntryCommission, get_SalesRepCommission_OLD, check_already_paid_invoices, check_duplicate_receipt, set_DebtSettlement)
+    set_paymentEntryCommission, get_SalesRepCommission_OLD, check_already_paid_invoices, check_duplicate_receipt, set_DebtSettlement,
+    get_all_related_receipts)
     
 from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepNameAndEmail)
 
@@ -1148,7 +1149,9 @@ def send_validationEmail():
         paid_amount = invoice[4]
         account_id = invoice[5]
         if(total_debt == paid_amount):
-            set_DebtSettlement(account_id, receipt_id)
+            related_receipt_ids = get_all_related_receipts(account_id)
+            for r_id in related_receipt_ids:
+                set_DebtSettlement(account_id, r_id)
     
     # Logo Store (dinámico desde store[2])
     logo_store_path = store[2] if store and len(store) > 2 else None
