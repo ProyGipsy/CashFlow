@@ -784,6 +784,77 @@ def get_documents_lists(data):
         if cursor: cursor.close()
         if connection: connection.close()
 
+def get_document_by_id(data):
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        # 1. OBTENER CABECERA (Datos fijos + Anexo)
+        sql_header = """
+            SELECT 
+                D.DocumentID, 
+                D.TypeID, 
+                DT.Name AS TypeName,
+                D.CompanyID, 
+                C.Name AS CompanyName, 
+                DA.AnnexURL
+            FROM Documents.Document D
+            -- Join para nombre del tipo
+            JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
+            -- Join para nombre de la empresa
+            JOIN Documents.Company C ON D.CompanyID = C.CompanyID
+            -- Left Join para el anexo (puede no tener, o no haberse subido aún)
+            LEFT JOIN Documents.DocumentAnnex DA ON D.DocumentID = DA.DocumentID
+            WHERE D.DocumentID = %s
+        """
+        
+        cursor.execute(sql_header, (data['id'],))
+        doc_header = cursor.fetchone()
+
+        if not doc_header:
+            return None
+
+        # 2. OBTENER VALORES DE LOS CAMPOS (Datos dinámicos)
+        sql_values = """
+            SELECT 
+                TF.Name AS FieldName, 
+                FV.Value
+            FROM Documents.FieldValue FV
+            JOIN Documents.TypeFields TF ON FV.FieldID = TF.FieldID
+            WHERE FV.DocumentID = %s
+        """
+        
+        cursor.execute(sql_values, (data['id'],))
+        field_rows = cursor.fetchall()
+
+        # 3. TRANSFORMACIÓN DE DATOS (Para el Frontend)
+        
+        fields_data_dict = {row['FieldName']: row['Value'] for row in field_rows}
+
+        # Construimos el objeto final
+        document_full = {
+            'DocumentID': doc_header['DocumentID'],
+            'TypeID': doc_header['TypeID'],
+            'TypeName': doc_header['TypeName'],
+            'CompanyID': doc_header['CompanyID'],
+            'CompanyName': doc_header['CompanyName'],
+            'AnnexURL': doc_header['AnnexURL'],
+            'fieldsData': fields_data_dict # <--- Esto es lo que usa el Modal para rellenar inputs
+        }
+
+        return document_full
+
+    except Exception as e:
+        print(f"Error obteniendo detalle del documento ID {data.get('id')}: {e}")
+        raise e # Relanzamos para que la ruta capture el 500
+    
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
 """
 ---- QUERIES APP DE DOCUMENTOS ---
 

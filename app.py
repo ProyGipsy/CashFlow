@@ -51,6 +51,7 @@ from documents import (
     create_document,
     edit_document,
     get_documents_lists,
+    get_document_by_id,
     create_company,
     update_company,
     get_roles,
@@ -1940,11 +1941,38 @@ def getDocumentsList():
         documents = get_documents_lists(data)
         
         # Si retorna una lista vacía, es un 200 OK (simplemente no hay documentos aún)
-        print(documents)
         return jsonify(documents), 200
 
     except Exception as e:
         print(f"Error en endpoint getDocumentsList: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@app.route('/documents/getDocument', methods=['GET'])
+def getDocument():
+    """
+    Endpoint para obtener datos de un documento específico
+    """
+    doc_id = request.args.get('id')
+
+    if not doc_id:
+        return jsonify({'error': 'Falta el parámetro id'}), 400
+
+    data = {
+        'id': doc_id,
+    }
+
+    try:
+        document = get_document_by_id(data)
+
+        if not document:
+            return jsonify({
+                'error': 'No se encontró el documento solicitado',
+            }), 404
+
+        return document, 200
+
+    except Exception as e:
+        print(f"Error en endpoint getDocument: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
 
 if __name__ == '__main__':
