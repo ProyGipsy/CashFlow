@@ -218,6 +218,10 @@
             }
         });
     });
+    // Después del DOMContentLoaded, aplicar deshabilitación global si corresponde
+    document.addEventListener('DOMContentLoaded', function() {
+        applyGlobalRetentionDisableToRows();
+    });
     function loadTenders(currencyId, row) {
         fetch(`/get_tenders/${currencyId}`)
             .then(response => response.json())
@@ -236,8 +240,63 @@
                     option.textContent = tender.description;
                     targetSelect.appendChild(option);
                 });
+
+                // Después de agregar opciones, verificar si esta fila ya está vinculada a
+                // algún documento de tipo N/E. Si es así, deshabilitar la opción de retenciones (id 12)
+                // para evitar que el usuario la seleccione.
+                try {
+                    const appliedDocTypes = row.dataset.appliedDocTypes ? JSON.parse(row.dataset.appliedDocTypes) : [];
+                    // Considerar también la regla global (primer doc o todos N/E)
+                    const shouldDisableRetentions = appliedDocTypes.includes('N/E') || shouldDisableRetentionsGlobally();
+                    const retentionOption = Array.from(targetSelect.options).find(o => String(o.value) === '12' || o.textContent.toUpperCase().includes('RETENCIONES'));
+                    if (retentionOption) {
+                        retentionOption.disabled = shouldDisableRetentions;
+                        // Si actualmente está seleccionada y debe deshabilitarse, resetear la selección
+                        if (shouldDisableRetentions && targetSelect.value == String(retentionOption.value)) {
+                            targetSelect.selectedIndex = 0;
+                            // refrescar cuentas bancarias para la fila
+                            updateBankAccounts(targetSelect);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error aplicando restricción de retenciones:', e);
+                }
             })
             .catch(error => console.error('Error:', error));
+    }
+
+    // Obtener tipos de documento de las facturas listadas en la tabla (excluye encabezado)
+    function getInvoiceDocTypes() {
+        const rows = Array.from(document.querySelectorAll('.heading-table tr')).slice(1);
+        return rows.map(r => r.children[1] ? r.children[1].textContent.trim() : '');
+    }
+
+    // Determina si, por regla global (primer documento o todos N/E), deben deshabilitarse las retenciones
+    function shouldDisableRetentionsGlobally() {
+        const types = getInvoiceDocTypes();
+        if (!types || types.length === 0) return false;
+        const firstIsNE = types[0] === 'N/E';
+        const allAreNE = types.every(t => t === 'N/E');
+        return firstIsNE || allAreNE;
+    }
+
+    // Aplica la deshabilitación global de la opción RETENCIONES a todos los selects existentes
+    function applyGlobalRetentionDisableToRows() {
+        const disableGlobally = shouldDisableRetentionsGlobally();
+        document.querySelectorAll('.payment-row').forEach(row => {
+            const select = row.querySelector('select[name="payment_method"]');
+            if (!select) return;
+            const retentionOption = Array.from(select.options).find(o => String(o.value) === '12' || o.textContent.toUpperCase().includes('RETENCIONES'));
+            const appliedDocTypes = row.dataset.appliedDocTypes ? JSON.parse(row.dataset.appliedDocTypes) : [];
+            const shouldDisable = disableGlobally || (appliedDocTypes && appliedDocTypes.includes('N/E'));
+            if (retentionOption) {
+                retentionOption.disabled = shouldDisable;
+                if (shouldDisable && select.value == String(retentionOption.value)) {
+                    select.selectedIndex = 0;
+                    updateBankAccounts(select);
+                }
+            }
+        });
     }
 
     // Filtro de Cuentas Bancarias
@@ -317,6 +376,8 @@
         
         // Establecer listeners para los nuevos inputs
         addInputListeners();
+        // Aplicar deshabilitación global en la nueva fila en caso de que aplique
+        applyGlobalRetentionDisableToRows();
     });
 
     function deleteRow(btn) {
@@ -605,6 +666,42 @@
             if (invoice.remaining <= 0.001) {
                 invoiceIndex++;
             }
+        }
+        // Construir mapeo de qué filas de pago (paymentRowIdx) aplican a qué tipos de documento
+        try {
+            const paymentRowDocTypesMap = {};
+            receiptData.forEach(inv => {
+                inv.payments.forEach(p => {
+                    const idx = p.paymentRowIdx;
+                    paymentRowDocTypesMap[idx] = paymentRowDocTypesMap[idx] || new Set();
+                    if (inv.docType) paymentRowDocTypesMap[idx].add(inv.docType);
+                });
+            });
+
+            // Asignar al dataset de cada fila de pago para uso por loadTenders
+            paymentData.forEach(pd => {
+                const rowIdx = pd.paymentRowIdx;
+                const rowEl = pd.row;
+                const typesSet = paymentRowDocTypesMap[rowIdx] || new Set();
+                const arr = Array.from(typesSet);
+                rowEl.dataset.appliedDocTypes = JSON.stringify(arr);
+
+                // Actualizar estado de la opción de retenciones si ya tiene el select cargado
+                const tenderSelect = rowEl.querySelector('select[name="payment_method"]');
+                if (tenderSelect) {
+                    const retentionOption = Array.from(tenderSelect.options).find(o => String(o.value) === '12' || o.textContent.toUpperCase().includes('RETENCIONES'));
+                    const shouldDisable = arr.includes('N/E');
+                    if (retentionOption) {
+                        retentionOption.disabled = shouldDisable;
+                        if (shouldDisable && tenderSelect.value == String(retentionOption.value)) {
+                            tenderSelect.selectedIndex = 0;
+                            updateBankAccounts(tenderSelect);
+                        }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Error construyendo mapeo paymentRowDocTypesMap:', e);
         }
         // Actualización de la interfaz y cálculo de comisión por factura y ahora por moneda
         let totalCommissionPerCurrency = {}; // Ejemplo: { 'Bs': 150.00, 'USD': 50.00 }
