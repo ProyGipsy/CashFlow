@@ -1622,8 +1622,11 @@ def upload_file_to_onedrive(file_object):
     if response.status_code not in (200, 201):
         raise Exception(f"Error creando enlace OneDrive: {response.text}")
 
-    # Retornamos solo la URL pública
-    return response.json()['link']['webUrl']
+    result = {
+        'filename': unique_name,
+        'link': response.json()['link']['webUrl']
+    }
+    return result
 
 # Endpoints para el módulo de Documentos
 @app.route('/documents/getDocType', methods=['GET'])
@@ -1956,7 +1959,9 @@ def createDoc():
 
             # 3. SUBIR ARCHIVO (Aquí iría tu lógica real de OneDrive)
             try:
-                file_url = upload_file_to_onedrive(file)
+                result = upload_file_to_onedrive(file)
+                filename = result['filename']
+                file_url = result['link']
             
             except Exception as e:
                 print(f"Error subiendo archivo a OneDrive: {e}")
@@ -2017,7 +2022,10 @@ def editDoc():
             if file and file.filename != '':
                 # Lógica de subida a OneDrive
                 try:
-                    new_file_url = upload_file_to_onedrive(file)
+                    result = upload_file_to_onedrive(file)
+
+                    filename = result['filename']
+                    new_file_url = ['link']
                 
                 except Exception as e:
                     print(f"Error subiendo archivo a OneDrive: {e}")
@@ -2025,6 +2033,8 @@ def editDoc():
                         'error': 'Error al subir la factura a OneDrive',
                         'details': str(e)
                     }), 500
+        else:
+            new_file_url = None
                 
         # 3. LLAMAR A LA LÓGICA DE ACTUALIZACIÓN
         success = edit_document(data, new_file_url)
