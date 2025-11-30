@@ -1,45 +1,112 @@
 import os
-import urllib.parse
 import json
-from io import BytesIO
-import mimetypes
-import requests
 import base64
-from datetime import datetime, timedelta
+import requests
+import mimetypes
 
-#from weasyprint import HTML
-from werkzeug.utils import secure_filename
-
-from datetime import datetime
-from flask import (Flask, redirect, render_template, request, send_from_directory, url_for, jsonify, make_response, current_app, session)
+from io import BytesIO
+from reports import reports_bp
+from urllib.parse import quote
 from flask_session import Session
 from flask_mail import Mail, Message
-from reports import reports_bp
-#from documents import documents_bp
+from datetime import datetime, timedelta
+from onedrive import get_onedrive_headers
+from werkzeug.utils import secure_filename
+
+from flask import (
+    Flask, 
+    redirect, 
+    render_template, 
+    request, 
+    send_from_directory, 
+    url_for, 
+    jsonify, 
+    make_response, 
+    current_app, 
+    session
+    )
+
+#from weasyprint import HTML
 
 #Imports para módulo de Documentos
 from flask_cors import CORS
 from flask import request, jsonify
 
-from cashflow_db import (get_beneficiaries, get_cashflowStores, get_concepts, get_creditConcepts, get_debitConcepts,
-    get_operations, get_last_beneficiary_id, get_last_concept_id, get_motion_id, get_last_store_id,
-    set_beneficiaries, set_concepts, set_stores, set_operations, get_operations_count)
+from cashflow_db import (
+    get_beneficiaries, 
+    get_cashflowStores, 
+    get_concepts, 
+    get_creditConcepts, 
+    get_debitConcepts,
+    get_operations, 
+    get_last_beneficiary_id, 
+    get_last_concept_id, 
+    get_motion_id, 
+    get_last_store_id,
+    set_beneficiaries, 
+    set_concepts, 
+    set_stores, 
+    set_operations, 
+    get_operations_count
+    )
 
 # OJO: Variables balance corresponden a PaidAmount
-from receipt_db import (get_db_connection, get_receiptStores_DebtAccount, get_receiptStores_Receipts, get_receiptStores_Sellers,
-    get_receiptStore_by_id, get_sellers, get_count_sellers, get_seller_details, get_customers, get_tender, get_commissionsRules,
-    get_invoices_by_customer, get_receiptsInfo, get_receiptsStoreCustomer, get_bankAccounts, get_commissions, get_customer_by_id,
-    get_customers_with_unvalidated_receipts, get_count_customers_with_unvalidated_receipts, get_unvalidated_receipts_by_customer,
-    get_invoices_by_receipt, get_paymentEntries_by_receipt, get_salesRep_isRetail, set_SalesRepCommission, get_SalesRepCommission,
-    set_commissionsRules, set_paymentReceipt, set_paymentEntry, save_proofOfPayment, set_invoicePaidAmount, set_DebtPaymentRelation,
-    set_isReviewedReceipt, set_isApprovedReceipt, get_onedriveProofsOfPayments, get_onedriveStoreLogo, get_count_customers_with_accountsReceivable,
-    get_currency, get_paymentRelations_by_receipt, get_invoiceCurrentPaidAmount, revert_invoicePaidAmount, get_customers_admin,
-    get_count_customers_with_accountsReceivable_admin, get_receiptStores_DebtAccount_admin, get_invoices_by_customer_admin, 
-    set_paymentEntryCommission, get_SalesRepCommission_OLD, check_already_paid_invoices, check_duplicate_receipt)
+from receipt_db import (
+    get_db_connection,
+    get_receiptStores_DebtAccount,
+    get_receiptStores_Receipts,
+    get_receiptStores_Sellers,
+    get_receiptStore_by_id,
+    get_sellers, get_count_sellers,
+    get_seller_details, 
+    get_customers, 
+    get_tender, 
+    get_commissionsRules,
+    get_invoices_by_customer, 
+    get_receiptsInfo, 
+    get_receiptsStoreCustomer, 
+    get_bankAccounts, 
+    get_commissions, 
+    get_customer_by_id,
+    get_customers_with_unvalidated_receipts, 
+    get_count_customers_with_unvalidated_receipts, 
+    get_unvalidated_receipts_by_customer,
+    get_invoices_by_receipt, 
+    get_paymentEntries_by_receipt, 
+    get_salesRep_isRetail, 
+    set_SalesRepCommission, 
+    get_SalesRepCommission,
+    set_commissionsRules, 
+    set_paymentReceipt, 
+    set_paymentEntry, 
+    save_proofOfPayment, 
+    set_invoicePaidAmount, 
+    set_DebtPaymentRelation,
+    set_isReviewedReceipt, 
+    set_isApprovedReceipt, 
+    get_onedriveProofsOfPayments, 
+    get_onedriveStoreLogo, 
+    get_count_customers_with_accountsReceivable,
+    get_currency, 
+    get_paymentRelations_by_receipt, 
+    get_invoiceCurrentPaidAmount, 
+    revert_invoicePaidAmount, 
+    get_customers_admin,
+    get_count_customers_with_accountsReceivable_admin, 
+    get_receiptStores_DebtAccount_admin, 
+    get_invoices_by_customer_admin, 
+    set_paymentEntryCommission, 
+    get_SalesRepCommission_OLD, 
+    check_already_paid_invoices, 
+    check_duplicate_receipt
+    )
     
-from accessControl import (get_user_data, get_roleInfo, get_userEmail, get_salesRepNameAndEmail)
-
-from onedrive import get_onedrive_headers
+from accessControl import (
+    get_user_data, 
+    get_roleInfo, 
+    get_userEmail, 
+    get_salesRepNameAndEmail
+    )
 
 #Funciones para la obtención de datos desde BD para Documentos
 from documents import (
@@ -51,6 +118,7 @@ from documents import (
     create_document,
     edit_document,
     get_documents_lists,
+    get_all_documents_lists,
     get_document_by_id,
     create_company,
     update_company,
@@ -1514,6 +1582,49 @@ def generate_pdf():
     response.headers['Content-Disposition'] = f'inline; filename="{safe_filename}"'
     return response
 
+#Función de subida a OneDrive para Documentos
+def upload_file_to_onedrive(file_object):
+    """
+    Sube un archivo a OneDrive y devuelve el enlace público.
+    """
+    headers = get_onedrive_headers()
+    original_filename = secure_filename(file_object.filename) 
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    unique_name = f"{timestamp}_{original_filename}"
+    
+    # Ruta de la carpeta en OneDrive
+    raw_folder_path = "APP DOCUMENTOS/Anexos"
+    folder_path = quote(raw_folder_path)
+    user_email = "desarrollo@grupogipsy.com"
+
+    # 1. SUBIDA DEL ARCHIVO (PUT)
+    upload_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/root:/{folder_path}/{unique_name}:/content"
+
+    resp = requests.put(upload_url, headers=headers, data=file_object.read())
+
+    if resp.status_code not in (200, 201):
+        raise Exception(f"Error OneDrive ({resp.status_code}): {resp.text}")
+
+    data = resp.json()
+    file_id = data['id']
+
+    # 2. GENERAR ENLACE PÚBLICO (POST)
+    create_link_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/items/{file_id}/createLink"
+
+    body = {
+        'type': 'view',
+        'scope': 'anonymous'
+    }
+
+    response = requests.post(create_link_url, headers=headers, json=body)
+    
+    if response.status_code not in (200, 201):
+        raise Exception(f"Error creando enlace OneDrive: {response.text}")
+
+    # Retornamos solo la URL pública
+    return response.json()['link']['webUrl']
+
 # Endpoints para el módulo de Documentos
 @app.route('/documents/getDocType', methods=['GET'])
 def getDoctTypes():
@@ -1842,12 +1953,20 @@ def createDoc():
         # Convertimos el string a Diccionario Python
         try:
             data = json.loads(json_data_string)
+
+            # 3. SUBIR ARCHIVO (Aquí iría tu lógica real de OneDrive)
+            try:
+                file_url = upload_file_to_onedrive(file)
+            
+            except Exception as e:
+                print(f"Error subiendo archivo a OneDrive: {e}")
+                return jsonify({
+                    'error': 'Error al subir la factura a OneDrive',
+                    'details': str(e)
+                }), 500
+
         except json.JSONDecodeError:
             return jsonify({'error': 'El formato de los datos JSON es inválido'}), 400
-
-        # 3. SUBIR ARCHIVO (Aquí iría tu lógica real de OneDrive)
-        # file_url = upload_to_onedrive(file) <--- Tu función real iría aquí
-        file_url = f"https://onedrive.live.com/anexos/{file.filename}" # Simulación
 
         # 4. LLAMAR A LA LÓGICA DE BASE DE DATOS
         document_id = create_document(data, file_url)
@@ -1890,20 +2009,23 @@ def editDoc():
         if 'id' not in data:
             return jsonify({'error': 'Se requiere el ID del documento para editar'}), 400
 
-        # 2. GESTIÓN DEL ARCHIVO (OPCIONAL EN EDICIÓN)
-        new_file_url = None
-        
         # Verificamos si en la petición viene un archivo llamado 'file'
         if 'file' in request.files:
             file = request.files['file']
             
             # A veces el navegador envía el campo vacío si no se selecciona nada
             if file and file.filename != '':
-                # --- LOGICA DE SUBIDA (Simulada) ---
-                # filename = secure_filename(file.filename)
-                # new_file_url = upload_to_onedrive(file) 
-                new_file_url = f"https://onedrive.live.com/anexos/UPDATED_{file.filename}" # Simulación
-
+                # Lógica de subida a OneDrive
+                try:
+                    new_file_url = upload_file_to_onedrive(file)
+                
+                except Exception as e:
+                    print(f"Error subiendo archivo a OneDrive: {e}")
+                    return jsonify({
+                        'error': 'Error al subir la factura a OneDrive',
+                        'details': str(e)
+                    }), 500
+                
         # 3. LLAMAR A LA LÓGICA DE ACTUALIZACIÓN
         success = edit_document(data, new_file_url)
 
@@ -1921,6 +2043,21 @@ def editDoc():
     except Exception as e:
         print(f"Error en endpoint editDocument: {e}")
         return jsonify({'error': 'Error interno del servidor', 'details': str(e)}), 500        
+
+@app.route('/documents/getAllDocumentsList', methods=['GET'])
+def getAllDocumentsList():
+    """
+    Endpoint para obtener lista de todos los documentos sin filtro.
+    """
+    try:
+        documents = get_all_documents_lists()
+        
+        # Si retorna una lista vacía, es un 200 OK (simplemente no hay documentos aún)
+        return jsonify(documents), 200
+
+    except Exception as e:
+        print(f"Error en endpoint getAllDocumentsList: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 @app.route('/documents/getDocumentsList', methods=['GET'])
 def getDocumentsList():

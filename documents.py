@@ -784,6 +784,43 @@ def get_documents_lists(data):
         if cursor: cursor.close()
         if connection: connection.close()
 
+def get_all_documents_lists():
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT 
+            D.DocumentID, 
+            D.TypeID, 
+            DT.Name AS TypeName,
+            D.CompanyID, 
+            C.Name AS CompanyName, 
+            DA.Date AS AnnexDate
+        FROM Documents.Document D
+        JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
+        JOIN Documents.Company C ON D.CompanyID = C.CompanyID
+        LEFT JOIN Documents.DocumentAnnex DA ON D.DocumentID = DA.DocumentID
+        """
+
+        cursor.execute(sql)
+        documents = cursor.fetchall()
+        
+        return documents
+    
+    except Exception as e:
+        print(f"Error SQL en get_all_documents_lists: {e}")
+        # Retornamos lista vacía en caso de error para no romper el frontend, 
+        # aunque idealmente se debería propagar la excepción.
+        return []
+    
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
 def get_document_by_id(data):
     connection = None
     cursor = None
