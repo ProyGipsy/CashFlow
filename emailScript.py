@@ -1,14 +1,14 @@
 import os
-from email.message import EmailMessage
 import ssl
 import smtplib
-from pathlib import Path
 import mimetypes
+
+from pathlib import Path
 from datetime import datetime
-
 from dotenv import load_dotenv
-load_dotenv()
+from email.message import EmailMessage
 
+load_dotenv()
 
 # --- FUNCIÓN DE ENVÍO DE CORREO ---
 def send_email(subject, body_html, sender_email, email_password, receiver_emails, attachments=None):
@@ -16,7 +16,7 @@ def send_email(subject, body_html, sender_email, email_password, receiver_emails
     print(f"Iniciando envío de correo a: {', '.join(receiver_emails)}")
     print(f"Asunto: {subject}")
 
-    mail_server = os.environ.get("MAIL_SERVER")
+    mail_server = os.environ.get("MAIL_SERVER_DOCUMENTS")
     mail_port = os.environ.get("EMAIL_PORT", 587) # Puerto estándar para STARTTLS
 
     msg = EmailMessage()
@@ -241,6 +241,26 @@ def create_new_doc_html(data):
         </tr>
         """
 
+    # --- Lógica del Botón de Descarga ---
+    file_url = data.get('file_url')
+    
+    if file_url:
+        attachment_section = f"""
+        <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin-bottom: 15px;">Puede visualizar o descargar el documento original desde el siguiente enlace:</p>
+            <a href="{file_url}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #8b56ed; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px;">
+                📄 Ver Documento Adjunto (PDF)
+            </a>
+            <p style="margin-top: 10px; font-size: 12px; color: #999;">Enlace seguro a OneDrive</p>
+        </div>
+        """
+    else:
+        attachment_section = """
+        <div style="margin-top: 20px; padding: 10px; background-color: #f9f9f9; border-radius: 5px; text-align: center; color: #666;">
+            <em>Este documento se ha registrado sin archivo adjunto.</em>
+        </div>
+        """
+
     html_content = f"""
     <!DOCTYPE html>
     <html lang="es">
@@ -251,15 +271,15 @@ def create_new_doc_html(data):
     <body>
         <div class="container">
             <div class="header">
-                <h2>Gipsy Documentos - Nuevo Documento Creado</h2>
+                <h2>Gipsy Documentos - Nuevo Documento</h2>
             </div>
             <div class="body-content">
                 <p><strong>Hola, {data.get('user_name', 'Usuario')}.</strong></p>
-                <p>Se ha creado un nuevo documento en la plataforma. A continuación, se detallan los datos del mismo:</p>
+                <p>Se ha registrado un nuevo documento exitosamente en la plataforma:</p>
                 
-                <table class="data-table">
+                <table class="data-table" style="margin-top: 20px;">
                     <tr>
-                        <th>Tipo de Documento</th>
+                        <th style="width: 40%;">Tipo de Documento</th>
                         <td>{data.get('doc_type', 'N/A')}</td>
                     </tr>
                     <tr>
@@ -268,15 +288,15 @@ def create_new_doc_html(data):
                     </tr>
                 </table>
 
-                <h3 style="color: #421d83;">Datos del Documento</h3>
+                <h3 style="color: #421d83; margin-top: 25px;">Datos Registrados</h3>
                 <table class="data-table">
                     {fields_rows}
                 </table>
                 
-                <p>Para su referencia, se adjunta el archivo .pdf correspondiente a este documento.</p>
+                {attachment_section}
             </div>
             <div class="footer">
-                <p>Este es un correo automático, por favor no responda a este mensaje.</p>
+                <p>Este es un correo automático generado por el sistema de gestión documental.</p>
             </div>
         </div>
     </body>
@@ -288,8 +308,10 @@ def create_new_doc_html(data):
 # --- ENVÍO DE CORREO DE DOCUMENTOS ---
 
 def generate_document_content_html(doc_data):
-    """Genera un bloque HTML estilizado para mostrar los campos de un documento,
-    usando estilos consistentes con la paleta de colores del CSS base."""
+    """
+    Genera un bloque HTML estilizado para mostrar los campos de un documento,
+    usando estilos consistentes con la paleta de colores del CSS base.
+    """
 
     # Colores extraídos del CSS base:
     COLOR_DARK_LILA = "#421d83"
@@ -298,8 +320,37 @@ def generate_document_content_html(doc_data):
     COLOR_BG_DETAIL = "#f9f9f9"
     COLOR_BORDER = "#e0e0e0"
     
-    doc_title = f"{doc_data.get('docTypeName', 'Documento sin Nombre')} ({doc_data.get('companyName', 'Empresa Desconocida')})"
+    # 1. CORRECCIÓN DE NOMBRES (Probamos ambas claves por seguridad)
+    type_name = doc_data.get('TypeName') or doc_data.get('docTypeName') or 'Documento sin Nombre'
+    company_name = doc_data.get('CompanyName') or doc_data.get('companyName') or 'Empresa Desconocida'
     
+    doc_title = f"{type_name} ({company_name})"
+    
+    # 2. LÓGICA PARA EL ENLACE DEL DOCUMENTO
+    annex_url = doc_data.get('AnnexURL') or doc_data.get('attachment')
+    attachment_display = '<span style="color: #999;">Sin archivo adjunto</span>'
+    
+    if annex_url:
+        # Si es una URL completa (OneDrive), creamos un enlace
+        if str(annex_url).startswith('http'):
+            # Intentamos obtener un nombre limpio del archivo desde la URL
+            filename = annex_url.split('/')[-1]
+            try:
+                from urllib.parse import unquote
+                filename = unquote(filename)
+            except: 
+                pass
+            
+            # Creamos el botón/enlace HTML
+            attachment_display = f"""
+            <a href="{annex_url}" target="_blank" style="color: {COLOR_PRIMARY_LILA}; text-decoration: none; font-weight: bold;">
+                📄 Click aquí para Ver/Descargar el archivo
+            </a>
+            """
+        else:
+            # Si solo es el nombre (legacy data), lo mostramos como texto
+            attachment_display = annex_url
+
     # Encabezado del bloque del documento
     html = f"""
         <tr>
@@ -307,8 +358,8 @@ def generate_document_content_html(doc_data):
                 <h3 style="margin: 0; font-size: 16px; color: {COLOR_DARK_LILA}; border-bottom: 1px solid {COLOR_BORDER}; padding-bottom: 5px;">
                     Detalles del Documento: {doc_title}
                 </h3>
-                <p style="margin-top: 10px; margin-bottom: 0; font-size: 13px; color: #555; font-style: italic;">
-                    Archivo Adjunto: {doc_data.get('attachment', 'N/A')}
+                <p style="margin-top: 5px; margin-bottom: 0; font-size: 13px; color: #555;">
+                    {attachment_display}
                 </p>
             </td>
         </tr>
@@ -366,31 +417,39 @@ def generate_document_content_html(doc_data):
 
 def create_custom_email_html(custom_email_data, document_data_list=None): 
     """
-    Genera el cuerpo HTML completo de un correo personalizado usando clases CSS 
-    del estilo base.
+    Genera el cuerpo HTML completo de un correo personalizado.
+    Adaptada para recibir las claves que envía el Frontend (SendDocumentModal).
     """
     
-    css_styles = get_base_email_style() # Obtiene la cadena CSS
+    css_styles = get_base_email_style()
     
-    greeting_name = custom_email_data.get("greeting_name", "Estimado/a")
-    body_message = custom_email_data.get("body_message", "Se adjunta la documentación solicitada.")
-    signature_name = custom_email_data.get("signature_name", "El Equipo de Gipsy")
+    # --- CORRECCIÓN DE MAPEO DE CLAVES ---
+    # El Frontend envía: recipientName, senderName, body
+    greeting_name = custom_email_data.get("recipientName", "Estimado usuario")
+    body_message = custom_email_data.get("body", "Se adjunta la documentación solicitada.")
+    signature_name = custom_email_data.get("senderName", "El Equipo de Gipsy")
 
+    # Convertir saltos de línea (\n) en <br> para HTML
     body_message_html = body_message.replace('\n', '<br>')
     
     # Generar el contenido de los documentos si existe
     documents_html_blocks = ""
     if document_data_list and isinstance(document_data_list, list):
         # Encabezado antes de los documentos
-        documents_html_blocks = f"""
+        header_block = f"""
         <tr>
             <td class="body-content" style="padding: 0 0 10px 0;">
                 <p style="font-weight: bold; margin-bottom: 0;">Documentos Enviados:</p>
             </td>
         </tr>
-        """ + "".join(generate_document_content_html(doc_data) for doc_data in document_data_list)
+        """
+        # Generamos los bloques de cada documento
+        # Nota: Asegúrate de que generate_document_content_html esté definida arriba en el mismo archivo
+        docs_content = "".join(generate_document_content_html(doc_data) for doc_data in document_data_list)
+        
+        documents_html_blocks = header_block + docs_content
 
-    # HTML Template que respeta la estructura de email-safe tables y usa las clases CSS
+    # HTML Template
     html_content = f"""
     <!DOCTYPE html>
     <html lang="es">
@@ -448,7 +507,6 @@ def create_custom_email_html(custom_email_data, document_data_list=None):
     """
     
     return html_content
-
 
 # --- CORREO DE NOTIFICACIÓN DE ENVÍO ---
 
