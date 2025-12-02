@@ -98,7 +98,9 @@ from receipt_db import (
     set_paymentEntryCommission, 
     get_SalesRepCommission_OLD, 
     check_already_paid_invoices, 
-    check_duplicate_receipt
+    check_duplicate_receipt,
+    set_DebtSettlement,
+    get_all_related_receipts
     )
     
 from accessControl import (
@@ -1215,6 +1217,16 @@ def send_validationEmail():
     """
     set_isReviewedReceipt(receipt_id)
     set_isApprovedReceipt(receipt_id)
+
+    # Si el recibo validado paga la totalidad de una factura, se registra en DebtSettlement
+    for invoice in invoices:
+        total_debt = invoice[1]
+        paid_amount = invoice[4]
+        account_id = invoice[5]
+        if(total_debt == paid_amount):
+            related_receipt_ids = get_all_related_receipts(account_id)
+            for r_id in related_receipt_ids:
+                set_DebtSettlement(account_id, r_id)
     
     # Logo Store (dinámico desde store[2])
     logo_store_path = store[2] if store and len(store) > 2 else None

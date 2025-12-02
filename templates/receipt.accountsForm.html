@@ -218,6 +218,10 @@
             }
         });
     });
+    // Después del DOMContentLoaded, aplicar deshabilitación global si corresponde
+    document.addEventListener('DOMContentLoaded', function() {
+        applyGlobalRetentionDisableToRows();
+    });
     function loadTenders(currencyId, row) {
         fetch(`/get_tenders/${currencyId}`)
             .then(response => response.json())
@@ -236,8 +240,63 @@
                     option.textContent = tender.description;
                     targetSelect.appendChild(option);
                 });
+
+                // Después de agregar opciones, verificar si esta fila ya está vinculada a
+                // algún documento de tipo N/E. Si es así, deshabilitar la opción de retenciones (id 12)
+                // para evitar que el usuario la seleccione.
+                try {
+                    const appliedDocTypes = row.dataset.appliedDocTypes ? JSON.parse(row.dataset.appliedDocTypes) : [];
+                    // Considerar también la regla global (primer doc o todos N/E)
+                    const shouldDisableRetentions = appliedDocTypes.includes('N/E') || shouldDisableRetentionsGlobally();
+                    const retentionOption = Array.from(targetSelect.options).find(o => String(o.value) === '12' || o.textContent.toUpperCase().includes('RETENCIONES'));
+                    if (retentionOption) {
+                        retentionOption.disabled = shouldDisableRetentions;
+                        // Si actualmente está seleccionada y debe deshabilitarse, resetear la selección
+                        if (shouldDisableRetentions && targetSelect.value == String(retentionOption.value)) {
+                            targetSelect.selectedIndex = 0;
+                            // refrescar cuentas bancarias para la fila
+                            updateBankAccounts(targetSelect);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error aplicando restricción de retenciones:', e);
+                }
             })
             .catch(error => console.error('Error:', error));
+    }
+
+    // Obtener tipos de documento de las facturas listadas en la tabla (excluye encabezado)
+    function getInvoiceDocTypes() {
+        const rows = Array.from(document.querySelectorAll('.heading-table tr')).slice(1);
+        return rows.map(r => r.children[1] ? r.children[1].textContent.trim() : '');
+    }
+
+    // Determina si, por regla global (primer documento o todos N/E), deben deshabilitarse las retenciones
+    function shouldDisableRetentionsGlobally() {
+        const types = getInvoiceDocTypes();
+        if (!types || types.length === 0) return false;
+        const firstIsNE = types[0] === 'N/E';
+        const allAreNE = types.every(t => t === 'N/E');
+        return firstIsNE || allAreNE;
+    }
+
+    // Aplica la deshabilitación global de la opción RETENCIONES a todos los selects existentes
+    function applyGlobalRetentionDisableToRows() {
+        const disableGlobally = shouldDisableRetentionsGlobally();
+        document.querySelectorAll('.payment-row').forEach(row => {
+            const select = row.querySelector('select[name="payment_method"]');
+            if (!select) return;
+            const retentionOption = Array.from(select.options).find(o => String(o.value) === '12' || o.textContent.toUpperCase().includes('RETENCIONES'));
+            const appliedDocTypes = row.dataset.appliedDocTypes ? JSON.parse(row.dataset.appliedDocTypes) : [];
+            const shouldDisable = disableGlobally || (appliedDocTypes && appliedDocTypes.includes('N/E'));
+            if (retentionOption) {
+                retentionOption.disabled = shouldDisable;
+                if (shouldDisable && select.value == String(retentionOption.value)) {
+                    select.selectedIndex = 0;
+                    updateBankAccounts(select);
+                }
+            }
+        });
     }
 
     // Filtro de Cuentas Bancarias
@@ -317,6 +376,8 @@
         
         // Establecer listeners para los nuevos inputs
         addInputListeners();
+        // Aplicar deshabilitación global en la nueva fila en caso de que aplique
+        applyGlobalRetentionDisableToRows();
     });
 
     function deleteRow(btn) {
@@ -571,17 +632,21 @@
                 continue;
             }
             let amountToApply = Math.min(payment.amount, invoiceRemaining);
-            if (amountToApply > 0) {
+                if (amountToApply > 0) {
                 // Registrar pago aplicado a la factura, agregando el índice de la forma de pago
-                let daysElapsed = 0;
+                let realDays = 0;
                 if (payment.dateObj && !isNaN(invoice.dueDate.getTime())){
                     const difference = payment.dateObj - invoice.dueDate;
-                    daysElapsed = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
+                    realDays = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
                 }
+                // Si la forma de pago es retención, los días usados para cálculo se toman siempre como 0
+                const effectiveDays = payment.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays);
+                // Guardar ambos: 'realDays' para mostrar en UI y 'daysElapsed' (effective) para cálculos
                 invoice.payments.push({
                     amount: amountToApply,
                     paymentDate: payment.dateObj,
-                    daysElapsed: isNaN(daysElapsed) ? 0 : daysElapsed,
+                    daysElapsed: effectiveDays,
+                    realDays: isNaN(realDays) ? 0 : realDays,
                     paymentRowIdx: payment.paymentRowIdx // Relación con la forma de pago
                 });
                 invoice.amountPaid = parseFloat((invoice.amountPaid + amountToApply).toFixed(2));
@@ -602,6 +667,42 @@
                 invoiceIndex++;
             }
         }
+        // Construir mapeo de qué filas de pago (paymentRowIdx) aplican a qué tipos de documento
+        try {
+            const paymentRowDocTypesMap = {};
+            receiptData.forEach(inv => {
+                inv.payments.forEach(p => {
+                    const idx = p.paymentRowIdx;
+                    paymentRowDocTypesMap[idx] = paymentRowDocTypesMap[idx] || new Set();
+                    if (inv.docType) paymentRowDocTypesMap[idx].add(inv.docType);
+                });
+            });
+
+            // Asignar al dataset de cada fila de pago para uso por loadTenders
+            paymentData.forEach(pd => {
+                const rowIdx = pd.paymentRowIdx;
+                const rowEl = pd.row;
+                const typesSet = paymentRowDocTypesMap[rowIdx] || new Set();
+                const arr = Array.from(typesSet);
+                rowEl.dataset.appliedDocTypes = JSON.stringify(arr);
+
+                // Actualizar estado de la opción de retenciones si ya tiene el select cargado
+                const tenderSelect = rowEl.querySelector('select[name="payment_method"]');
+                if (tenderSelect) {
+                    const retentionOption = Array.from(tenderSelect.options).find(o => String(o.value) === '12' || o.textContent.toUpperCase().includes('RETENCIONES'));
+                    const shouldDisable = arr.includes('N/E');
+                    if (retentionOption) {
+                        retentionOption.disabled = shouldDisable;
+                        if (shouldDisable && tenderSelect.value == String(retentionOption.value)) {
+                            tenderSelect.selectedIndex = 0;
+                            updateBankAccounts(tenderSelect);
+                        }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Error construyendo mapeo paymentRowDocTypesMap:', e);
+        }
         // Actualización de la interfaz y cálculo de comisión por factura y ahora por moneda
         let totalCommissionPerCurrency = {}; // Ejemplo: { 'Bs': 150.00, 'USD': 50.00 }
         const businessRules = JSON.parse('{{ commissions | tojson | safe }}');
@@ -609,8 +710,10 @@
             // Mostrar saldo pendiente
             balanceCalculationFields[idx].textContent = formatSpanishNumber(invoice.remaining);
             invoice.element.dataset.invoicePaidAmount = invoice.amountPaid.toFixed(2);
-            // Mostrar todos los días transcurridos de los pagos aplicados
-            let daysElapsedList = invoice.payments.map(p => p.daysElapsed);
+            // Mostrar todos los días transcurridos reales de los pagos aplicados (UI)
+            let daysElapsedList = invoice.payments.map(p => p.realDays);
+            // Guardar en el dataset los días efectivos usados para cálculo (para uso interno/envío)
+            invoice.element.dataset.calculatedDays = invoice.payments.length > 0 ? invoice.payments.map(p => p.daysElapsed).join(' / ') : '0';
             // Tooltip explicativo para el usuario
             const tooltipText = 'Si la factura fue pagada con varias formas de pago, aquí se mostrarán los días transcurridos de cada pago, separados por "/".';
             daysPassedFields[idx].textContent = daysElapsedList.length > 0 ? daysElapsedList.join(" / ") : "0";
@@ -628,9 +731,6 @@
                 const payCurrencyId = paymentData[paymentRowIdx]?.currencyId || receiptCurrency;
                 const payCurrencyCode = getCurrencyCodeById(payCurrencyId);
 
-                if (paymentData[paymentRowIdx]?.isRetention) {
-                    // Retenciones no generan comisión
-                } else {
                     for (let i=0; i<businessRules.length; i++){
                         const comm = businessRules[i];
                         if (!commissionApplied) {
@@ -669,7 +769,6 @@
                             }
                         }
                     }
-                }
 
                 //console.log(`Comisión por moneda para la factura ${invoice.docType} N_CTA ${document.querySelectorAll('.heading-table tr')[idx + 1]?.children[0].textContent.trim()}:`, commissionPerCurrency);
             });
@@ -901,10 +1000,14 @@
             // leer detalle por moneda almacenado en el elemento de factura
             const balanceCalcEls = document.querySelectorAll('#balance_calculation');
             const commissionPerCurrencyRaw = balanceCalcEls[idx].dataset.commissionPerCurrency ? JSON.parse(balanceCalcEls[idx].dataset.commissionPerCurrency) : {};
+            // Para envío, usar los días efectivos usados en el cálculo (dataset.calculatedDays),
+            // mientras que la UI muestra los días reales.
+            const calculatedDaysRaw = balanceCalcEls[idx].dataset.calculatedDays || '';
+            const daysPassedForSend = calculatedDaysRaw ? parseInt(calculatedDaysRaw.split('/')[0].trim()) : 0;
             commissionData.push({
                 account_id: accountInputs[idx].value,
                 balance_amount: cleanNumberForServer(document.querySelectorAll('#balance_calculation')[idx].textContent),
-                days_passed: parseInt(document.querySelectorAll('#days_passed')[idx].textContent),
+                days_passed: daysPassedForSend,
                 commission_per_currency: commissionPerCurrencyRaw
             });
         });
@@ -979,15 +1082,17 @@
             }
             let amountToApply = Math.min(payment.amount, invoiceRemaining);
             if (amountToApply > 0) {
-                let daysElapsed = 0;
+                let realDays = 0;
                 if (payment.dateObj && !isNaN(invoice.dueDate.getTime())){
                     const difference = payment.dateObj - invoice.dueDate;
-                    daysElapsed = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
+                    realDays = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
                 }
+                const effectiveDays = payment.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays);
                 invoice.payments.push({
                     amount: amountToApply,
                     paymentDate: payment.dateObj,
-                    daysElapsed: isNaN(daysElapsed) ? 0 : daysElapsed,
+                    daysElapsed: effectiveDays,
+                    realDays: isNaN(realDays) ? 0 : realDays,
                     paymentRowIdx: payment.paymentRowIdx
                 });
                 invoice.amountPaid = parseFloat((invoice.amountPaid + amountToApply).toFixed(2));
@@ -1017,28 +1122,23 @@
                 let commissionAmount = 0;
                 let commissionApplied = false;
 
-                // Si la forma de pago es retención, la comisión es 0
-                if (paymentData[paymentRowIdx]?.isRetention) {
-                    commissionAmount = 0;
-                } else {
-                    for (let i=0; i<businessRules.length; i++){
-                        const comm = businessRules[i];
-                        if (!commissionApplied) {
-                            const isLastRule = (i === businessRules.length - 1);
-                            const conditionMet = isLastRule 
-                                ? payment.daysElapsed >= comm[2]
-                                : payment.daysElapsed <= comm[2];
-                            if (conditionMet && comm[3] == 1) {
-                                let amountForCommission = payment.amount;
-                                if (amountForCommission < 0) amountForCommission = 0;
-                                if (invoice.docType === 'FAC') {
-                                    commissionAmount = amountForCommission / 1.16 * (comm[1] / 100);
-                                } else if (invoice.docType === 'N/E') {
-                                    commissionAmount = amountForCommission * (comm[1] / 100);
-                                }
-                                commissionId = comm[0];
-                                commissionApplied = true;
+                for (let i=0; i<businessRules.length; i++){
+                    const comm = businessRules[i];
+                    if (!commissionApplied) {
+                        const isLastRule = (i === businessRules.length - 1);
+                        const conditionMet = isLastRule 
+                            ? payment.daysElapsed >= comm[2]
+                            : payment.daysElapsed <= comm[2];
+                        if (conditionMet && comm[3] == 1) {
+                            let amountForCommission = payment.amount;
+                            if (amountForCommission < 0) amountForCommission = 0;
+                            if (invoice.docType === 'FAC') {
+                                commissionAmount = amountForCommission / 1.16 * (comm[1] / 100);
+                            } else if (invoice.docType === 'N/E') {
+                                commissionAmount = amountForCommission * (comm[1] / 100);
                             }
+                            commissionId = comm[0];
+                            commissionApplied = true;
                         }
                     }
                 }
@@ -1047,10 +1147,6 @@
                 let commissionPerCurrency = {}; // { 'Bs': 150.00, 'USD': 50.00 }
                 let commissionIdForThisPayment = null;
 
-                if (paymentData[paymentRowIdx]?.isRetention) {
-                    // Las Retenciones no generan comisión
-                    commissionPerCurrency = {};
-                } else {
                     // Determinación de la moneda y código de la forma de pago
                     const payCurrencyId = paymentData[paymentRowIdx]?.currencyId || receiptCurrency;
                     const payCurrencyCode = getCurrencyCodeById(payCurrencyId);
@@ -1090,7 +1186,6 @@
                             }
                         }
                     }
-                }
 
                 // Cálculo de representación en Bs y USD del monto aplicado de esta entrada
                 const payCurrencyIdForLog = paymentData[paymentRowIdx]?.currencyId || receiptCurrency;
