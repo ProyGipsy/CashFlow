@@ -126,9 +126,10 @@ from documents import (
     update_company,
     get_roles,
     create_role,
-    update_role,
+    edit_role,
     get_permissions,
     get_users,
+    send_documents,
     )
 
 app = Flask(__name__)
@@ -1915,7 +1916,6 @@ def editRole():
     """
     Endpoint para la actualización de un Rol
     """
-
     data = request.get_json()
 
     if not data:
@@ -1924,12 +1924,11 @@ def editRole():
         }), 400
 
     try:
-        rowcount = update_role(data)
+        success = edit_role(data)
 
-        if rowcount:
+        if success:
             return jsonify({
-                'message': 'Rol actualizado exitosamente',
-                'rows_affected': rowcount
+                'message': 'Rol actualizado exitosamente'
             }), 200
 
         else:
@@ -2133,6 +2132,50 @@ def getDocument():
     except Exception as e:
         print(f"Error en endpoint getDocument: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
+
+@app.route('/documents/sendDocuments', methods=['POST'])
+def sendDocuments():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'error': 'No se proporcionaron datos'
+            }), 400
+
+    doc_ids = data.get('documentIds', [])
+    email_data = data.get('emailData', {})
+
+    if not doc_ids or not email_data:
+        return jsonify({
+            'error': 'Faltan IDs de documentos o datos de correo electrónico'
+        }), 400
+
+    try:
+        full_documents_data = []
+
+        for doc_id in doc_ids:
+            details = get_document_by_id({'id': doc_id})
+
+            if details:
+                full_documents_data.append(details)
+
+        if not full_documents_data:
+            return jsonify({
+                'error': 'No se encontraron los documentos en la base de datos.'
+            }), 404
+
+        result = send_documents(email_data, full_documents_data)
+
+        if result:
+            return jsonify({
+                'success': True
+            }), 200
+
+    except Exception as e:
+        print(f'Error enviando documentos por correo: {e}')
+        return jsonify({
+            'error': f'Error en el servidor: {str(e)}'
+        }), 500
 
 if __name__ == '__main__':
    app.run()
