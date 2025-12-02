@@ -124,7 +124,7 @@ from documents import (
     update_company,
     get_roles,
     create_role,
-    update_role,
+    edit_role,
     get_permissions,
     get_users,
     send_documents,
@@ -1904,7 +1904,6 @@ def editRole():
     """
     Endpoint para la actualización de un Rol
     """
-
     data = request.get_json()
 
     if not data:
@@ -1913,12 +1912,11 @@ def editRole():
         }), 400
 
     try:
-        rowcount = update_role(data)
+        success = edit_role(data)
 
-        if rowcount:
+        if success:
             return jsonify({
-                'message': 'Rol actualizado exitosamente',
-                'rows_affected': rowcount
+                'message': 'Rol actualizado exitosamente'
             }), 200
 
         else:

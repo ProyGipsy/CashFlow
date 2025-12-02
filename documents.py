@@ -544,7 +544,7 @@ def get_roles():
         connection = pool.connection()
         cursor = connection.cursor(as_dict=True)
 
-        sql = """
+        sql_all_roles = """
         SELECT 
             R.roleId, 
             R.name AS roleName,
@@ -555,14 +555,37 @@ def get_roles():
             U.lastName, 
             U.username
         FROM AccessControl.Roles R
-        LEFT JOIN AccessControl.RolePermissions RP ON R.roleId = RP.roleId
+        LEFT JOIN Documents.RolePermissions RP ON R.roleId = RP.roleId
         LEFT JOIN AccessControl.Permissions P ON RP.permissionId = P.permissionId AND P.isDocumentsModule = 1
-        LEFT JOIN AccessControl.UserRoles UR ON R.roleId = UR.roleId
+        LEFT JOIN Documents.UserRoles UR ON R.roleId = UR.roleId
         LEFT JOIN AccessControl.Users U ON UR.userId = U.userId
         ORDER BY R.roleId;
         """
 
-        cursor.execute(sql)
+        sql_only_documents_roles = """
+        SELECT 
+            R.roleId, 
+            R.name AS roleName,
+            P.permissionId, 
+            P.name AS permissionName,
+            U.userId, 
+            U.firstName, 
+            U.lastName, 
+            U.username
+        FROM AccessControl.Roles R
+        -- Usamos INNER JOIN aquí para obligar a que exista una relación con permisos
+        JOIN Documents.RolePermissions RP ON R.roleId = RP.roleId
+        -- Usamos INNER JOIN aquí para obligar a que el permiso exista y sea de Documentos
+        JOIN AccessControl.Permissions P ON RP.permissionId = P.permissionId
+        LEFT JOIN Documents.UserRoles UR ON R.roleId = UR.roleId
+        LEFT JOIN AccessControl.Users U ON UR.userId = U.userId
+        -- Filtramos explícitamente
+        WHERE P.isDocumentsModule = 1 
+        AND RP.isActive = 1 -- (Opcional) Recomendado si manejas borrado lógico
+        ORDER BY R.roleId;
+        """
+
+        cursor.execute(sql_only_documents_roles)
         roles = cursor.fetchall()
         roles = format_roles(roles)
 
@@ -653,20 +676,20 @@ def create_role(data):
         inserted_id = cursor.fetchone()['roleID']
 
         sql_role_permissions = """
-        INSERT INTO AccessControl.RolePermissions (roleId, moduleId, permissionId)
-        VALUES (%s, 3, %s)
+        INSERT INTO Documents.RolePermissions (roleId, permissionId, isActive, lastUpdate)
+        VALUES (%s, %s, 1, GETDATE())
         """
 
         for permiso in data.get('permisos', []):
             cursor.execute(sql_role_permissions, (inserted_id, permiso['id']))
 
         sql_user_roles = """
-        INSERT INTO AccessControl.UserRoles (userId, roleId)
-        VALUES (%s, %s)
+        INSERT INTO Documents.UserRoles (roleId, userId, isActive, lastUpdate)
+        VALUES (%s, %s, 1, GETDATE())
         """
 
         for usuario in data.get('usuarios', []):
-            cursor.execute(sql_user_roles, (usuario['id'], inserted_id))
+            cursor.execute(sql_user_roles, (inserted_id, usuario['id']))
                 
         connection.commit()
 
@@ -685,7 +708,7 @@ def create_role(data):
         if connection:
             connection.close()
 
-def update_role(data):
+def edit_role(data):
     connection = None
     cursor = None
 
@@ -693,26 +716,89 @@ def update_role(data):
         connection = pool.connection()
         cursor = connection.cursor(as_dict=True)
 
-        sql = """
-        UPDATE AccessControl.Roles
-        SET name = ?
-        WHERE roleID = ?
+        # 1. ACTUALIZAR NOMBRE DEL ROL
+        sql_update_role = """
+            UPDATE AccessControl.Roles
+            SET name = %s
+            WHERE roleID = %s
         """
-        cursor.execute(sql, (data['name'], data['id']))
+        cursor.execute(sql_update_role, (data['name'], data['id']))
+
+        # 2. GESTIÓN DE PERMISOS (Estrategia Soft Delete + Upsert)
         
+        # A. "Resetear": Marcar todos los permisos actuales como inactivos
+        sql_deactivate_perms = """
+            UPDATE Documents.RolePermissions 
+            SET isActive = 0, lastUpdate = GETDATE() 
+            WHERE roleId = %s
+        """
+        cursor.execute(sql_deactivate_perms, (data['id'],))
+
+        # B. "Upsert": Reactivar los seleccionados o insertar nuevos
+        sql_update_perm = """
+            UPDATE Documents.RolePermissions
+            SET isActive = 1, lastUpdate = GETDATE()
+            WHERE roleId = %s AND permissionId = %s
+        """
+        
+        sql_insert_perm = """
+            INSERT INTO Documents.RolePermissions (roleId, permissionId, isActive, lastUpdate)
+            VALUES (%s, %s, 1, GETDATE())
+        """
+
+        for permiso in data.get('permisos', []):
+            permission_id = permiso['id']
+            
+            # Intentamos actualizar (reactivar)
+            cursor.execute(sql_update_perm, (data['id'], permission_id))
+            
+            # Si rowcount es 0, significa que la relación no existía, así que insertamos
+            if cursor.rowcount == 0:
+                cursor.execute(sql_insert_perm, (data['id'], permission_id))
+
+        # 3. GESTIÓN DE USUARIOS (Misma estrategia)
+        # A. "Resetear": Marcar todos los usuarios actuales como inactivos
+        sql_deactivate_users = """
+            UPDATE Documents.UserRoles 
+            SET isActive = 0, lastUpdate = GETDATE() 
+            WHERE roleId = %s
+        """
+        cursor.execute(sql_deactivate_users, (data['id'],))
+
+        # B. "Upsert": Reactivar o Insertar
+        sql_update_user = """
+            UPDATE Documents.UserRoles
+            SET isActive = 1, lastUpdate = GETDATE()
+            WHERE roleId = %s AND userId = %s
+        """
+        
+        sql_insert_user = """
+            INSERT INTO Documents.UserRoles (roleId, userId, isActive, lastUpdate)
+            VALUES (%s, %s, 1, GETDATE())
+        """
+
+        for usuario in data.get('usuarios', []):
+            user_id = usuario['id']
+            
+            # Intentamos actualizar (reactivar)
+            cursor.execute(sql_update_user, (data['id'], user_id))
+            
+            # Si no existía, insertamos
+            if cursor.rowcount == 0:
+                cursor.execute(sql_insert_user, (data['id'], user_id))
+
+        connection.commit()
+        return True
 
     except Exception as e:
         if connection:
             connection.rollback()
-
-        print(f"Error actualizando el Rol: {e}")
+        print(f"Error editando el Rol: {e}")
         raise e
 
     finally:
-        if cursor:
-            cursor.close()
-        if connection:
-            connection.close()
+        if cursor: cursor.close()
+        if connection: connection.close()
 
 def create_document(data, file_url):
     connection = None
