@@ -7,12 +7,14 @@ import mimetypes
 from io import BytesIO
 from reports import reports_bp
 from urllib.parse import quote
-#from flask_session import Session
+from flask_session import Session
 from flask_mail import Mail, Message
 from datetime import datetime, timedelta
 from onedrive import get_onedrive_headers
 from werkzeug.utils import secure_filename
 from werkzeug.middleware.proxy_fix import ProxyFix
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+
 
 from flask import (
     Flask, 
@@ -145,21 +147,22 @@ app.config["SESSION_COOKIE_SAMESITE"] = 'None'
 app.config["SESSION_COOKIE_SECURE"] = True
 
 # Configuración de sesión para usuarios
-#app.config["SESSION_PERMANENT"] = False
-#app.config["SESSION_TYPE"] = "filesystem"
-app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
 
 # Definición de una SECRET_KEY
 app.secret_key = os.environ.get('SECRET_KEY')
 
 # Confiar en que Azure maneja el HTTPS
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-#Session(app)
+Session(app)
 
 # Configuración del servidor SMTP
 app.config['MAIL_PORT'] = os.environ.get('MAIL_PORT')
 app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
+
+serializer = URLSafeTimedSerializer(app.secret_key)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -174,7 +177,6 @@ def login():
         user_data = get_user_data(username, password)
 
         if user_data:
-            session.permament = True
             # Creación de la sesión
             session.update({
                 'user_id': user_data['user_id'],
@@ -193,23 +195,35 @@ def login():
    
     return render_template('indexLogin.html')
 
-@app.route('/documents/me', methods=['GET'])
+@app.route('/documents/getUser', methods=['GET'])
 def get_current_user():
-    user_id = session.get('user_id')
-    print(f'Obteniendo info del usuario: {user_id}')
-    if not user_id:
-        return jsonify({'authenticated': False}), 401
+    auth_header = request.headers.get('Authorization')
+    user_id = None
 
-    firstName = session.get('user_firstName')
-    lastName = session.get('user_lastName')
-    
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(" ")[1]
+
+        try:
+            serializer = URLSafeTimedSerializer(app.secret_key)
+            data = serializer.loads(token, salt='transfer-auth', max_age=86400)
+            user_id = data.get('user_id')
+            print(f"Hola desde React, aquí lo leído: {user_id}")
+        
+        except SignatureExpired:
+            return jsonify({
+                'authenticated': False,
+                'message': 'El token ha expirado'
+            }), 401
+
+        except BadSignature:
+            return jsonify({
+                'authenticated': False,
+                'message': 'El token es inválido'
+            }), 401
+
     return jsonify({
-        'authenticated': True,
-        'user': {
-            'id': user_id,
-            'firstName': firstName,
-            'lastName': lastName
-        }
+        'message': 'Probando token de acceso desde Flask',
+        'user_id': user_id   
     }), 200
 
 @app.route('/welcome', methods=['GET', 'POST'])
@@ -227,7 +241,14 @@ def welcome():
                     'name': role_name
                 })
 
-    return render_template('welcome.html', roles_info=roles_info, react_app_url=f"{react_origin}/documents/")
+    user_id = session.get('user_id')
+    token = ""
+
+    if user_id:
+        token = serializer.dumps({'user_id': user_id}, salt='transfer-auth')
+
+    react_target = f"{react_origin}/documents/?token={token}"
+    return render_template('welcome.html', roles_info=roles_info, react_app_url=react_target)
 
 
 # INICIOS DE SESIÓN INDIVIDUALES (Descartados con el nuevo flujo)
