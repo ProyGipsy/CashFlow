@@ -12,6 +12,7 @@ from flask_mail import Mail, Message
 from datetime import datetime, timedelta
 from onedrive import get_onedrive_headers
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from flask import (
     Flask, 
@@ -134,15 +135,25 @@ from documents import (
 
 app = Flask(__name__)
 app.register_blueprint(reports_bp)
-#app.register_blueprint(documents_bp)
 
 #CORS
 react_origin = os.environ.get('VITE_FRONT_API_URL_PROD', 'http://localhost:5173')
 CORS(app, resources={r"/*": {"origins": react_origin}}, supports_credentials=True)
 
+# Configuración de cookies para el Cross-site de Documentos (React)
+app.config["SESSION_COOKIE_SAMESITE"] = 'None'
+app.config["SESSION_COOKIE_SECURE"] = True
+
 # Configuración de sesión para usuarios
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
+
+# Definición de una SECRET_KEY
+app.secret_key = os.environ.get('SECRET_KEY')
+
+# Confiar en que Azure maneja el HTTPS
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
 Session(app)
 
 # Configuración del servidor SMTP
