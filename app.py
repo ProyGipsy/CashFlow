@@ -185,7 +185,7 @@ def login():
                 'modules': user_data['modules_id'],
                 'permissions': user_data['permissions_id']
             })
-            print(session)
+
             return redirect(url_for('welcome'))
         else: 
             return render_template('indexLogin.html', error="Credenciales incorrectas, por favor intente de nuevo.")
@@ -195,7 +195,7 @@ def login():
 @app.route('/documents/me', methods=['GET'])
 def get_current_user():
     user_id = session.get('user_id')
-    print(user_id)
+    print(f'Obteniendo info del usuario: {user_id}')
     if not user_id:
         return jsonify({'authenticated': False}), 401
 
