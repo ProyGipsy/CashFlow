@@ -7,7 +7,7 @@ import mimetypes
 from io import BytesIO
 from reports import reports_bp
 from urllib.parse import quote
-from flask_session import Session
+#from flask_session import Session
 from flask_mail import Mail, Message
 from datetime import datetime, timedelta
 from onedrive import get_onedrive_headers
@@ -145,8 +145,9 @@ app.config["SESSION_COOKIE_SAMESITE"] = 'None'
 app.config["SESSION_COOKIE_SECURE"] = True
 
 # Configuración de sesión para usuarios
-app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_TYPE"] = "filesystem"
+#app.config["SESSION_PERMANENT"] = False
+#app.config["SESSION_TYPE"] = "filesystem"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 
 # Definición de una SECRET_KEY
 app.secret_key = os.environ.get('SECRET_KEY')
@@ -154,7 +155,7 @@ app.secret_key = os.environ.get('SECRET_KEY')
 # Confiar en que Azure maneja el HTTPS
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-Session(app)
+#Session(app)
 
 # Configuración del servidor SMTP
 app.config['MAIL_PORT'] = os.environ.get('MAIL_PORT')
@@ -173,7 +174,7 @@ def login():
         user_data = get_user_data(username, password)
 
         if user_data:
-
+            session.permament = True
             # Creación de la sesión
             session.update({
                 'user_id': user_data['user_id'],
@@ -185,7 +186,7 @@ def login():
                 'modules': user_data['modules_id'],
                 'permissions': user_data['permissions_id']
             })
-
+            print(session)
             return redirect(url_for('welcome'))
         else: 
             return render_template('indexLogin.html', error="Credenciales incorrectas, por favor intente de nuevo.")
