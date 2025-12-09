@@ -642,6 +642,7 @@ def get_users():
         SELECT userId AS id, firstName + ' ' + lastName AS fullName, username 
         FROM AccessControl.Users
         WHERE isActive = 1
+        ORDER BY fullName
         """
 
         cursor.execute(sql)
@@ -651,6 +652,34 @@ def get_users():
     
     except Exception as e:
         print(f"Error al obtener los Usuarios: {e}")
+        return []
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def get_user_by_id(id):
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT userId AS id, firstName, lastName, username, email
+        FROM AccessControl.Users
+        WHERE userId = %s AND isActive = 1
+        """
+        cursor.execute(sql, (id))
+
+        user = cursor.fetchone()
+        return user
+
+    except Exception as e:
+        print(f"Error al obtener el usuario: {e}")
         return []
     
     finally:
