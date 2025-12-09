@@ -12,6 +12,9 @@ from flask_mail import Mail, Message
 from datetime import datetime, timedelta
 from onedrive import get_onedrive_headers
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+
 
 from flask import (
     Flask, 
@@ -134,20 +137,32 @@ from documents import (
 
 app = Flask(__name__)
 app.register_blueprint(reports_bp)
-#app.register_blueprint(documents_bp)
 
 #CORS
 react_origin = os.environ.get('VITE_FRONT_API_URL_PROD', 'http://localhost:5173')
 CORS(app, resources={r"/*": {"origins": react_origin}}, supports_credentials=True)
 
+# Configuración de cookies para el Cross-site de Documentos (React)
+app.config["SESSION_COOKIE_SAMESITE"] = 'None'
+app.config["SESSION_COOKIE_SECURE"] = True
+
 # Configuración de sesión para usuarios
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
+
+# Definición de una SECRET_KEY
+app.secret_key = os.environ.get('SECRET_KEY')
+
+# Confiar en que Azure maneja el HTTPS
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 Session(app)
 
 # Configuración del servidor SMTP
 app.config['MAIL_PORT'] = os.environ.get('MAIL_PORT')
 app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
+
+serializer = URLSafeTimedSerializer(app.secret_key)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -162,7 +177,6 @@ def login():
         user_data = get_user_data(username, password)
 
         if user_data:
-
             # Creación de la sesión
             session.update({
                 'user_id': user_data['user_id'],
@@ -174,12 +188,43 @@ def login():
                 'modules': user_data['modules_id'],
                 'permissions': user_data['permissions_id']
             })
-
+            print(session)
             return redirect(url_for('welcome'))
         else: 
             return render_template('indexLogin.html', error="Credenciales incorrectas, por favor intente de nuevo.")
    
     return render_template('indexLogin.html')
+
+@app.route('/documents/getUser', methods=['GET'])
+def get_current_user():
+    auth_header = request.headers.get('Authorization')
+    user_id = None
+
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(" ")[1]
+
+        try:
+            serializer = URLSafeTimedSerializer(app.secret_key)
+            data = serializer.loads(token, salt='transfer-auth', max_age=86400)
+            user_id = data.get('user_id')
+            print(f"Hola desde React, aquí lo leído: {user_id}")
+        
+        except SignatureExpired:
+            return jsonify({
+                'authenticated': False,
+                'message': 'El token ha expirado'
+            }), 401
+
+        except BadSignature:
+            return jsonify({
+                'authenticated': False,
+                'message': 'El token es inválido'
+            }), 401
+
+    return jsonify({
+        'message': 'Probando token de acceso desde Flask',
+        'user_id': user_id   
+    }), 200
 
 @app.route('/welcome', methods=['GET', 'POST'])
 def welcome():
@@ -196,7 +241,14 @@ def welcome():
                     'name': role_name
                 })
 
-    return render_template('welcome.html', roles_info=roles_info, react_app_url=f"{react_origin}/documents/")
+    user_id = session.get('user_id')
+    token = ""
+
+    if user_id:
+        token = serializer.dumps({'user_id': user_id}, salt='transfer-auth')
+
+    react_target = f"{react_origin}/documents/?token={token}"
+    return render_template('welcome.html', roles_info=roles_info, react_app_url=react_target)
 
 
 # INICIOS DE SESIÓN INDIVIDUALES (Descartados con el nuevo flujo)
