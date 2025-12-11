@@ -994,25 +994,33 @@ def edit_document(data, new_file_url=None):
         connection = pool.connection()
         cursor = connection.cursor(as_dict=True)
 
-        # 1. ACTUALIZAR VALORES DE LOS CAMPOS
+        # SQLs preparados
         sql_update_value = """
             UPDATE Documents.FieldValue
             SET Value = %s
             WHERE FieldID = %s AND DocumentID = %s
         """
+        
+        # Necesitamos el INSERT por si el campo estaba vacío antes
+        sql_insert_value = """
+            INSERT INTO Documents.FieldValue (Value, FieldID, DocumentID)
+            VALUES (%s, %s, %s)
+        """
 
-        # Iteramos sobre los campos recibidos.
-        # data['fields'] viene como [{'fieldId': 1, 'value': 'Nuevo Valor'}, ...]
+        # 1. ACTUALIZAR O INSERTAR VALORES (Lógica UPSERT)
         for field in data.get('fields', []):
             field_id = field.get('fieldId')
             new_value = field.get('value')
             
-            # Ejecutamos update para cada campo
+            # A. Intentamos actualizar
             cursor.execute(sql_update_value, (new_value, field_id, data['id']))
 
-        # 2. ACTUALIZAR ARCHIVO ADJUNTO (Solo si se subió uno nuevo)
+            # B. Si no se actualizó nada (rowcount es 0), significa que el campo no existía. Lo insertamos.
+            if cursor.rowcount == 0:
+                cursor.execute(sql_insert_value, (new_value, field_id, data['id']))
+
+        # 2. ACTUALIZAR ARCHIVO ADJUNTO
         if new_file_url:
-            # Opción A: Actualizar el registro existente (si la relación es 1 a 1)
             sql_update_annex = """
                 UPDATE Documents.DocumentAnnex
                 SET AnnexURL = %s, Date = GETDATE()
@@ -1020,8 +1028,7 @@ def edit_document(data, new_file_url=None):
             """
             cursor.execute(sql_update_annex, (new_file_url, data['id']))
             
-            # Nota: Si checkeas rowcount y da 0, significa que el documento no tenía anexo previo.
-            # En ese caso podrías necesitar hacer un INSERT de contingencia.
+            # Misma lógica: Si no existía anexo, lo creamos
             if cursor.rowcount == 0:
                 sql_insert_annex = """
                     INSERT INTO Documents.DocumentAnnex (DocumentID, AnnexURL, Date)
@@ -1033,10 +1040,9 @@ def edit_document(data, new_file_url=None):
         return True
 
     except Exception as e:
-        if connection:
-            connection.rollback()
+        if connection: connection.rollback()
         print(f"Error actualizando el Documento: {e}")
-        raise e
+        raise e # Re-lanzar para que el endpoint sepa que falló
     
     finally:
         if cursor: cursor.close()
