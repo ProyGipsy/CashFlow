@@ -2015,6 +2015,7 @@ def createDoc():
     Recibe multipart/form-data.
     """
     try:
+        """
         # 1. VALIDAR Y OBTENER EL ARCHIVO
         if 'file' not in request.files:
             return jsonify({'error': 'No se envió el archivo anexo (.pdf)'}), 400
@@ -2023,6 +2024,7 @@ def createDoc():
         
         if file.filename == '':
             return jsonify({'error': 'El archivo no tiene nombre'}), 400
+        """
 
         # 2. VALIDAR Y OBTENER LOS DATOS JSON
         json_data_string = request.form.get('data')
@@ -2034,6 +2036,7 @@ def createDoc():
         try:
             data = json.loads(json_data_string)
 
+            """
             # 3. SUBIR ARCHIVO (Aquí iría tu lógica real de OneDrive)
             try:
                 result = upload_file_to_onedrive(file)
@@ -2046,11 +2049,13 @@ def createDoc():
                     'error': 'Error al subir la factura a OneDrive',
                     'details': str(e)
                 }), 500
+            """
 
         except json.JSONDecodeError:
             return jsonify({'error': 'El formato de los datos JSON es inválido'}), 400
 
         # 4. LLAMAR A LA LÓGICA DE BASE DE DATOS
+        file_url = None
         document_id = create_document(data, file_url)
 
         if document_id:
