@@ -10,6 +10,7 @@ cryptography==44.0.2
 cssselect2==0.8.0
 DBUtils==3.1.1
 Flask==3.1.0
+flask-cors==6.0.1
 Flask-Mail==0.10.0
 Flask-Session==0.6.0
 fonttools==4.56.0
@@ -23,7 +24,9 @@ markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 mdurl==0.1.2
 msal==1.32.0
+numpy==2.3.5
 packaging==24.2
+pandas==2.3.3
 pdfkit==1.0.0
 pillow==11.1.0
 platformdirs==4.2.2
@@ -38,15 +41,19 @@ pyodbc==5.2.0
 pyphen==0.17.2
 pyppeteer==2.0.0
 pyscript==0.3.3
+python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
+pytz==2025.2
 requests==2.26.0
 rich==13.7.1
+six==1.17.0
 tinycss2==1.4.0
 tinyhtml5==2.0.0
 toml==0.10.2
 tqdm==4.67.1
 typer==0.9.0
 typing_extensions==4.12.2
+tzdata==2025.2
 urllib3==1.26.20
 weasyprint==64.1
 webencodings==0.5.1
@@ -54,4 +61,3 @@ websockets==10.4
 Werkzeug==3.1.0
 zipp==3.21.0
 zopfli==0.2.3.post1
-flask-cors==6.0.1
