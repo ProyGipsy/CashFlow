@@ -174,8 +174,11 @@ def login():
     if request.method == 'POST':
         username = request.form.get('User')
         password = request.form.get('Password')
+        print('username: ', username)
+        print('password: ', password)
 
         user_data = get_user_data(username, password)
+        print('user_data: ', user_data)
 
         if user_data:
             # Creación de la sesión
