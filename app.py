@@ -132,6 +132,7 @@ from documents import (
     edit_role,
     get_permissions,
     get_users,
+    get_user_by_id,
     send_documents,
     )
 
@@ -207,7 +208,18 @@ def get_current_user():
             serializer = URLSafeTimedSerializer(app.secret_key)
             data = serializer.loads(token, salt='transfer-auth', max_age=86400)
             user_id = data.get('user_id')
-            print(f"Hola desde React, aquí lo leído: {user_id}")
+            user_data = get_user_by_id(user_id)
+
+            if user_data:
+                return jsonify({
+                    'message': 'Usuario autorizado',
+                    'user': user_data  
+                }), 200
+            
+            else:
+                return jsonify({
+                    'error': 'Usuario no encontrado'
+                }), 404
         
         except SignatureExpired:
             return jsonify({
@@ -220,11 +232,10 @@ def get_current_user():
                 'authenticated': False,
                 'message': 'El token es inválido'
             }), 401
-
-    return jsonify({
-        'message': 'Probando token de acceso desde Flask',
-        'user_id': user_id   
-    }), 200
+    else:
+        return jsonify({
+            'error': 'Petición no autorizada'
+        }), 500
 
 @app.route('/welcome', methods=['GET', 'POST'])
 def welcome():
