@@ -2048,7 +2048,6 @@ def createDoc():
                     }), 500
 
         # 3. LLAMAR A LA LÓGICA DE BASE DE DATOS
-        # Pasamos file_url, que será una URL válida o None
         document_id = create_document(data, file_url)
 
         if document_id:
@@ -2133,7 +2132,11 @@ def getAllDocumentsList():
     Endpoint para obtener lista de todos los documentos sin filtro.
     """
     try:
-        documents = get_all_documents_lists()
+        # Obtener parámetros del Query String (?page=1&pageSize=20&search=...)
+        page = request.args.get('page', 1, type=int)
+        page_size = request.args.get('pageSize', 20, type=int)
+
+        documents = get_all_documents_lists(page=page, page_size=page_size)
         
         # Si retorna una lista vacía, es un 200 OK (simplemente no hay documentos aún)
         return jsonify(documents), 200
