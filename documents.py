@@ -37,6 +37,7 @@ def get_docs_by_type():
         sql = """
         SELECT TypeID AS id, Name AS name, ShortName AS shortName 
         FROM Documents.DocumentType
+        ORDER BY name
         """
 
         cursor.execute(sql)
@@ -65,6 +66,7 @@ def get_docs_companies():
         sql = """
         SELECT CompanyID AS id, Name AS name, RIFtype AS rifType, RIFnumber AS rifNumber
         FROM Documents.Company
+        ORDER BY name
         """
 
         cursor.execute(sql)
@@ -173,9 +175,7 @@ def create_doc_type(data):
         
         connection.commit()
 
-        # ==========================================
         # 3. NOTIFICACIÓN POR CORREO (Usando tu función)
-        # ==========================================
         try:
             # A. Obtener credenciales de variables de entorno
             sender_email = os.environ.get("MAIL_USERNAME_DOCUMENTS") # O MAIL_USERNAME_RECEIPT según tu .env
@@ -612,6 +612,7 @@ def get_permissions():
         SELECT permissionId AS id, name 
         FROM AccessControl.Permissions
         WHERE isDocumentsModule = 1
+        ORDER BY name
         """
 
         cursor.execute(sql)
@@ -1048,7 +1049,7 @@ def edit_document(data, new_file_url=None):
         if cursor: cursor.close()
         if connection: connection.close()
 
-def get_documents_lists(data):
+def get_documents_by_type_id(data):
     connection = None
     cursor = None
 
@@ -1070,7 +1071,7 @@ def get_documents_lists(data):
         -- JOIN para obtener el nombre del tipo (útil para el frontend)
         JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
         
-        -- JOIN para obtener el nombre de la empresa
+        -- JOIN para obtener el Nombre de la Entidad
         JOIN Documents.Company C ON D.CompanyID = C.CompanyID
         
         -- LEFT JOIN CRÍTICO: Trae el documento aunque no tenga anexo en la tabla DocumentAnnex
@@ -1086,7 +1087,7 @@ def get_documents_lists(data):
         return documents
     
     except Exception as e:
-        print(f"Error SQL en get_documents_lists: {e}")
+        print(f"Error SQL en get_documents_by_type_id: {e}")
         # Retornamos lista vacía en caso de error para no romper el frontend, 
         # aunque idealmente se debería propagar la excepción.
         return []
@@ -1152,7 +1153,7 @@ def get_document_by_id(data):
             FROM Documents.Document D
             -- Join para nombre del tipo
             JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
-            -- Join para nombre de la empresa
+            -- Join para Nombre de la Entidad
             JOIN Documents.Company C ON D.CompanyID = C.CompanyID
             -- Left Join para el anexo (puede no tener, o no haberse subido aún)
             LEFT JOIN Documents.DocumentAnnex DA ON D.DocumentID = DA.DocumentID
