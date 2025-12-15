@@ -174,8 +174,11 @@ def login():
     if request.method == 'POST':
         username = request.form.get('User')
         password = request.form.get('Password')
+        print('username: ', username)
+        print('password: ', password)
 
         user_data = get_user_data(username, password)
+        print('user_data: ', user_data)
 
         if user_data:
             # Creación de la sesión
@@ -2008,46 +2011,44 @@ def editRole():
 @app.route('/documents/createDocument', methods=['POST'])
 def createDoc():
     """
-    Endpoint para la creación de un documento con archivo adjunto.
+    Endpoint para la creación de un documento con archivo adjunto OPCIONAL.
     Recibe multipart/form-data.
     """
     try:
-        # 1. VALIDAR Y OBTENER EL ARCHIVO
-        if 'file' not in request.files:
-            return jsonify({'error': 'No se envió el archivo anexo (.pdf)'}), 400
-        
-        file = request.files['file']
-        
-        if file.filename == '':
-            return jsonify({'error': 'El archivo no tiene nombre'}), 400
-
-        # 2. VALIDAR Y OBTENER LOS DATOS JSON
+        # 1. VALIDAR Y OBTENER LOS DATOS JSON (Obligatorio)
         json_data_string = request.form.get('data')
         
         if not json_data_string:
             return jsonify({'error': 'No se recibieron los datos del documento'}), 400
 
-        # Convertimos el string a Diccionario Python
         try:
             data = json.loads(json_data_string)
-
-            # 3. SUBIR ARCHIVO (Aquí iría tu lógica real de OneDrive)
-            try:
-                result = upload_file_to_onedrive(file)
-                filename = result['filename']
-                file_url = result['link']
-            
-            except Exception as e:
-                print(f"Error subiendo archivo a OneDrive: {e}")
-                return jsonify({
-                    'error': 'Error al subir la factura a OneDrive',
-                    'details': str(e)
-                }), 500
-
         except json.JSONDecodeError:
             return jsonify({'error': 'El formato de los datos JSON es inválido'}), 400
 
-        # 4. LLAMAR A LA LÓGICA DE BASE DE DATOS
+        # 2. GESTIÓN DEL ARCHIVO (Opcional)
+        file_url = None # Valor por defecto si no hay archivo
+
+        # Verificamos si existe la key 'file' y si el archivo tiene nombre
+        if 'file' in request.files:
+            file = request.files['file']
+            
+            if file and file.filename != '':
+                # SOLO SI HAY ARCHIVO VALIDO -> SUBIMOS A ONEDRIVE
+                try:
+                    result = upload_file_to_onedrive(file)
+                    # filename = result['filename'] # No lo usamos abajo, pero está disponible
+                    file_url = result['link']
+                
+                except Exception as e:
+                    print(f"Error subiendo archivo a OneDrive: {e}")
+                    return jsonify({
+                        'error': 'Error al subir el anexo a OneDrive',
+                        'details': str(e)
+                    }), 500
+
+        # 3. LLAMAR A LA LÓGICA DE BASE DE DATOS
+        # Pasamos file_url, que será una URL válida o None
         document_id = create_document(data, file_url)
 
         if document_id:
@@ -2084,39 +2085,37 @@ def editDoc():
         except json.JSONDecodeError:
             return jsonify({'error': 'JSON inválido'}), 400
 
-        # Validación básica
         if 'id' not in data:
             return jsonify({'error': 'Se requiere el ID del documento para editar'}), 400
 
-        # Verificamos si en la petición viene un archivo llamado 'file'
+        # 2. GESTIÓN DEL ARCHIVO (Opcional)
+        new_file_url = None # Por defecto no hay cambio de archivo
+
         if 'file' in request.files:
             file = request.files['file']
             
-            # A veces el navegador envía el campo vacío si no se selecciona nada
+            # Solo procesamos si el archivo existe y tiene nombre
             if file and file.filename != '':
-                # Lógica de subida a OneDrive
                 try:
                     result = upload_file_to_onedrive(file)
-
-                    filename = result['filename']
-                    new_file_url = ['link']
+                    # filename = result['filename']
+                    new_file_url = result['link'] # <--- CORREGIDO (antes decía ['link'])
                 
                 except Exception as e:
                     print(f"Error subiendo archivo a OneDrive: {e}")
                     return jsonify({
-                        'error': 'Error al subir la factura a OneDrive',
+                        'error': 'Error al subir el anexo a OneDrive',
                         'details': str(e)
                     }), 500
-        else:
-            new_file_url = None
-                
+
         # 3. LLAMAR A LA LÓGICA DE ACTUALIZACIÓN
+        # Si new_file_url es None, la función edit_document debería saber que no debe actualizar ese campo
         success = edit_document(data, new_file_url)
 
         if success:
             response = {'message': 'Documento actualizado exitosamente'}
             
-            # Si hubo cambio de archivo, devolvemos la nueva URL para que el frontend actualice su estado
+            # Si hubo cambio de archivo, devolvemos la nueva URL
             if new_file_url:
                 response['new_annex_url'] = new_file_url
                 
@@ -2126,7 +2125,7 @@ def editDoc():
 
     except Exception as e:
         print(f"Error en endpoint editDocument: {e}")
-        return jsonify({'error': 'Error interno del servidor', 'details': str(e)}), 500        
+        return jsonify({'error': 'Error interno del servidor', 'details': str(e)}), 500      
 
 @app.route('/documents/getAllDocumentsList', methods=['GET'])
 def getAllDocumentsList():
