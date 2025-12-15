@@ -1096,7 +1096,7 @@ def get_documents_by_type_id(data):
         if cursor: cursor.close()
         if connection: connection.close()
 
-def get_all_documents_lists():
+def get_all_documents_lists(page=1, page_size=20):
     connection = None
     cursor = None
 
@@ -1104,6 +1104,11 @@ def get_all_documents_lists():
         connection = pool.connection()
         cursor = connection.cursor(as_dict=True)
 
+        # Calculamos el desplazamiento para la paginación
+        offset = (page - 1) * page_size
+
+        # Consulta base
+        # NOTA: Agregamos FV.Value como 'ExpirationDate'
         sql = """
         SELECT 
             D.DocumentID, 
@@ -1111,23 +1116,60 @@ def get_all_documents_lists():
             DT.Name AS TypeName,
             D.CompanyID, 
             C.Name AS CompanyName, 
-            DA.Date AS AnnexDate
+            DA.Date AS AnnexDate,
+            FV.Value AS ExpirationDate, -- <--- EL CAMPO MÁGICO
+            COUNT(*) OVER() as TotalCount -- <--- Para saber el total de páginas
         FROM Documents.Document D
         JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
         JOIN Documents.Company C ON D.CompanyID = C.CompanyID
         LEFT JOIN Documents.DocumentAnnex DA ON D.DocumentID = DA.DocumentID
+        
+        -- JOIN para obtener la Fecha de Vencimiento dinámicamente
+        -- Buscamos valores donde el campo asociado tenga nombre 'Vencimiento' o similar
+        LEFT JOIN Documents.FieldValue FV ON D.DocumentID = FV.DocumentID 
+            AND FV.FieldID IN (
+                SELECT FieldID FROM Documents.TypeFields 
+                WHERE Name LIKE '%Vencimiento%' OR Name LIKE '%Fecha%Venc%'
+            )
         """
 
-        cursor.execute(sql)
+        params = []
+
+        # Ordenamiento y Paginación (Crucial para velocidad)
+        # Asumimos SQL Server / Azure SQL. Si usas MySQL/Postgres cambia a LIMIT/OFFSET
+        sql += """
+        ORDER BY D.DocumentID DESC
+        OFFSET %s ROWS
+        FETCH NEXT %s ROWS ONLY
+        """
+        params.extend([offset, page_size])
+
+        cursor.execute(sql, tuple(params))
         documents = cursor.fetchall()
+
+        # Si no hay documentos, devolvemos estructura vacía
+        if not documents:
+            return {'data': [], 'total': 0, 'page': page}
+
+        # El TotalCount viene repetido en cada fila (truco de SQL), lo sacamos del primero
+        total_records = documents[0]['TotalCount'] if documents else 0
+
+        # Limpiamos el TotalCount de cada objeto para no ensuciar el JSON
+        for doc in documents:
+            doc.pop('TotalCount', None)
         
-        return documents
+        result = {
+            'data': documents, 
+            'total': total_records,
+            'page': page,
+            'pageSize': page_size
+        }
+
+        return result
     
     except Exception as e:
         print(f"Error SQL en get_all_documents_lists: {e}")
-        # Retornamos lista vacía en caso de error para no romper el frontend, 
-        # aunque idealmente se debería propagar la excepción.
-        return []
+        return {'data': [], 'total': 0, 'error': str(e)}
     
     finally:
         if cursor: cursor.close()
