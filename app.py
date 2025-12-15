@@ -122,7 +122,7 @@ from documents import (
     edit_doc_type,
     create_document,
     edit_document,
-    get_documents_lists,
+    get_documents_by_type_id,
     get_all_documents_lists,
     get_document_by_id,
     create_company,
@@ -2142,8 +2142,8 @@ def getAllDocumentsList():
         print(f"Error en endpoint getAllDocumentsList: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
 
-@app.route('/documents/getDocumentsList', methods=['GET'])
-def getDocumentsList():
+@app.route('/documents/getDocumentByTypeId', methods=['GET'])
+def getDocumentByTypeId():
     """
     Endpoint para obtener lista de documentos filtrados por ID del Tipo.
     Recibe: id (ej: 5)
@@ -2158,13 +2158,13 @@ def getDocumentsList():
     }
 
     try:
-        documents = get_documents_lists(data)
+        documents = get_documents_by_type_id(data)
         
         # Si retorna una lista vacía, es un 200 OK (simplemente no hay documentos aún)
         return jsonify(documents), 200
 
     except Exception as e:
-        print(f"Error en endpoint getDocumentsList: {e}")
+        print(f"Error en endpoint getDocumentByTypeId: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
 
 @app.route('/documents/getDocument', methods=['GET'])
