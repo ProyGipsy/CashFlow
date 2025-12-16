@@ -174,8 +174,6 @@ def login():
     if request.method == 'POST':
         username = request.form.get('User')
         password = request.form.get('Password')
-        print('username: ', username)
-        print('password: ', password)
 
         user_data = get_user_data(username, password)
         print('user_data: ', user_data)
@@ -497,7 +495,7 @@ def operations():
         msg.html = html_content
 
         try:
-            #mail.send(msg)
+            mail.send(msg)
             print("Correo enviado exitosamente.")
         except Exception as e:
             print(f"Error al enviar correo: {e}")
@@ -804,24 +802,15 @@ def submit_receipt():
             payment_entry_id = set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, payment_destination_id, tender_id, file_path)
             payment_entry_ids.append(payment_entry_id)
         
-        print("Voy a for detail in payment_invoice_details")
         for detail in payment_invoice_details:
-            print("Entré a for detail in payment_invoice_details")
             paymentReceiptEntry_id = payment_entry_ids[detail['paymentReceiptEntryIdx']]
-            print('paymentReceiptEntry_id: ', paymentReceiptEntry_id)
             debtaccount_id = detail['debtAccountId']
-            print("debtaccount_id: ", debtaccount_id)
             payment_date = detail['paymentDate']
-            print("payment_date: ", payment_date)
             amount = detail['amount']
-            print("amount: ", amount)
             days_elapsed = detail['daysElapsed']
-            print("days_elapsed: ", days_elapsed)
             commission_id = detail['commissionId']
-            print("commission_id: ", commission_id)
             commission_amount = detail['commissionAmount']
             commission_per_currency = detail['commission_per_currency']
-            print("commission_per_currency: ", commission_per_currency)
             bs_commission = commission_per_currency.get('Bs', 0) if commission_per_currency else 0
             usd_commission = commission_per_currency.get('USD', 0) if commission_per_currency else 0
             set_paymentEntryCommission(cursor, receipt_id, paymentReceiptEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, bs_commission, usd_commission) # CAMBIO EN COMISIÓN
@@ -839,7 +828,6 @@ def submit_receipt():
             raise ValueError("Inconsistencia en los datos recibidos")
         
         # Procesamiento por factura
-        print("Voy a for index in range(len(all_account_ids))")
         for index in range(len(all_account_ids)):
             account_id = all_account_ids[index]
 
@@ -861,14 +849,12 @@ def submit_receipt():
             invoice_paidAmount = float(invoice_paid_amounts[index])
             # Si es N/C, marcar como "utilizadas" actualizando su paidAmount
             if doc_type == 'N/C':
-                print("El documento es N/C.")
                 invoice_paidAmount = original_amount * -1
-                print("invoice_paidAmount: ", invoice_paidAmount)
 
             set_invoicePaidAmount(cursor, account_id, invoice_paidAmount)
             # Relación factura-recibo
             # DESCOMENTAR AL ENVIAR A PRODUCCIÓN
-            #set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount)
+            set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount)
 
         # Confirmación la transacción
         conn.commit()
@@ -956,7 +942,7 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
 
     # Envío del correo
     try:
-        #mail.send(msg)
+        mail.send(msg)
         return jsonify({'success': True})
     except Exception as e:
         print(f"Error enviando correo: {e}")
@@ -1022,7 +1008,7 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
 
     # Envío del correo
     try:
-        #mail.send(msg)
+        mail.send(msg)
         return jsonify({'success': True})
     except Exception as e:
         print(f"Error enviando correo: {e}")
@@ -1173,7 +1159,7 @@ def send_receipt_PaymentProofNotification(receipt_id, store_id, store_name, cust
 
     # Envío del correo
     try:
-        #mail.send(msg)
+        mail.send(msg)
         return jsonify({'success': True})
     except Exception as e:
         print(f"Error enviando correo: {e}")
@@ -1271,7 +1257,7 @@ def send_rejectionEmail():
 
     # Envío del correo
     try:
-        #mail.send(msg)
+        mail.send(msg)
         return jsonify({'success': True})
     except Exception as e:
         print(f"Error enviando correo: {e}")
@@ -1489,7 +1475,7 @@ def send_validationEmail():
 
     # Envío del correo
     try:
-        #mail.send(msg)
+        mail.send(msg)
         return jsonify({'success': True})
     except Exception as e:
         print(f"Error enviando correo: {e}")
