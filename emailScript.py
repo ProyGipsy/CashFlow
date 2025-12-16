@@ -283,7 +283,7 @@ def create_new_doc_html(data):
                         <td>{data.get('doc_type', 'N/A')}</td>
                     </tr>
                     <tr>
-                        <th>Empresa Asociada</th>
+                        <th>Entidad Asociada</th>
                         <td>{data.get('company', 'N/A')}</td>
                     </tr>
                 </table>
