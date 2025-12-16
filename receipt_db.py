@@ -43,7 +43,7 @@ def get_receiptStores_DebtAccount(salesRep_id):
     cursor.execute('''SELECT DISTINCT(S.ID), S.Name
                     FROM Main.Store S
                     JOIN Commission_Receipt.DebtAccount D ON S.ID = D.StoreID
-                    WHERE S.ID != 0 AND (D.Amount-D.PaidAmount) > 0 AND D.SalesRepID=%s
+                    WHERE S.ID != 0 AND (D.Amount-D.PaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.SalesRepID=%s
                    ''', (salesRep_id))
     stores = cursor.fetchall()
     conn.close()
@@ -55,7 +55,7 @@ def get_receiptStores_DebtAccount_admin():
     cursor.execute('''SELECT DISTINCT(S.ID), S.Name
                     FROM Main.Store S
                     JOIN Commission_Receipt.DebtAccount D ON S.ID = D.StoreID
-                    WHERE S.ID != 0 AND (D.Amount-D.PaidAmount) > 0 ''',)
+                    WHERE S.ID != 0 AND (D.Amount-D.PaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) ''',)
     stores = cursor.fetchall()
     conn.close()
     return stores
@@ -258,8 +258,8 @@ def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_i
     cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.PaidAmount, C.Description, D.DocumentType
                    FROM Commission_Receipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = %s AND isRembd = %s AND StoreID = %s
-						AND D.Amount-D.PaidAmount > 0 AND D.SalesRepID = %s
+                   WHERE CustomerID = 19111 AND isRembd = 0 AND StoreID = 911
+						AND (D.Amount-D.PaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.SalesRepID = 1
                    ORDER BY D.N_CTA''',
                    (customer_id, customer_isRembd, store_id, salesRep_id))
     invoices = cursor.fetchall()    
@@ -272,7 +272,7 @@ def get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id):
     cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.PaidAmount, C.Description, D.DocumentType
                    FROM Commission_Receipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = %s AND isRembd = %s AND StoreID = %s AND D.Amount-D.PaidAmount > 0
+                   WHERE CustomerID = %s AND isRembd = %s AND StoreID = %s AND (D.Amount-D.PaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0))
                    ORDER BY D.N_CTA''',
                    (customer_id, customer_isRembd, store_id))
     invoices = cursor.fetchall()    
@@ -531,7 +531,12 @@ def set_commissionsRules(rules):
 
 
 def set_paymentReceipt(cursor, total_receipt_amount, commission_bs, commission_usd):
-    cursor.execute('''
+    # cursor.execute('''
+    #                INSERT INTO Commission_Receipt.PaymentReceipt
+    #                (Amount, IsReviewed, FilePath, isRetail, IsApproved, CommissionAmount_Bs, CommissionAmount_USD)
+    #                VALUES (%s, %s, %s, %s, %s, %s, %s)
+    #                ''', (total_receipt_amount, 0, '', 0, 0, commission_bs, commission_usd))
+    print('''
                    INSERT INTO Commission_Receipt.PaymentReceipt
                    (Amount, IsReviewed, FilePath, isRetail, IsApproved, CommissionAmount_Bs, CommissionAmount_USD)
                    VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -545,7 +550,12 @@ def set_paymentReceipt(cursor, total_receipt_amount, commission_bs, commission_u
 
 
 def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, proof_path): 
-    cursor.execute('''
+    # cursor.execute('''
+    #     INSERT INTO Commission_Receipt.PaymentReceiptEntry
+    #     (ReceiptID, PaymentDate, Amount, Discount, Reference, PaymentDestinationID, TenderID, isRetail, ProofOfPaymentPath)
+    #     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    #     ''', (receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, 0, proof_path))
+    print('''
         INSERT INTO Commission_Receipt.PaymentReceiptEntry
         (ReceiptID, PaymentDate, Amount, Discount, Reference, PaymentDestinationID, TenderID, isRetail, ProofOfPaymentPath)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -559,7 +569,12 @@ def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, referen
     
 
 def set_paymentEntryCommission(cursor, receipt_id, paymentEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, bs_commission, usd_commission):
-    cursor.execute('''
+    # cursor.execute('''
+    #     INSERT INTO Commission_Receipt.PaymentEntryCommission
+    #     (ReceiptID, PaymentReceiptEntryID, DebtAccountID, PaymentDate, Amount, DaysElapsed, CommissionID, CommissionAmount_Bs, CommissionAmount_USD)
+    #     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    #     ''', (receipt_id, paymentEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, bs_commission, usd_commission))
+    print('''
         INSERT INTO Commission_Receipt.PaymentEntryCommission
         (ReceiptID, PaymentReceiptEntryID, DebtAccountID, PaymentDate, Amount, DaysElapsed, CommissionID, CommissionAmount_Bs, CommissionAmount_USD)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -610,7 +625,12 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
 
 
 def set_invoicePaidAmount(cursor, account_id, amount_to_add):
-    cursor.execute('''
+    # cursor.execute('''
+    #                UPDATE Commission_Receipt.DebtAccount
+    #                SET PaidAmount = PaidAmount + %s
+    #                WHERE AccountID = %s
+    #                ''', (amount_to_add, account_id))
+    print('''
                    UPDATE Commission_Receipt.DebtAccount
                    SET PaidAmount = PaidAmount + %s
                    WHERE AccountID = %s
@@ -637,7 +657,12 @@ def revert_invoicePaidAmount(account_id, new_paidAmount):
     
 
 def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount):
-    cursor.execute('''
+    # cursor.execute('''
+    #                 INSERT INTO Commission_Receipt.DebtPaymentRelation
+    #                 (DebtAccountID, PaymentReceiptID, isRetail, PaidAmount)
+    #                 VALUES (%s, %s, %s, %s)
+    #                 ''', (account_id, int(receipt_id), 0, invoice_paidAmount))
+    print('''
                     INSERT INTO Commission_Receipt.DebtPaymentRelation
                     (DebtAccountID, PaymentReceiptID, isRetail, PaidAmount)
                     VALUES (%s, %s, %s, %s)
@@ -645,7 +670,12 @@ def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount):
 
 
 def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission):
-    cursor.execute('''
+    # cursor.execute('''
+    #                 INSERT INTO Commission_Receipt.SalesRepCommission
+    #                 (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CreatedAt, ReceiptID, CommissionAmount_Bs, CommissionAmount_USD)
+    #                 VALUES (%s, %s, %s, %s, %s, GETDATE(), %s, %s, %s)
+    #                 ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission))
+    print('''
                     INSERT INTO Commission_Receipt.SalesRepCommission
                     (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CreatedAt, ReceiptID, CommissionAmount_Bs, CommissionAmount_USD)
                     VALUES (%s, %s, %s, %s, %s, GETDATE(), %s, %s, %s)

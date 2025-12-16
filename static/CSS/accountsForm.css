@@ -98,6 +98,17 @@
     box-sizing: border-box;
 }
 
+.styled-table tr .col-daysElapsed {
+    width: 28%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+.styled-table tr .col-commission {
+    width: 28%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
 .heading-table td {
     padding: 5px;
 }
@@ -369,4 +380,18 @@ input[type="submit"]:hover {
 .hidden-discount,
 .hidden-discount-input {
     display: none !important;
+}
+
+/* Estilo para alinear el campo de descuento y el campo de soporte en la misma línea */
+.discount-controls {
+    display: flex;
+    align-items: center; 
+    gap: 15px; 
+    margin-bottom: 20px;
+    white-space: nowrap;
+}
+
+/* Asegura que los inputs pequeños no sean demasiado grandes */
+.discount-controls .small-input {
+    width: 80px;
 }
