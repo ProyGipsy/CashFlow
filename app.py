@@ -1802,7 +1802,7 @@ def editDocType():
     Endpoint para la edición de los Tipos de Documento
     """
     data = request.get_json()
-    print(data)
+
     # Validación básica
     if not data or 'id' not in data:
         return jsonify({'error': 'Faltan datos o el ID del documento'}), 400
