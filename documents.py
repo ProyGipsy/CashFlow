@@ -880,28 +880,35 @@ def create_document(data, file_url):
         connection = pool.connection()
         cursor = connection.cursor(as_dict=True)
 
+        # --- 0. PREPARACIÓN DE IDs DE EMPRESA ---
+        raw_company = data.get('companyId')
+        company_ids = raw_company if isinstance(raw_company, list) else [raw_company]
+
         # 1. OBTENER NOMBRES (Para el Correo y Logs)
-        sql_names = """
-            SELECT 
-                DT.Name AS DocTypeName,
-                C.Name AS CompanyName
-            FROM Documents.DocumentType DT
-            JOIN Documents.Company C ON C.CompanyID = %s
-            WHERE DT.TypeID = %s
-        """
-        cursor.execute(sql_names, (data['companyId'], data['docTypeId']))
-        names_row = cursor.fetchone()
-        
-        doc_type_name = names_row['DocTypeName'] if names_row else 'Desconocido'
-        company_name = names_row['CompanyName'] if names_row else 'Desconocida'
+        sql_dtype_name = "SELECT Name FROM Documents.DocumentType WHERE TypeID = %s"
+        cursor.execute(sql_dtype_name, (data['docTypeId'],))
+        dt_row = cursor.fetchone()
+        doc_type_name = dt_row['Name'] if dt_row else 'Desconocido'
+
+        # Obtenemos los nombres de las Compañías (Concatenados)
+        if company_ids:
+            placeholders = ', '.join(['%s'] * len(company_ids))
+            sql_comp_names = f"SELECT Name FROM Documents.Company WHERE CompanyID IN ({placeholders})"
+            cursor.execute(sql_comp_names, tuple(company_ids))
+            comp_rows = cursor.fetchall()
+            company_names_list = [row['Name'] for row in comp_rows]
+            company_name_str = ", ".join(company_names_list) # Ej: "Empresa A, Empresa B"
+        else:
+            company_name_str = "Sin Empresa Asignada"
 
         # 2. INSERTAR DOCUMENTO (Cabecera)
         sql_doc = """
-            INSERT INTO Documents.Document (TypeID, CompanyID, DocumentName)
+            INSERT INTO Documents.Document (TypeID, DocumentName)
             OUTPUT INSERTED.DocumentID
-            VALUES (%s, %s, %s)
+            VALUES (%s, %s)
         """
-        cursor.execute(sql_doc, (data['docTypeId'], data['companyId'], data['documentName']))
+        # Enviamos docTypeId y documentName (que ahora viene separado en el JSON)
+        cursor.execute(sql_doc, (data['docTypeId'], data['documentName']))
         row = cursor.fetchone()
 
         if not row:
@@ -909,13 +916,21 @@ def create_document(data, file_url):
 
         inserted_id = row['DocumentID']
 
-        # 3. INSERTAR VALORES Y PREPARAR DATOS CORREO
+        # 3. INSERTAR RELACIÓN DOCUMENTO - COMPAÑÍA
+        sql_doc_company = """
+            INSERT INTO Documents.DocumentCompanies (DocumentID, CompanyID)
+            VALUES (%s, %s)
+        """
+        for comp_id in company_ids:
+            if comp_id: # Validación simple para no insertar nulos
+                cursor.execute(sql_doc_company, (inserted_id, comp_id))
+
+        # 4. INSERTAR VALORES DINÁMICOS
         sql_insert_value = """
             INSERT INTO Documents.FieldValue (FieldID, DocumentID, Value)
             VALUES (%s, %s, %s)
         """
         
-        # Consulta auxiliar para obtener el nombre del campo dado su ID
         sql_get_field_name = "SELECT Name FROM Documents.TypeFields WHERE FieldID = %s"
 
         fields_for_email = []
@@ -928,7 +943,7 @@ def create_document(data, file_url):
             if field_id is not None:
                 cursor.execute(sql_insert_value, (field_id, inserted_id, value))
                 
-                # Obtener Nombre del Campo para el Correo
+                # Obtener Nombre del Campo para el Correo (Opcional: podrías optimizarlo con un JOIN previo)
                 cursor.execute(sql_get_field_name, (field_id,))
                 name_row = cursor.fetchone()
                 field_name = name_row['Name'] if name_row else f"Campo {field_id}"
@@ -938,7 +953,7 @@ def create_document(data, file_url):
                     'valor': value
                 })
 
-        # 4. INSERTAR ANEXO
+        # 5. INSERTAR ANEXO
         if file_url:
             sql_insert_annex = """
                 INSERT INTO Documents.DocumentAnnex (DocumentID, AnnexURL, Date)
@@ -957,14 +972,14 @@ def create_document(data, file_url):
             if sender_email and email_password and recipient_admin:
                 
                 email_context = {
-                    'user_name': 'Administrador', # O pasar el usuario real si lo tienes en 'data'
+                    'user_name': 'Administrador', 
                     'doc_type': doc_type_name,
-                    'company': company_name,
+                    'company': company_name_str, # Ahora pasamos la cadena concatenada
                     'fields': fields_for_email,
                     'file_url': file_url
                 }
 
-                subject = f"Nuevo Documento Creado: {doc_type_name} - {company_name}"
+                subject = f"Nuevo Documento Creado: {doc_type_name} - {company_name_str}"
                 html_body = create_new_doc_html(email_context)
 
                 send_email(
@@ -975,12 +990,17 @@ def create_document(data, file_url):
                     receiver_emails=[recipient_admin],
                     attachments=None 
                 )
-                print(f"Correo de notificación enviado a {recipient_admin}")
+                # print(f"Correo de notificación enviado a {recipient_admin}")
 
         except Exception as email_error:
             print(f"Documento creado, pero falló el envío de correo: {email_error}")
 
-        return inserted_id
+        # Retornamos datos útiles para el frontend (incluyendo el nombre del documento)
+        return {
+            'document_id': inserted_id,
+            'document_name': data['documentName'], # Confirmamos el nombre guardado
+            'annex_url': file_url
+        }
 
     except Exception as e:
         if connection:
@@ -1022,7 +1042,29 @@ def edit_document(data, new_file_url=None):
         else:
             raise ValueError(f"El documento ID {data['id']} no existe.")
 
-        # 2. SQLs preparados para Campos
+        # --- 2. ACTUALIZAR COMPAÑÍAS ---
+        # Verificamos si la clave 'companyId' existe en el diccionario 'data'.
+        # Esto permite editar otros campos sin tocar las compañías si el frontend no envía el campo.
+        if 'companyId' in data:
+            raw_company = data['companyId']
+            # Normalizamos a lista (puede venir un int o una lista de ints)
+            company_ids = raw_company if isinstance(raw_company, list) else [raw_company]
+
+            # A. Borrar relaciones existentes (Estrategia: Borrón y cuenta nueva)
+            sql_delete_rels = "DELETE FROM Documents.DocumentCompanies WHERE DocumentID = %s"
+            cursor.execute(sql_delete_rels, (data['id'],))
+
+            # B. Insertar las nuevas (si la lista no está vacía)
+            if company_ids:
+                sql_insert_rel = """
+                    INSERT INTO Documents.DocumentCompanies (DocumentID, CompanyID) 
+                    VALUES (%s, %s)
+                """
+                for comp_id in company_ids:
+                    if comp_id: # Validación para no insertar nulos/vacíos
+                        cursor.execute(sql_insert_rel, (data['id'], comp_id))
+
+        # 3. SQLs preparados para Campos
         sql_update_value = """
             UPDATE Documents.FieldValue
             SET Value = %s
@@ -1034,7 +1076,7 @@ def edit_document(data, new_file_url=None):
             VALUES (%s, %s, %s)
         """
 
-        # 3. ACTUALIZAR O INSERTAR VALORES (Lógica UPSERT)
+        # 4. ACTUALIZAR O INSERTAR VALORES (Lógica UPSERT)
         for field in data.get('fields', []):
             field_id = field.get('fieldId')
             new_value = field.get('value')
@@ -1042,11 +1084,11 @@ def edit_document(data, new_file_url=None):
             # A. Intentamos actualizar
             cursor.execute(sql_update_value, (new_value, field_id, data['id']))
 
-            # B. Si no se actualizó nada, insertamos
+            # B. Si no se actualizó nada (rowcount 0), insertamos
             if cursor.rowcount == 0:
                 cursor.execute(sql_insert_value, (new_value, field_id, data['id']))
 
-        # 4. ACTUALIZAR ARCHIVO ADJUNTO (Si se subió uno nuevo)
+        # 5. ACTUALIZAR ARCHIVO ADJUNTO (Si se subió uno nuevo)
         if new_file_url:
             sql_update_annex = """
                 UPDATE Documents.DocumentAnnex
@@ -1063,7 +1105,12 @@ def edit_document(data, new_file_url=None):
                 cursor.execute(sql_insert_annex, (data['id'], new_file_url))
 
         connection.commit()
-        return True
+        
+        # Devolvemos el nombre para actualizar el estado en el frontend inmediatamente
+        return {
+            'document_id': data['id'],
+            'document_name': data.get('documentName', current_name)
+        }
 
     except Exception as e:
         if connection: connection.rollback()
@@ -1083,28 +1130,43 @@ def get_documents_by_type_id(data):
         cursor = connection.cursor(as_dict=True)
 
         sql = """
-        SELECT 
-            D.DocumentID AS id, 
-            D.TypeID AS typeId, 
-            DT.Name AS docTypeName,
-            D.CompanyID AS companyId,
-            D.DocumentName AS DocumentName,
-            C.Name AS companyName,  
-            -- Fecha del anexo (puede ser null si no se ha subido)
-            A.Date AS annexDate
-        FROM Documents.Document D
-        
-        -- JOIN para obtener el nombre del tipo (útil para el frontend)
-        JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
-        
-        -- JOIN para obtener el Nombre de la Entidad
-        JOIN Documents.Company C ON D.CompanyID = C.CompanyID
-        
-        -- LEFT JOIN CRÍTICO: Trae el documento aunque no tenga anexo en la tabla DocumentAnnex
-        LEFT JOIN Documents.DocumentAnnex A ON A.DocumentID = D.DocumentID
-        
-        -- FILTRO POR ID (Numérico)
-        WHERE D.TypeID = %s
+            SELECT 
+                D.DocumentID AS id, 
+                D.TypeID AS typeId, 
+                DT.Name AS docTypeName,
+                D.DocumentName AS DocumentName,
+                
+                -- SUBQUERY para obtener los nombres de las compañías concatenados
+                (
+                    SELECT STRING_AGG(C.Name, ', ') 
+                    FROM Documents.DocumentCompanies DC
+                    JOIN Documents.Company C ON DC.CompanyID = C.CompanyID
+                    WHERE DC.DocumentID = D.DocumentID
+                ) AS companyName,
+                
+                -- También es útil traer los IDs de las compañías por si necesitas filtrar en el front
+                (
+                    SELECT STRING_AGG(CAST(DC.CompanyID AS VARCHAR), ',') 
+                    FROM Documents.DocumentCompanies DC
+                    WHERE DC.DocumentID = D.DocumentID
+                ) AS companyIds,
+
+                -- Fecha del anexo
+                A.Date AS annexDate
+
+            FROM Documents.Document D
+
+            -- JOIN para obtener el nombre del tipo
+            JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
+
+            -- YA NO HACEMOS JOIN DIRECTO A COMPANY AQUÍ para evitar duplicados
+            -- La relación se maneja en las subqueries de arriba
+
+            -- LEFT JOIN para el anexo
+            LEFT JOIN Documents.DocumentAnnex A ON A.DocumentID = D.DocumentID
+
+            -- FILTRO POR TIPO DE DOCUMENTO
+            WHERE D.TypeID = %s
         """
 
         cursor.execute(sql, (data['docType_id'],))
@@ -1133,31 +1195,43 @@ def get_all_documents_lists(page=1, page_size=20):
         # Calculamos el desplazamiento para la paginación
         offset = (page - 1) * page_size
 
-        # Consulta base
-        # NOTA: Agregamos FV.Value como 'ExpirationDate'
         sql = """
-        SELECT 
-            D.DocumentID, 
-            D.TypeID, 
-            DT.Name AS TypeName,
-            D.CompanyID, 
-            D.DocumentName AS DocumentName,
-            C.Name AS CompanyName, 
-            DA.Date AS AnnexDate,
-            FV.Value AS ExpirationDate, -- <--- EL CAMPO MÁGICO
-            COUNT(*) OVER() as TotalCount -- <--- Para saber el total de páginas
-        FROM Documents.Document D
-        JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
-        JOIN Documents.Company C ON D.CompanyID = C.CompanyID
-        LEFT JOIN Documents.DocumentAnnex DA ON D.DocumentID = DA.DocumentID
-        
-        -- JOIN para obtener la Fecha de Vencimiento dinámicamente
-        -- Buscamos valores donde el campo asociado tenga nombre 'Vencimiento' o similar
-        LEFT JOIN Documents.FieldValue FV ON D.DocumentID = FV.DocumentID 
-            AND FV.FieldID IN (
-                SELECT FieldID FROM Documents.TypeFields 
-                WHERE Name LIKE '%Vencimiento%' OR Name LIKE '%Fecha%Venc%'
-            )
+            SELECT 
+                D.DocumentID, 
+                D.TypeID, 
+                DT.Name AS TypeName,
+                D.DocumentName AS DocumentName,
+                
+                -- CAMBIO PRINCIPAL: Subconsulta para obtener nombres de empresas concatenados
+                (
+                    SELECT STRING_AGG(C.Name, ', ') 
+                    FROM Documents.DocumentCompanies DC
+                    JOIN Documents.Company C ON DC.CompanyID = C.CompanyID
+                    WHERE DC.DocumentID = D.DocumentID
+                ) AS CompanyName, 
+
+                DA.Date AS AnnexDate,
+                FV.Value AS ExpirationDate, -- Campo dinámico de vencimiento
+                
+                -- El conteo total se mantiene correcto porque no hay duplicidad de filas
+                COUNT(*) OVER() as TotalCount 
+
+            FROM Documents.Document D
+
+            -- Join para el Tipo de Documento
+            JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
+
+            -- Join para el Anexo
+            LEFT JOIN Documents.DocumentAnnex DA ON D.DocumentID = DA.DocumentID
+
+            -- Join para Fecha de Vencimiento (Mantenemos tu lógica)
+            -- NOTA: Si un documento tuviera 2 campos que coinciden con el LIKE, esto duplicaría filas.
+            -- Si eso pasa, avísame para cambiarlo a un OUTER APPLY.
+            LEFT JOIN Documents.FieldValue FV ON D.DocumentID = FV.DocumentID 
+                AND FV.FieldID IN (
+                    SELECT FieldID FROM Documents.TypeFields 
+                    WHERE Name LIKE '%Vencimiento%' OR Name LIKE '%Fecha%Venc%'
+                )
         """
 
         params = []
@@ -1215,18 +1289,33 @@ def get_document_by_id(data):
                 D.DocumentID, 
                 D.TypeID, 
                 DT.Name AS TypeName,
-                D.CompanyID,
                 D.DocumentName AS DocumentName,
-                C.Name AS CompanyName, 
+                
+                -- SUBCONSULTA: Concatena los nombres de las empresas (Ej: "Empresa A, Empresa B")
+                (
+                    SELECT STRING_AGG(C.Name, ', ') 
+                    FROM Documents.DocumentCompanies DC
+                    JOIN Documents.Company C ON DC.CompanyID = C.CompanyID
+                    WHERE DC.DocumentID = D.DocumentID
+                ) AS CompanyName,
+
+                -- OPCIONAL PERO RECOMENDADO: Traer también los IDs para poder pre-cargar el formulario de edición
+                (
+                    SELECT STRING_AGG(CAST(DC.CompanyID AS VARCHAR), ',') 
+                    FROM Documents.DocumentCompanies DC
+                    WHERE DC.DocumentID = D.DocumentID
+                ) AS CompanyIDs,
+
                 DA.AnnexURL
+
             FROM Documents.Document D
+
             -- Join para nombre del tipo
             JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
-            -- Join para Nombre de la Entidad
-            JOIN Documents.Company C ON D.CompanyID = C.CompanyID
-            -- Left Join para el anexo (puede no tener, o no haberse subido aún)
+            -- Left Join para el anexo
             LEFT JOIN Documents.DocumentAnnex DA ON D.DocumentID = DA.DocumentID
-            WHERE D.DocumentID = %s
+
+            WHERE D.DocumentID = %s 
         """
         
         cursor.execute(sql_header, (data['id'],))
@@ -1251,6 +1340,8 @@ def get_document_by_id(data):
         # 3. TRANSFORMACIÓN DE DATOS (Para el Frontend)
         
         fields_data_dict = {row['FieldName']: row['Value'] for row in field_rows}
+        raw_company_ids = doc_header.get('CompanyIDs', '')
+        company_ids_list = [int(x) for x in raw_company_ids.split(',')] if raw_company_ids else []
 
         # Construimos el objeto final
         document_full = {
@@ -1258,7 +1349,8 @@ def get_document_by_id(data):
             'DocumentName': doc_header['DocumentName'],
             'TypeID': doc_header['TypeID'],
             'TypeName': doc_header['TypeName'],
-            'CompanyID': doc_header['CompanyID'],
+            'CompanyIDs': company_ids_list,
+            'CompanyID': company_ids_list[0] if company_ids_list else None,
             'CompanyName': doc_header['CompanyName'],
             'AnnexURL': doc_header['AnnexURL'],
             'fieldsData': fields_data_dict # <--- Esto es lo que usa el Modal para rellenar inputs
