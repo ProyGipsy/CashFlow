@@ -890,14 +890,13 @@ def create_document(data, file_url):
         dt_row = cursor.fetchone()
         doc_type_name = dt_row['Name'] if dt_row else 'Desconocido'
 
-        # Obtenemos los nombres de las Compañías (Concatenados)
         if company_ids:
             placeholders = ', '.join(['%s'] * len(company_ids))
             sql_comp_names = f"SELECT Name FROM Documents.Company WHERE CompanyID IN ({placeholders})"
             cursor.execute(sql_comp_names, tuple(company_ids))
             comp_rows = cursor.fetchall()
             company_names_list = [row['Name'] for row in comp_rows]
-            company_name_str = ", ".join(company_names_list) # Ej: "Empresa A, Empresa B"
+            company_name_str = ", ".join(company_names_list)
         else:
             company_name_str = "Sin Empresa Asignada"
 
@@ -907,7 +906,6 @@ def create_document(data, file_url):
             OUTPUT INSERTED.DocumentID
             VALUES (%s, %s)
         """
-        # Enviamos docTypeId y documentName (que ahora viene separado en el JSON)
         cursor.execute(sql_doc, (data['docTypeId'], data['documentName']))
         row = cursor.fetchone()
 
@@ -922,7 +920,7 @@ def create_document(data, file_url):
             VALUES (%s, %s)
         """
         for comp_id in company_ids:
-            if comp_id: # Validación simple para no insertar nulos
+            if comp_id: 
                 cursor.execute(sql_doc_company, (inserted_id, comp_id))
 
         # 4. INSERTAR VALORES DINÁMICOS
@@ -931,7 +929,9 @@ def create_document(data, file_url):
             VALUES (%s, %s, %s)
         """
         
-        sql_get_field_name = "SELECT Name FROM Documents.TypeFields WHERE FieldID = %s"
+        # Modificamos esta consulta para traer también el Tipo de Dato (DataType)
+        # Esto nos ayuda a formatear el correo mejor (ej: mostrar 'Sí' en lugar de '1')
+        sql_get_field_info = "SELECT Name, DataType FROM Documents.TypeFields WHERE FieldID = %s"
 
         fields_for_email = []
 
@@ -939,18 +939,33 @@ def create_document(data, file_url):
             field_id = field.get('fieldId')
             value = field.get('value')
             
+            # --- CORRECCIÓN PARA BOOLEANOS ---
+            if isinstance(value, bool):
+                value = '1' if value else '0'
+            
             # Insertar Valor
             if field_id is not None:
                 cursor.execute(sql_insert_value, (field_id, inserted_id, value))
                 
-                # Obtener Nombre del Campo para el Correo (Opcional: podrías optimizarlo con un JOIN previo)
-                cursor.execute(sql_get_field_name, (field_id,))
-                name_row = cursor.fetchone()
-                field_name = name_row['Name'] if name_row else f"Campo {field_id}"
+                # Obtener Nombre y Tipo para el Correo
+                cursor.execute(sql_get_field_info, (field_id,))
+                field_info = cursor.fetchone()
+                
+                if field_info:
+                    field_name = field_info['Name']
+                    field_type = field_info['DataType']
+                    
+                    # Formatear valor para el correo (Visualización amigable)
+                    display_value = value
+                    if field_type == 'bool' or field_type == 'bit': # Ajusta según tu BD
+                        display_value = 'Sí' if value == '1' else 'No'
+                else:
+                    field_name = f"Campo {field_id}"
+                    display_value = value
                 
                 fields_for_email.append({
                     'nombre': field_name,
-                    'valor': value
+                    'valor': display_value
                 })
 
         # 5. INSERTAR ANEXO
@@ -974,7 +989,7 @@ def create_document(data, file_url):
                 email_context = {
                     'user_name': 'Administrador', 
                     'doc_type': doc_type_name,
-                    'company': company_name_str, # Ahora pasamos la cadena concatenada
+                    'company': company_name_str,
                     'fields': fields_for_email,
                     'file_url': file_url
                 }
@@ -990,15 +1005,13 @@ def create_document(data, file_url):
                     receiver_emails=[recipient_admin],
                     attachments=None 
                 )
-                # print(f"Correo de notificación enviado a {recipient_admin}")
 
         except Exception as email_error:
             print(f"Documento creado, pero falló el envío de correo: {email_error}")
 
-        # Retornamos datos útiles para el frontend (incluyendo el nombre del documento)
         return {
             'document_id': inserted_id,
-            'document_name': data['documentName'], # Confirmamos el nombre guardado
+            'document_name': data['documentName'], 
             'annex_url': file_url
         }
 
@@ -1029,6 +1042,9 @@ def edit_document(data, new_file_url=None):
         cursor.execute(get_current_doc_name_sql, (data['id'],))
         current_doc_row = cursor.fetchone()
 
+        # Variable para guardar el nombre actual o el nuevo
+        current_name = ""
+
         if current_doc_row:
             current_name = current_doc_row['DocumentName']
             
@@ -1039,29 +1055,27 @@ def edit_document(data, new_file_url=None):
                     WHERE DocumentID = %s
                 """
                 cursor.execute(sql_doc_name_update, (data['documentName'], data['id']))
+                current_name = data['documentName'] # Actualizamos la variable local
         else:
             raise ValueError(f"El documento ID {data['id']} no existe.")
 
         # --- 2. ACTUALIZAR COMPAÑÍAS ---
-        # Verificamos si la clave 'companyId' existe en el diccionario 'data'.
-        # Esto permite editar otros campos sin tocar las compañías si el frontend no envía el campo.
         if 'companyId' in data:
             raw_company = data['companyId']
-            # Normalizamos a lista (puede venir un int o una lista de ints)
             company_ids = raw_company if isinstance(raw_company, list) else [raw_company]
 
-            # A. Borrar relaciones existentes (Estrategia: Borrón y cuenta nueva)
+            # A. Borrar relaciones existentes
             sql_delete_rels = "DELETE FROM Documents.DocumentCompanies WHERE DocumentID = %s"
             cursor.execute(sql_delete_rels, (data['id'],))
 
-            # B. Insertar las nuevas (si la lista no está vacía)
+            # B. Insertar las nuevas
             if company_ids:
                 sql_insert_rel = """
                     INSERT INTO Documents.DocumentCompanies (DocumentID, CompanyID) 
                     VALUES (%s, %s)
                 """
                 for comp_id in company_ids:
-                    if comp_id: # Validación para no insertar nulos/vacíos
+                    if comp_id: 
                         cursor.execute(sql_insert_rel, (data['id'], comp_id))
 
         # 3. SQLs preparados para Campos
@@ -1080,6 +1094,11 @@ def edit_document(data, new_file_url=None):
         for field in data.get('fields', []):
             field_id = field.get('fieldId')
             new_value = field.get('value')
+            
+            # --- CORRECCIÓN PARA BOOLEANOS ---
+            # Convertimos True/False a '1'/'0' para la BD
+            if isinstance(new_value, bool):
+                new_value = '1' if new_value else '0'
             
             # A. Intentamos actualizar
             cursor.execute(sql_update_value, (new_value, field_id, data['id']))
@@ -1106,10 +1125,9 @@ def edit_document(data, new_file_url=None):
 
         connection.commit()
         
-        # Devolvemos el nombre para actualizar el estado en el frontend inmediatamente
         return {
             'document_id': data['id'],
-            'document_name': data.get('documentName', current_name)
+            'document_name': current_name
         }
 
     except Exception as e:
@@ -1283,85 +1301,67 @@ def get_document_by_id(data):
         connection = pool.connection()
         cursor = connection.cursor(as_dict=True)
 
-        # 1. OBTENER CABECERA (Datos fijos + Anexo)
+        # 1. CABECERA (Sin cambios)
         sql_header = """
             SELECT 
-                D.DocumentID, 
-                D.TypeID, 
-                DT.Name AS TypeName,
-                D.DocumentName AS DocumentName,
-                
-                -- SUBCONSULTA: Concatena los nombres de las empresas (Ej: "Empresa A, Empresa B")
-                (
-                    SELECT STRING_AGG(C.Name, ', ') 
-                    FROM Documents.DocumentCompanies DC
-                    JOIN Documents.Company C ON DC.CompanyID = C.CompanyID
-                    WHERE DC.DocumentID = D.DocumentID
-                ) AS CompanyName,
-
-                -- OPCIONAL PERO RECOMENDADO: Traer también los IDs para poder pre-cargar el formulario de edición
-                (
-                    SELECT STRING_AGG(CAST(DC.CompanyID AS VARCHAR), ',') 
-                    FROM Documents.DocumentCompanies DC
-                    WHERE DC.DocumentID = D.DocumentID
-                ) AS CompanyIDs,
-
+                D.DocumentID, D.TypeID, DT.Name AS TypeName, D.DocumentName,
+                (SELECT STRING_AGG(C.Name, ', ') FROM Documents.DocumentCompanies DC JOIN Documents.Company C ON DC.CompanyID = C.CompanyID WHERE DC.DocumentID = D.DocumentID) AS CompanyName,
+                (SELECT STRING_AGG(CAST(DC.CompanyID AS VARCHAR), ',') FROM Documents.DocumentCompanies DC WHERE DC.DocumentID = D.DocumentID) AS CompanyIDs,
                 DA.AnnexURL
-
             FROM Documents.Document D
-
-            -- Join para nombre del tipo
             JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
-            -- Left Join para el anexo
             LEFT JOIN Documents.DocumentAnnex DA ON D.DocumentID = DA.DocumentID
-
-            WHERE D.DocumentID = %s 
+            WHERE D.DocumentID = %s
         """
-        
         cursor.execute(sql_header, (data['id'],))
         doc_header = cursor.fetchone()
 
-        if not doc_header:
-            return None
+        if not doc_header: return None
 
-        # 2. OBTENER VALORES DE LOS CAMPOS (Datos dinámicos)
+        # 2. VALORES (MODIFICADO: Traemos el DataType para saber cuándo convertir)
         sql_values = """
             SELECT 
                 TF.Name AS FieldName, 
+                TF.DataType, -- <--- Necesitamos esto
                 FV.Value
             FROM Documents.FieldValue FV
             JOIN Documents.TypeFields TF ON FV.FieldID = TF.FieldID
             WHERE FV.DocumentID = %s
         """
-        
         cursor.execute(sql_values, (data['id'],))
         field_rows = cursor.fetchall()
 
-        # 3. TRANSFORMACIÓN DE DATOS (Para el Frontend)
-        
-        fields_data_dict = {row['FieldName']: row['Value'] for row in field_rows}
+        # 3. TRANSFORMACIÓN DE DATOS (Conversión inteligente)
+        fields_data_dict = {}
+        for row in field_rows:
+            val = row['Value']
+            dtype = row['DataType']
+
+            # Si es bool, convertimos '1'/'0' a True/False real de Python
+            if dtype == 'bool' or dtype == 'bit':
+                val = True if val == '1' or val == 'true' else False
+            
+            fields_data_dict[row['FieldName']] = val
+
+        # Procesar CompanyIDs
         raw_company_ids = doc_header.get('CompanyIDs', '')
         company_ids_list = [int(x) for x in raw_company_ids.split(',')] if raw_company_ids else []
 
-        # Construimos el objeto final
-        document_full = {
+        return {
             'DocumentID': doc_header['DocumentID'],
-            'DocumentName': doc_header['DocumentName'],
             'TypeID': doc_header['TypeID'],
             'TypeName': doc_header['TypeName'],
-            'CompanyIDs': company_ids_list,
-            'CompanyID': company_ids_list[0] if company_ids_list else None,
+            'DocumentName': doc_header['DocumentName'],
+            'CompanyIDs': company_ids_list, 
+            'CompanyID': company_ids_list[0] if company_ids_list else None, 
             'CompanyName': doc_header['CompanyName'],
             'AnnexURL': doc_header['AnnexURL'],
-            'fieldsData': fields_data_dict # <--- Esto es lo que usa el Modal para rellenar inputs
+            'fieldsData': fields_data_dict # Ahora lleva booleanos reales
         }
 
-        return document_full
-
     except Exception as e:
-        print(f"Error obteniendo detalle del documento ID {data.get('id')}: {e}")
-        raise e # Relanzamos para que la ruta capture el 500
-    
+        print(f"Error: {e}")
+        raise e 
     finally:
         if cursor: cursor.close()
         if connection: connection.close()
