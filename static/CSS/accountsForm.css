@@ -395,3 +395,8 @@ input[type="submit"]:hover {
 .discount-controls .small-input {
     width: 80px;
 }
+
+/* Ocultando visualmente filas N/C */
+.hidden-nc {
+    display: none;
+}

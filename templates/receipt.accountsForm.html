@@ -59,6 +59,18 @@
         </span>
     </div>
 
+    <!-- Descuento por N/C -->
+    {% set total_nc = receiptDetails | selectattr(6, 'equalto', 'N/C') | sum(attribute=1) %}
+    {% if total_nc != 0 %}
+    <div class="inline-label">
+        <label for="total_nc_discount">Total Descuento por N/C:</label>
+        {{ receiptStoreCustomer[5] }}
+        <span id="total_nc_discount" class="small-input">
+            {{ "{:,.2f}".format(-total_nc).replace(".", "X").replace(",", ".").replace("X", ",") }}
+        </span>
+    </div>
+    {% endif %}
+
     <br> 
     <div id="formas-de-pago"> 
         <h3>Formas de Pago</h3> 
@@ -148,13 +160,14 @@
             <th class="col-commission">Comisión</th>
         </tr> 
         {% for receipt in receiptDetails %}
-        <tr>
+        <!-- Ocultando visualmente filas de documentos que sean N/C -->
+        <tr class="{% if receipt[6] == 'N/C' %}hidden-nc{% endif %}">
             <td><p>{{ receipt[6] }}</p></td> 
             <td><p>{{ receipt[0] }}</p></td>
             <td><p id="balance_calculation" data-original-value="{{ "%.2f"|format(receipt[1] - receipt[4]) }}" data-due-date="{{ receipt[3] }}">{{ "{:,.2f}".format(receipt[1] - receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
             <td><p id="days_passed"></p></td>
             <td><p id="commission_received"></p></td>
-        </tr> 
+        </tr>
         {% endfor %}
     </table>
 
