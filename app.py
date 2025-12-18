@@ -1825,7 +1825,7 @@ def editDocType():
 @app.route('/documents/createDocCompany', methods=['POST'])
 def createDocCompany():
     """
-    Endpoint para la creación de Empresas
+    Endpoint para la creación de Entidad
     """
 
     data = request.get_json()
@@ -1858,7 +1858,7 @@ def createDocCompany():
 @app.route('/documents/updateDocCompany', methods=['PUT'])
 def updateDocCompany():
     """
-    Endpoint para la actualización de Empresas
+    Endpoint para la actualización de Entidad
     """
 
     data = request.get_json()
@@ -2207,6 +2207,7 @@ def sendDocuments():
             'error': 'No se proporcionaron datos'
             }), 400
 
+    user_id = data.get('userId', None)
     doc_ids = data.get('documentIds', [])
     email_data = data.get('emailData', {})
 
@@ -2229,7 +2230,7 @@ def sendDocuments():
                 'error': 'No se encontraron los documentos en la base de datos.'
             }), 404
 
-        result = send_documents(email_data, full_documents_data)
+        result = send_documents(user_id, email_data, full_documents_data)
 
         if result:
             return jsonify({
