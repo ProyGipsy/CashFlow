@@ -122,7 +122,7 @@ from documents import (
     edit_doc_type,
     create_document,
     edit_document,
-    get_documents_lists,
+    get_documents_by_type_id,
     get_all_documents_lists,
     get_document_by_id,
     create_company,
@@ -1802,7 +1802,7 @@ def editDocType():
     Endpoint para la edición de los Tipos de Documento
     """
     data = request.get_json()
-    print(data)
+
     # Validación básica
     if not data or 'id' not in data:
         return jsonify({'error': 'Faltan datos o el ID del documento'}), 400
@@ -1825,7 +1825,7 @@ def editDocType():
 @app.route('/documents/createDocCompany', methods=['POST'])
 def createDocCompany():
     """
-    Endpoint para la creación de Empresas
+    Endpoint para la creación de Entidad
     """
 
     data = request.get_json()
@@ -1858,7 +1858,7 @@ def createDocCompany():
 @app.route('/documents/updateDocCompany', methods=['PUT'])
 def updateDocCompany():
     """
-    Endpoint para la actualización de Empresas
+    Endpoint para la actualización de Entidad
     """
 
     data = request.get_json()
@@ -2048,7 +2048,6 @@ def createDoc():
                     }), 500
 
         # 3. LLAMAR A LA LÓGICA DE BASE DE DATOS
-        # Pasamos file_url, que será una URL válida o None
         document_id = create_document(data, file_url)
 
         if document_id:
@@ -2133,7 +2132,11 @@ def getAllDocumentsList():
     Endpoint para obtener lista de todos los documentos sin filtro.
     """
     try:
-        documents = get_all_documents_lists()
+        # Obtener parámetros del Query String (?page=1&pageSize=20&search=...)
+        page = request.args.get('page', 1, type=int)
+        page_size = request.args.get('pageSize', 20, type=int)
+
+        documents = get_all_documents_lists(page=page, page_size=page_size)
         
         # Si retorna una lista vacía, es un 200 OK (simplemente no hay documentos aún)
         return jsonify(documents), 200
@@ -2142,8 +2145,8 @@ def getAllDocumentsList():
         print(f"Error en endpoint getAllDocumentsList: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
 
-@app.route('/documents/getDocumentsList', methods=['GET'])
-def getDocumentsList():
+@app.route('/documents/getDocumentByTypeId', methods=['GET'])
+def getDocumentByTypeId():
     """
     Endpoint para obtener lista de documentos filtrados por ID del Tipo.
     Recibe: id (ej: 5)
@@ -2158,13 +2161,13 @@ def getDocumentsList():
     }
 
     try:
-        documents = get_documents_lists(data)
+        documents = get_documents_by_type_id(data)
         
         # Si retorna una lista vacía, es un 200 OK (simplemente no hay documentos aún)
         return jsonify(documents), 200
 
     except Exception as e:
-        print(f"Error en endpoint getDocumentsList: {e}")
+        print(f"Error en endpoint getDocumentByTypeId: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
 
 @app.route('/documents/getDocument', methods=['GET'])
@@ -2204,6 +2207,7 @@ def sendDocuments():
             'error': 'No se proporcionaron datos'
             }), 400
 
+    user_id = data.get('userId', None)
     doc_ids = data.get('documentIds', [])
     email_data = data.get('emailData', {})
 
@@ -2226,7 +2230,7 @@ def sendDocuments():
                 'error': 'No se encontraron los documentos en la base de datos.'
             }), 404
 
-        result = send_documents(email_data, full_documents_data)
+        result = send_documents(user_id, email_data, full_documents_data)
 
         if result:
             return jsonify({
