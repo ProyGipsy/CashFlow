@@ -75,7 +75,7 @@ def get_docs_companies():
         return companies
     
     except Exception as e:
-        print(f"Error al obtener las empresas: {e}")
+        print(f"Error al obtener las entidades: {e}")
         return []
     
     finally:
@@ -1147,14 +1147,15 @@ def get_documents_by_type_id(data):
         connection = pool.connection()
         cursor = connection.cursor(as_dict=True)
 
-        sql = """
+        # PASO 1: Obtener la lista principal de documentos
+        sql_docs = """
             SELECT 
                 D.DocumentID AS id, 
                 D.TypeID AS typeId, 
                 DT.Name AS docTypeName,
                 D.DocumentName AS DocumentName,
                 
-                -- SUBQUERY para obtener los nombres de las compañías concatenados
+                -- Nombres de compañías concatenados
                 (
                     SELECT STRING_AGG(C.Name, ', ') 
                     FROM Documents.DocumentCompanies DC
@@ -1162,40 +1163,83 @@ def get_documents_by_type_id(data):
                     WHERE DC.DocumentID = D.DocumentID
                 ) AS companyName,
                 
-                -- También es útil traer los IDs de las compañías por si necesitas filtrar en el front
+                -- IDs de compañías
                 (
                     SELECT STRING_AGG(CAST(DC.CompanyID AS VARCHAR), ',') 
                     FROM Documents.DocumentCompanies DC
                     WHERE DC.DocumentID = D.DocumentID
                 ) AS companyIds,
 
-                -- Fecha del anexo
-                A.Date AS annexDate
+                A.Date AS annexDate,
+                A.AnnexURL AS annexUrl
 
             FROM Documents.Document D
-
-            -- JOIN para obtener el nombre del tipo
             JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
-
-            -- YA NO HACEMOS JOIN DIRECTO A COMPANY AQUÍ para evitar duplicados
-            -- La relación se maneja en las subqueries de arriba
-
-            -- LEFT JOIN para el anexo
             LEFT JOIN Documents.DocumentAnnex A ON A.DocumentID = D.DocumentID
-
-            -- FILTRO POR TIPO DE DOCUMENTO
             WHERE D.TypeID = %s
+            ORDER BY D.DocumentID DESC -- Orden recomendado
         """
-
-        cursor.execute(sql, (data['docType_id'],))
+        cursor.execute(sql_docs, (data['docType_id'],))
         documents = cursor.fetchall()
         
+        # Si no hay documentos, retornamos lista vacía inmediatamente
+        if not documents:
+            return []
+
+        # PASO 2: Obtener los Campos Dinámicos (FieldValue)       
+        # A. Extraemos todos los IDs de los documentos encontrados
+        doc_ids = [d['id'] for d in documents]
+        
+        # B. Preparamos el query con IN (...) para traer campos solo de estos docs
+        placeholders = ','.join(['%s'] * len(doc_ids))
+        
+        sql_fields = f"""
+            SELECT 
+                FV.DocumentID,
+                TF.Name AS FieldName,
+                FV.Value,
+                TF.DataType -- Importante para convertir bools
+            FROM Documents.FieldValue FV
+            JOIN Documents.TypeFields TF ON FV.FieldID = TF.FieldID
+            WHERE FV.DocumentID IN ({placeholders})
+        """
+        
+        cursor.execute(sql_fields, tuple(doc_ids))
+        all_fields = cursor.fetchall()
+
+        # PASO 3: Unir datos en Python (Mapping)    
+        # Creamos un diccionario para acceso rápido: { doc_id: { 'Campo1': 'Valor', ... } }
+        fields_map = {}
+        
+        for row in all_fields:
+            doc_id = row['DocumentID']
+            field_name = row['FieldName']
+            val = row['Value']
+            dtype = row['DataType']
+
+            # Conversión de Booleano (Igual que hicimos antes)
+            if dtype == 'bool' or dtype == 'bit':
+                val = True if val == '1' or val == 'true' else False
+
+            # Inicializamos el dict del doc si no existe
+            if doc_id not in fields_map:
+                fields_map[doc_id] = {}
+            
+            fields_map[doc_id][field_name] = val
+
+        # PASO 4: Inyectar fieldsData en cada documento
+        for doc in documents:
+            # Asignamos los campos correspondientes o un objeto vacío si no tiene
+            doc['fieldsData'] = fields_map.get(doc['id'], {})
+            
+            # (Opcional) Procesar companyIds de string "1,2" a lista [1, 2]
+            raw_ids = doc.get('companyIds')
+            doc['companyIdsList'] = [int(x) for x in raw_ids.split(',')] if raw_ids else []
+
         return documents
     
     except Exception as e:
-        print(f"Error SQL en get_documents_by_type_id: {e}")
-        # Retornamos lista vacía en caso de error para no romper el frontend, 
-        # aunque idealmente se debería propagar la excepción.
+        print(f"Error en get_documents_by_type_id: {e}")
         return []
     
     finally:
@@ -1220,7 +1264,7 @@ def get_all_documents_lists(page=1, page_size=20):
                 DT.Name AS TypeName,
                 D.DocumentName AS DocumentName,
                 
-                -- CAMBIO PRINCIPAL: Subconsulta para obtener nombres de empresas concatenados
+                -- CAMBIO PRINCIPAL: Subconsulta para obtener nombres de entidades concatenados
                 (
                     SELECT STRING_AGG(C.Name, ', ') 
                     FROM Documents.DocumentCompanies DC
@@ -1366,15 +1410,19 @@ def get_document_by_id(data):
         if cursor: cursor.close()
         if connection: connection.close()
 
-def send_documents(email_data, full_documents_data):
+def send_documents(user_id, email_data, full_documents_data):
     sender_email = os.environ.get('MAIL_USERNAME_DOCUMENTS')
     email_password = os.environ.get('MAIL_PASSWORD_DOCUMENTS')
 
     if not sender_email or not email_password:
         raise Exception("Credenciales de correo no configuradas en el servidor.")
 
+    # Variables de conexión BD
+    connection = None
+    cursor = None
+
     try:
-        # ENVÍO DE CORREO A LOS DESTINATARIOS
+        # 1. ENVÍO DE CORREO A LOS DESTINATARIOS
         html_body_client = create_custom_email_html(email_data, full_documents_data)
         recipients_list = email_data.get('recipients', [])
         subject_client = email_data.get('subject', 'Envío de Documentos')
@@ -1390,7 +1438,38 @@ def send_documents(email_data, full_documents_data):
 
         print(f'--> Correo enviado a los destinatarios: {recipients_list}')
 
-        # ENVÍO DE CORREO A LA ADMINISTRACIÓN
+        # 2. GUARDADO EN BASE DE DATOS (LOG DE ENVÍO)
+        try:
+            connection = pool.connection()
+            cursor = connection.cursor()
+
+            send_email_sql = """
+                INSERT INTO Documents.Delivery (userId, Recipient, DeliveryDate, Subject, Body)
+                VALUES (%s, %s, GETDATE(), %s, %s)
+            """
+            
+            # Preparar datos
+            # Convertimos la lista de correos a un string: "correo1@test.com, correo2@test.com"
+            recipients_str = ", ".join(recipients_list) 
+            
+            # El body que guardamos es el mensaje personalizado, no el HTML completo (para no llenar la BD)
+            body_text = email_data.get('body', '')        
+
+            cursor.execute(send_email_sql, (user_id, recipients_str, subject_client, body_text))
+            connection.commit()
+            
+            print("--> Registro de envío guardado en Documents.Delivery")
+
+        except Exception as db_error:
+            # Si falla el guardado en BD, no detenemos el flujo, solo lo logueamos
+            print(f"⚠ El correo se envió, pero falló el guardado en BD: {db_error}")
+            if connection: connection.rollback()
+        
+        finally:
+            if cursor: cursor.close()
+            if connection: connection.close()
+
+        # 3. ENVÍO DE CORREO A LA ADMINISTRACIÓN (Notificación)
         try:
             notification_recipient = os.environ.get('MAIL_TEST_DOCUMENTS') or sender_email
 
@@ -1418,11 +1497,10 @@ def send_documents(email_data, full_documents_data):
 
                 print(f'--> Correo enviado a la administración: {notification_recipient}')
 
-                return True
-
         except Exception as admin_e:
             print(f"Error enviando notificación a la administración: {admin_e}")
-            return True
+        
+        return True
 
     except Exception as e:
         print(f"Error enviando documentos por correo: {e}")
