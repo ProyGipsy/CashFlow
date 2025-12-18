@@ -28,6 +28,20 @@ def send_email(subject, body_html, sender_email, email_password, receiver_emails
     msg.set_content("Este es un correo con contenido HTML. Por favor, use un cliente de correo compatible para ver el contenido completo.")
     msg.add_alternative(body_html, subtype='html')
 
+    # --- Inserción del logotipo corporativo ---
+    logo_path = Path("static/IMG/Gipsy_imagotipo_color.png")
+    if logo_path.exists():
+        with open(logo_path, "rb") as img:
+            msg.get_payload()[1].add_related(
+                img.read(), 
+                maintype="image", 
+                subtype="png", 
+                cid="logo_gipsy",
+                filename="GrupoGipsy_Logo.png"
+            )
+    else:
+        print(f"Advertencia: No se encontró el logo en {logo_path}")
+
     # --- Archivos Adjuntos (PDFs u otros) ---
     if attachments:
         print(f"Adjuntando {len(attachments)} archivo(s)...")
@@ -102,6 +116,29 @@ def get_base_email_style():
             color: #421d83; /* Color lila oscuro */
             font-size: 24px;
             font-weight: bold;
+        }
+        .brand-container {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .logo-img {
+            height: 40px;
+            width: auto;
+            display: block;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            margin-bottom: 10px;
+            padding-right: 40px !important; 
+            border: 0;
+        }
+        .brand-name {
+            display: block;
+            font-size: 14px;
+            font-weight: bold;
+            color: #421d83;
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         .body-content {
             color: #333; /* Texto gris oscuro */
@@ -181,6 +218,10 @@ def create_doc_type_html(data):
     <body>
         <div class="container">
             <div class="header">
+                <div class="brand-container">
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                    <span class="brand-name">Grupo Gipsy</span>
+                </div>
                 <h2>Gipsy Documentos - Nuevo Tipo de Documento</h2>
             </div>
             <div class="body-content">
@@ -271,6 +312,10 @@ def create_new_doc_html(data):
     <body>
         <div class="container">
             <div class="header">
+                <div class="brand-container">
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                    <span class="brand-name">Grupo Gipsy</span>
+                </div>
                 <h2>Gipsy Documentos - Nuevo Documento</h2>
             </div>
             <div class="body-content">
@@ -470,6 +515,10 @@ def create_custom_email_html(custom_email_data, document_data_list=None):
                         <tr>
                             <td style="padding: 20px 30px;">
                                 <div class="header" style="text-align: left; border-bottom: 2px solid #8b56ed; padding-bottom: 15px; margin-bottom: 20px;">
+                                    <div class="brand-container">
+                                        <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                                        <span class="brand-name">Grupo Gipsy</span>
+                                    </div>
                                     <h2 style="color: #421d83; font-size: 24px; margin: 0;">Envío de Documentos</h2>
                                 </div>
                                 
@@ -525,6 +574,10 @@ def create_send_notification_html(data):
     <body>
         <div class="container">
             <div class="header">
+                <div class="brand-container">
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                    <span class="brand-name">Grupo Gipsy</span>
+                </div>
                 <h2>Gipsy Documentos - Notificación de Envío</h2>
             </div>
             <div class="body-content">
