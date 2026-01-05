@@ -41,6 +41,7 @@ body{
     height: 5vw;
 }
 
+/* Formulario */
 .form{
     color: #191c16;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -50,21 +51,28 @@ body{
     text-align: center;
 }
 
+/* Contenedores de inputs */
+.input-container,
+.password-container{
+    width: 100%;
+    position: relative;
+}
+
+/* Inputs de texto y password */
 .form input[type="text"], 
-.form input[type="password"],
-.form input[type="submit"]{
-    width: 90%;
+.form input[type="password"]{
+    width: 100%;
     padding: 10px;
-    margin: 5px 0;
     font-size: 16px;
     border: 1px solid #191c16;
     border-radius: 10px;
     background-color: #fff;
     text-decoration: none;
     color: #191c16;
-    transition: background-color 0.3s ease;
+    box-sizing: border-box;
 }
 
+/* Submit */
 .form input[type="submit"]{
     background-color: #a2c0bb;
     color: #191c16;
@@ -73,30 +81,23 @@ body{
     font-size: 1em;
     text-decoration: none;
     cursor: pointer;
+    padding: 10px;
+    margin: 2px 0;
+    border: 1px solid #191c16;
+    transition: background-color 0.3s ease;
 }
 
 .form input[type="submit"]:hover{
     background-color: #7da69f;
 }
 
-/*
-.password-container input[type="password"]{
-    padding-right: 40px;
-}
-*/
-
+/* Remember checkbox */
 .form .remember-container{
     display: flex;
     justify-content: flex-start;
     align-items: center;
     border-radius: 4px;
     direction: row;
-}
-
-.form .input-container{
-    display: flex;
-    flex-direction: column;
-    align-items: center;
 }
 
 .form .remember-container input[type="checkbox"] {
@@ -109,15 +110,15 @@ body{
     border-radius: 4px;
     margin-right: 8px;
     transition: background-color 0.3s ease;
-  }
+}
   
-  /* Estilos para el checkbox cuando está seleccionado */
-  .form .remember-container input[type="checkbox"]:checked {
+.form .remember-container input[type="checkbox"]:checked {
     background-color: #504673;
     border-color: #504673;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='%23fff' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
-  }
+}
 
+/* Link genérico */
 a{
     color: #191c16;
     text-decoration: none;
@@ -127,7 +128,37 @@ a{
     width: 70%;
 }
 
+/* Password Eye */
+.password-container input{
+    padding-right: 36px;     /* espacio para el ojo */
+}
 
+.password-container img.eye-toggle{
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.password-container img.eye-toggle.active{
+    opacity: 0.7;
+}
+
+/* Ocultar botón nativo de revelar contraseña en Edge/IE */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+    display: none;
+}
+
+/* Por compatibilidad extra en algunos navegadores WebKit antiguos */
+input[type="password"] {
+    -webkit-text-security: disc;
+}
+
+/* Responsive */
 @media (max-width: 1220px) {
     body{
         background-image: none;
