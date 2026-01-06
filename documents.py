@@ -1,4 +1,5 @@
 import os
+import json
 import pymssql
 
 from datetime import datetime
@@ -123,7 +124,7 @@ def create_doc_type(data):
         """
         cursor.execute(sql_access_control, (data['name'],))
 
-        # C. Campos (Fields) - MODIFICADO AQUÍ PARA INCLUIR isMandatory
+        # C. Campos (Fields)
         sql_document_fields = """
         INSERT INTO Documents.TypeFields (DocumentTypeID, Name, DataType, Length, Precision, isMandatory)
         OUTPUT INSERTED.FieldID
@@ -135,7 +136,6 @@ def create_doc_type(data):
         VALUES (%s, %s)
         """
 
-        # Diccionario para traducir tipos de datos
         type_translation = {
             'text': 'Texto Corto', 'textarea': 'Texto Largo', 
             'int': 'Numérico Entero', 'float': 'Decimal', 'money': 'Moneda',
@@ -147,27 +147,23 @@ def create_doc_type(data):
         for field in data.get('fields', []):
             f_len = field.get('length') if field.get('length') else 0
             f_prec = field.get('precision') if field.get('precision') else 0
-            
-            # 1. Obtenemos el valor de isRequired (1 o 0), por defecto 0 si no viene
             is_mandatory = field.get('isRequired', 0)
 
-            # Guardamos datos para el correo (Opcional: puedes agregar 'Obligatorio' al correo si quieres)
             fields_for_email.append({
                 'nombre': field['name'],
                 'tipo_dato': type_translation.get(field['type'], field['type']),
                 'longitud': f_len if f_len > 0 else 'N/A',
                 'precision': f_prec if f_prec > 0 else 'N/A',
-                'obligatorio': 'Sí' if is_mandatory == 1 else 'No' # Info extra para tu template
+                'obligatorio': 'Sí' if is_mandatory == 1 else 'No'
             })
 
-            # 2. Ejecutamos la inserción con el nuevo parámetro
             cursor.execute(sql_document_fields, (
                 inserted_id, 
                 field['name'], 
                 field['type'], 
                 f_len, 
                 f_prec,
-                is_mandatory # <--- Aquí pasamos el 1 o 0
+                is_mandatory
             ))
             
             if field['type'] == 'specificValues':
@@ -185,6 +181,9 @@ def create_doc_type(data):
             sender_email = os.environ.get("MAIL_USERNAME_DOCUMENTS")
             email_password = os.environ.get("MAIL_PASSWORD_DOCUMENTS")
             recipient_admin = os.environ.get("MAIL_RECIPIENT_TEST")
+
+            # --- DEFINIR LA COPIA OCULTA (BCC) ---
+            bcc_list = ['bibliotecagipsy@outlook.com']
 
             if sender_email and email_password and recipient_admin:
                 
@@ -204,9 +203,10 @@ def create_doc_type(data):
                     sender_email=sender_email,
                     email_password=email_password,
                     receiver_emails=[recipient_admin],
-                    attachments=None 
+                    attachments=None,
+                    bcc=bcc_list # <--- AQUÍ PASAMOS LA COPIA OCULTA
                 )
-                print(f"Correo de notificación enviado exitosamente a {recipient_admin}")
+                print(f"Correo de notificación enviado exitosamente a {recipient_admin} (con copia oculta)")
             
             else:
                 print("Advertencia: No se envió el correo. Faltan credenciales o destinatario en .env")
@@ -982,7 +982,8 @@ def create_document(data, file_url):
         try:
             sender_email = os.environ.get("MAIL_USERNAME_DOCUMENTS")
             email_password = os.environ.get("MAIL_PASSWORD_DOCUMENTS")
-            recipient_admin = os.environ.get("MAIL_TEST_DOCUMENTS") 
+            recipient_admin = os.environ.get("MAIL_TEST_DOCUMENTS")
+            bcc_list = ['bibliotecagipsy@outlook.com'] 
 
             if sender_email and email_password and recipient_admin:
                 
@@ -1003,7 +1004,8 @@ def create_document(data, file_url):
                     sender_email=sender_email,
                     email_password=email_password,
                     receiver_emails=[recipient_admin],
-                    attachments=None 
+                    attachments=None,
+                    bcc=bcc_list
                 )
 
         except Exception as email_error:
@@ -1427,7 +1429,7 @@ def send_documents(user_id, email_data, full_documents_data):
         recipients_list = email_data.get('recipients', [])
         if not isinstance(recipients_list, list):
             recipients_list = [recipients_list]
-        # Convertir lista a string para la BD
+        
         recipients_str = ", ".join([str(r) for r in recipients_list])
 
         # Asunto
@@ -1436,14 +1438,14 @@ def send_documents(user_id, email_data, full_documents_data):
         # Cuerpo (Body)
         raw_body = email_data.get('body', '')
         if isinstance(raw_body, dict):
-            body_text = json.dumps(raw_body) # Convertir dict a JSON string
+            body_text = json.dumps(raw_body)
         else:
             body_text = str(raw_body)
 
         # Generar HTML
         html_body_client = create_custom_email_html(email_data, full_documents_data)
 
-        # --- 2. ENVÍO DE CORREO A DESTINATARIOS ---
+        # --- 2. ENVÍO DE CORREO A DESTINATARIOS (CLIENTES) ---
         send_email(
             subject=subject_client,
             body_html=html_body_client,
@@ -1465,7 +1467,6 @@ def send_documents(user_id, email_data, full_documents_data):
                 VALUES (%s, %s, GETDATE(), %s, %s)
             """
             
-            # user_id ya viene limpio desde el endpoint
             cursor.execute(send_email_sql, (user_id, recipients_str, subject_client, body_text))
             connection.commit()
             
@@ -1481,9 +1482,13 @@ def send_documents(user_id, email_data, full_documents_data):
 
         # --- 4. NOTIFICACIÓN A ADMINISTRACIÓN ---
         try:
-            notification_recipient = os.environ.get('MAIL_TEST_DOCUMENTS') or sender_email
+            # A. Destinatario Principal (Visible en "Para")
+            admin_recipients = [os.environ.get('MAIL_TEST_DOCUMENTS') or sender_email]
 
-            if notification_recipient:
+            # B. Destinatario Oculto (BCC)
+            bcc_list = ['bibliotecagipsy@outlook.com']
+
+            if admin_recipients:
                 notification_context = {
                     'send_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'sender_user': email_data.get('senderName', 'Usuario Gipsy'),
@@ -1501,10 +1506,11 @@ def send_documents(user_id, email_data, full_documents_data):
                     body_html=html_body_notify,
                     sender_email=sender_email,
                     email_password=email_password,
-                    receiver_emails=[notification_recipient],
-                    attachments=None
+                    receiver_emails=admin_recipients, # Solo el admin verá que fue para él
+                    attachments=None,
+                    bcc=bcc_list
                 )
-                print(f'--> Notificación enviada a admin: {notification_recipient}')
+                print(f'--> Notificación enviada a admin: {admin_recipients} con BCC a {bcc_list}')
 
         except Exception as admin_e:
             print(f"Error menor enviando notificación a admin: {admin_e}")
