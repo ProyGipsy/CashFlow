@@ -11,22 +11,57 @@ from email.message import EmailMessage
 load_dotenv()
 
 # --- FUNCIÓN DE ENVÍO DE CORREO ---
-def send_email(subject, body_html, sender_email, email_password, receiver_emails, attachments=None):
+def send_email(subject, body_html, sender_email, email_password, receiver_emails, attachments=None, bcc=None):
     
+    # Aseguramos que receiver_emails sea una lista
+    if isinstance(receiver_emails, str):
+        receiver_emails = [receiver_emails]
+
     print(f"Iniciando envío de correo a: {', '.join(receiver_emails)}")
+    
+    # Preparar lista de BCC
+    bcc_list = []
+    if bcc:
+        if isinstance(bcc, str):
+            bcc_list = [bcc]
+        elif isinstance(bcc, list):
+            bcc_list = bcc
+        print(f"Incluyendo copia oculta (BCC) a: {', '.join(bcc_list)}")
+
     print(f"Asunto: {subject}")
 
-    mail_server = os.environ.get("MAIL_SERVER_DOCUMENTS")
-    mail_port = os.environ.get("EMAIL_PORT", 587) # Puerto estándar para STARTTLS
+    mail_server = os.environ.get("MAIL_SERVER_DOCUMENTS", "smtp.office365.com") # Valor por defecto seguro
+    mail_port = int(os.environ.get("EMAIL_PORT", 587))
 
     msg = EmailMessage()
     msg['From'] = sender_email
     msg['To'] = ", ".join(receiver_emails)
     msg['Subject'] = subject
     
+    # NOTA: No agregamos msg['Bcc'] para mantener la privacidad total.
+
     # Contenido HTML
     msg.set_content("Este es un correo con contenido HTML. Por favor, use un cliente de correo compatible para ver el contenido completo.")
     msg.add_alternative(body_html, subtype='html')
+
+    # --- Inserción del logotipo corporativo ---
+    # Nota: Esto asume que la estructura es multipart/alternative y el HTML es la segunda parte (índice 1)
+    logo_path = Path("static/IMG/Gipsy_imagotipo_color.png")
+    if logo_path.exists():
+        try:
+            with open(logo_path, "rb") as img:
+                # Adjuntamos la imagen relacionada al contenido HTML
+                msg.get_payload()[1].add_related(
+                    img.read(), 
+                    maintype="image", 
+                    subtype="png", 
+                    cid="logo_gipsy",
+                    filename="GrupoGipsy_Logo.png"
+                )
+        except Exception as e:
+            print(f"Error adjuntando logo: {e}")
+    else:
+        print(f"Advertencia: No se encontró el logo en {logo_path}")
 
     # --- Archivos Adjuntos (PDFs u otros) ---
     if attachments:
@@ -53,18 +88,26 @@ def send_email(subject, body_html, sender_email, email_password, receiver_emails
             except Exception as e:
                 print(f"Error al leer o adjuntar el archivo {file_path_obj.name}: {e}")
 
+    # --- PREPARACIÓN DE DESTINATARIOS PARA SMTP ---
+    # Combinamos Para (To) + Ocultos (BCC) para el "sobre" de envío
+    all_recipients = receiver_emails + bcc_list
+
     context = ssl.create_default_context()
 
     try:
-        # Usar SMTP con STARTTLS (más común que SSL directo)
-        # Si tu servidor usa el puerto 465 (SMTPO_SSL), cambia smtplib.SMTP a smtplib.SMTP_SSL y quita smtp.starttls()
         with smtplib.SMTP(mail_server, mail_port) as smtp:
             smtp.starttls(context=context)
             smtp.login(sender_email, email_password)
-            smtp.sendmail(sender_email, receiver_emails, msg.as_string())
-        print(f"Correo enviado exitosamente a {', '.join(receiver_emails)}!\n")
+            
+            # AQUÍ ES DONDE OCURRE LA MAGIA: Enviamos a 'all_recipients'
+            smtp.sendmail(sender_email, all_recipients, msg.as_string())
+            
+        print(f"Correo enviado exitosamente a destinatarios y copias ocultas!\n")
+        return True
+
     except Exception as e:
-        print(f"Error al enviar el correo a {', '.join(receiver_emails)}: {e}\n")
+        print(f"Error al enviar el correo: {e}\n")
+        raise e
 
 
 # --- ESTILO CSS BASE PARA GIPSY DOCUMENTOS ---
@@ -102,6 +145,29 @@ def get_base_email_style():
             color: #421d83; /* Color lila oscuro */
             font-size: 24px;
             font-weight: bold;
+        }
+        .brand-container {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .logo-img {
+            height: 40px;
+            width: auto;
+            display: block;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            margin-bottom: 10px;
+            padding-right: 40px !important; 
+            border: 0;
+        }
+        .brand-name {
+            display: block;
+            font-size: 14px;
+            font-weight: bold;
+            color: #421d83;
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         .body-content {
             color: #333; /* Texto gris oscuro */
@@ -181,6 +247,10 @@ def create_doc_type_html(data):
     <body>
         <div class="container">
             <div class="header">
+                <div class="brand-container">
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                    <span class="brand-name">Grupo Gipsy</span>
+                </div>
                 <h2>Gipsy Documentos - Nuevo Tipo de Documento</h2>
             </div>
             <div class="body-content">
@@ -271,6 +341,10 @@ def create_new_doc_html(data):
     <body>
         <div class="container">
             <div class="header">
+                <div class="brand-container">
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                    <span class="brand-name">Grupo Gipsy</span>
+                </div>
                 <h2>Gipsy Documentos - Nuevo Documento</h2>
             </div>
             <div class="body-content">
@@ -470,6 +544,10 @@ def create_custom_email_html(custom_email_data, document_data_list=None):
                         <tr>
                             <td style="padding: 20px 30px;">
                                 <div class="header" style="text-align: left; border-bottom: 2px solid #8b56ed; padding-bottom: 15px; margin-bottom: 20px;">
+                                    <div class="brand-container">
+                                        <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                                        <span class="brand-name">Grupo Gipsy</span>
+                                    </div>
                                     <h2 style="color: #421d83; font-size: 24px; margin: 0;">Envío de Documentos</h2>
                                 </div>
                                 
@@ -525,6 +603,10 @@ def create_send_notification_html(data):
     <body>
         <div class="container">
             <div class="header">
+                <div class="brand-container">
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                    <span class="brand-name">Grupo Gipsy</span>
+                </div>
                 <h2>Gipsy Documentos - Notificación de Envío</h2>
             </div>
             <div class="body-content">
