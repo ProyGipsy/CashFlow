@@ -1409,7 +1409,7 @@ def get_document_by_id(data):
     finally:
         if cursor: cursor.close()
         if connection: connection.close()
-
+        
 def send_documents(user_id, email_data, full_documents_data):
     sender_email = os.environ.get('MAIL_USERNAME_DOCUMENTS')
     email_password = os.environ.get('MAIL_PASSWORD_DOCUMENTS')
@@ -1417,16 +1417,33 @@ def send_documents(user_id, email_data, full_documents_data):
     if not sender_email or not email_password:
         raise Exception("Credenciales de correo no configuradas en el servidor.")
 
-    # Variables de conexión BD
     connection = None
     cursor = None
 
     try:
-        # 1. ENVÍO DE CORREO A LOS DESTINATARIOS
-        html_body_client = create_custom_email_html(email_data, full_documents_data)
+        # --- 1. PREPARACIÓN Y LIMPIEZA DE DATOS ---
+        
+        # Destinatarios
         recipients_list = email_data.get('recipients', [])
-        subject_client = email_data.get('subject', 'Envío de Documentos')
+        if not isinstance(recipients_list, list):
+            recipients_list = [recipients_list]
+        # Convertir lista a string para la BD
+        recipients_str = ", ".join([str(r) for r in recipients_list])
 
+        # Asunto
+        subject_client = str(email_data.get('subject', 'Envío de Documentos'))
+
+        # Cuerpo (Body)
+        raw_body = email_data.get('body', '')
+        if isinstance(raw_body, dict):
+            body_text = json.dumps(raw_body) # Convertir dict a JSON string
+        else:
+            body_text = str(raw_body)
+
+        # Generar HTML
+        html_body_client = create_custom_email_html(email_data, full_documents_data)
+
+        # --- 2. ENVÍO DE CORREO A DESTINATARIOS ---
         send_email(
             subject=subject_client,
             body_html=html_body_client,
@@ -1436,9 +1453,9 @@ def send_documents(user_id, email_data, full_documents_data):
             attachments=None
         )
 
-        print(f'--> Correo enviado a los destinatarios: {recipients_list}')
+        print(f'--> Correo enviado exitosamente a: {recipients_list}')
 
-        # 2. GUARDADO EN BASE DE DATOS (LOG DE ENVÍO)
+        # --- 3. GUARDADO EN BASE DE DATOS (LOG) ---
         try:
             connection = pool.connection()
             cursor = connection.cursor()
@@ -1448,28 +1465,21 @@ def send_documents(user_id, email_data, full_documents_data):
                 VALUES (%s, %s, GETDATE(), %s, %s)
             """
             
-            # Preparar datos
-            # Convertimos la lista de correos a un string: "correo1@test.com, correo2@test.com"
-            recipients_str = ", ".join(recipients_list) 
-            
-            # El body que guardamos es el mensaje personalizado, no el HTML completo (para no llenar la BD)
-            body_text = email_data.get('body', '')        
-
+            # user_id ya viene limpio desde el endpoint
             cursor.execute(send_email_sql, (user_id, recipients_str, subject_client, body_text))
             connection.commit()
             
             print("--> Registro de envío guardado en Documents.Delivery")
 
         except Exception as db_error:
-            # Si falla el guardado en BD, no detenemos el flujo, solo lo logueamos
-            print(f"⚠ El correo se envió, pero falló el guardado en BD: {db_error}")
+            print(f"⚠ ALERTA: El correo se envió, pero falló el guardado en BD: {db_error}")
             if connection: connection.rollback()
         
         finally:
             if cursor: cursor.close()
             if connection: connection.close()
 
-        # 3. ENVÍO DE CORREO A LA ADMINISTRACIÓN (Notificación)
+        # --- 4. NOTIFICACIÓN A ADMINISTRACIÓN ---
         try:
             notification_recipient = os.environ.get('MAIL_TEST_DOCUMENTS') or sender_email
 
@@ -1480,11 +1490,11 @@ def send_documents(user_id, email_data, full_documents_data):
                     'sender_email': sender_email,
                     'recipients': recipients_list,
                     'subject': subject_client,
-                    'body_message': email_data.get('body', '')
+                    'body_message': body_text
                 }
 
                 html_body_notify = create_send_notification_html(notification_context)
-                subject_notify = f"Notificación de Envío de Documentos - {subject_client}"
+                subject_notify = f"Notificación de Envío - {subject_client}"
 
                 send_email(
                     subject=subject_notify,
@@ -1494,14 +1504,13 @@ def send_documents(user_id, email_data, full_documents_data):
                     receiver_emails=[notification_recipient],
                     attachments=None
                 )
-
-                print(f'--> Correo enviado a la administración: {notification_recipient}')
+                print(f'--> Notificación enviada a admin: {notification_recipient}')
 
         except Exception as admin_e:
-            print(f"Error enviando notificación a la administración: {admin_e}")
+            print(f"Error menor enviando notificación a admin: {admin_e}")
         
         return True
 
     except Exception as e:
-        print(f"Error enviando documentos por correo: {e}")
+        print(f"Error fatal enviando documentos: {e}")
         raise e

@@ -2203,42 +2203,74 @@ def sendDocuments():
     data = request.get_json()
 
     if not data:
-        return jsonify({
-            'error': 'No se proporcionaron datos'
-            }), 400
+        return jsonify({'error': 'No se proporcionaron datos'}), 400
 
-    user_id = data.get('userId', None)
-    doc_ids = data.get('documentIds', [])
+    # 1. EXTRACCIÓN Y LIMPIEZA DE USER_ID
+    user_id_raw = data.get('userId')
     email_data = data.get('emailData', {})
+    
+    if user_id_raw is None:
+        user_id_raw = email_data.get('userId')
 
-    if not doc_ids or not email_data:
-        return jsonify({
-            'error': 'Faltan IDs de documentos o datos de correo electrónico'
-        }), 400
+    final_user_id = None
+    
+    if isinstance(user_id_raw, dict):
+        final_user_id = user_id_raw.get('id') or user_id_raw.get('userId')
+    elif user_id_raw is not None:
+        try:
+            final_user_id = int(user_id_raw)
+        except (ValueError, TypeError):
+            final_user_id = None
+            print(f"DEBUG: No se pudo convertir user_id {user_id_raw} a entero")
+
+    # 2. PROCESAMIENTO DE DOCUMENTOS
+    doc_ids_raw = data.get('documentIds', [])
+    print(f"DEBUG: IDs recibidos crudos: {doc_ids_raw}")
+
+    if not doc_ids_raw or not email_data:
+        return jsonify({'error': 'Faltan IDs de documentos o datos de correo'}), 400
 
     try:
         full_documents_data = []
 
-        for doc_id in doc_ids:
-            details = get_document_by_id({'id': doc_id})
+        for item in doc_ids_raw:
+            actual_doc_id = item
+            
+            # Si el item es un diccionario, extraemos el ID usando las claves posibles
+            if isinstance(item, dict):
+                actual_doc_id = item.get('id') or item.get('DocumentID') or item.get('document_id')
+            
+            print(f"DEBUG: ID Extraído para procesar: {actual_doc_id}")
+
+            if not actual_doc_id:
+                print("DEBUG: ID vacío o nulo encontrado, saltando registro...")
+                continue
+
+            try:
+                search_id = int(actual_doc_id)
+            except (ValueError, TypeError):
+                print(f"DEBUG: El ID {actual_doc_id} no es un número válido.")
+                continue
+
+            details = get_document_by_id({'id': search_id})
 
             if details:
                 full_documents_data.append(details)
+            else:
+                print(f"DEBUG: get_document_by_id devolvió None para el ID {search_id}")
 
         if not full_documents_data:
             return jsonify({
-                'error': 'No se encontraron los documentos en la base de datos.'
+                'error': 'No se encontraron los documentos en la base de datos para los IDs proporcionados.'
             }), 404
 
-        result = send_documents(user_id, email_data, full_documents_data)
+        result = send_documents(final_user_id, email_data, full_documents_data)
 
         if result:
-            return jsonify({
-                'success': True
-            }), 200
+            return jsonify({'success': True}), 200
 
     except Exception as e:
-        print(f'Error enviando documentos por correo: {e}')
+        print(f'Error crítico en endpoint sendDocuments: {e}')
         return jsonify({
             'error': f'Error en el servidor: {str(e)}'
         }), 500
