@@ -3,6 +3,7 @@ import json
 import pymssql
 
 from datetime import datetime
+from collections import Counter
 from dbutils.pooled_db import PooledDB
 from emailScript import (
     send_email,
@@ -1520,3 +1521,76 @@ def send_documents(user_id, email_data, full_documents_data):
     except Exception as e:
         print(f"Error fatal enviando documentos: {e}")
         raise e
+
+def get_suggested_emails(user_id):
+    connection = None
+    cursor = None
+    
+    if not user_id:
+        return []
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        # Consultamos solo el historial de ESTE usuario, ordenado del más reciente al más antiguo
+        sql_history = """
+            SELECT Recipient, DeliveryDate 
+            FROM Documents.Delivery 
+            WHERE userId = %s AND Recipient IS NOT NULL AND Recipient <> ''
+            ORDER BY DeliveryDate DESC
+        """
+        cursor.execute(sql_history, (user_id,))
+        rows = cursor.fetchall()
+
+        # Estructuras para procesar los datos
+        email_frequency = Counter()      # Para contar cuántas veces se ha enviado
+        email_last_seen = {}             # Para saber cuándo fue la última vez (orden de recencia)
+        unique_emails_ordered = []       # Lista auxiliar para mantener el orden cronológico puro
+
+        for row in rows:
+            raw_recipient = row['Recipient']
+            # Separamos por comas en caso de envíos múltiples
+            emails_in_row = raw_recipient.split(',')
+            
+            for email in emails_in_row:
+                clean_email = email.strip().lower()
+                
+                # Validaciones básicas
+                if '@' not in clean_email or '.' not in clean_email:
+                    continue
+                
+                # 1. Contamos frecuencia (para los "Top 2 Contactados")
+                email_frequency[clean_email] += 1
+                
+                # 2. Registramos orden de llegada (para los "Últimos 3")
+                if clean_email not in email_last_seen:
+                    email_last_seen[clean_email] = row['DeliveryDate']
+                    unique_emails_ordered.append(clean_email)
+
+        # --- SELECCIÓN DE LOS 5 SUGERIDOS ---
+
+        # A. Los 2 más contactados
+        top_frequent = [item[0] for item in email_frequency.most_common(2)]
+
+        # B. Los últimos 3 contactados
+        top_recent = []
+        for email in unique_emails_ordered:
+            if email not in top_frequent:
+                top_recent.append(email)
+            
+            if len(top_recent) == 3:
+                break
+        
+        # C. Combinar listas
+        final_suggestions = top_frequent + top_recent
+
+        return final_suggestions
+
+    except Exception as e:
+        print(f"Error en get_suggested_emails_by_user: {e}")
+        return []
+    
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
