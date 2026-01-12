@@ -116,6 +116,12 @@
                 <h3>10. Farmatodo</h3>
             </a>
             {% endif %}
+            {% if 46 in session['permissions'] %}
+            <a target="_blank" href="https://app.powerbi.com/groups/me/reports/1eb1ad39-aa5b-4b8f-8a31-c0e83eb2ddd6/06457fb256cd9e2b2030?ctid=e28fcd45-30d5-4919-b266-27bca9760759&experience=power-bi&chromeless=1" class="card">
+                <img src="{{ url_for('static', filename='IMG/cobrar.png') }}" alt="Cuentas por Cobrar" class="card-img">
+                <h3>11. Cuentas por Cobrar</h3>
+            </a>
+            {% endif %}
         </div>
     </div>
 
