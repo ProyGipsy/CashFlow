@@ -115,25 +115,26 @@ from accessControl import (
 
 #Funciones para la obtención de datos desde BD para Documentos
 from documents import (
-    get_docs_by_type,
-    get_doc_type_full,
-    get_docs_companies,
-    create_doc_type,
-    edit_doc_type,
-    create_document,
-    edit_document,
-    get_documents_by_type_id,
-    get_all_documents_lists,
-    get_document_by_id,
-    create_company,
-    update_company,
-    get_roles,
-    create_role,
     edit_role,
-    get_permissions,
+    get_roles,
     get_users,
+    create_role,
+    edit_doc_type,
+    edit_document,
     get_user_by_id,
     send_documents,
+    create_company,
+    update_company,
+    get_permissions,
+    create_doc_type,
+    create_document,
+    get_docs_by_type,
+    get_doc_type_full,
+    get_document_by_id,
+    get_docs_companies,
+    get_suggested_emails,
+    get_all_documents_lists,    
+    get_documents_by_type_id,
     )
 
 app = Flask(__name__)
@@ -2295,6 +2296,25 @@ def sendDocuments():
         return jsonify({
             'error': f'Error en el servidor: {str(e)}'
         }), 500
+
+@app.route('/documents/getSuggestedEmails', methods=['GET'])
+def getSuggestedEmails():
+    try:
+        # Obtenemos el userId de la URL: /getSuggestedEmails?userId=123
+        user_id = request.args.get('userId')
+
+        if not user_id:
+            # Si no hay usuario, retornamos lista vacía en lugar de error
+            return jsonify([]), 200
+
+        # Llamamos a la nueva función
+        emails = get_suggested_emails(user_id)
+        
+        return jsonify(emails), 200
+
+    except Exception as e:
+        print(f"Error obteniendo correos sugeridos: {e}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
    app.run()
