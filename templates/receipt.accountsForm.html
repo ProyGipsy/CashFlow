@@ -51,11 +51,12 @@
         </tr> 
         {% endfor %}
     </table>
+    {% set total_sin_nc = receiptDetails | rejectattr(6, 'equalto', 'N/C') | sum(attribute=1) %}
     <div class="inline-label">
         <label for="total_debt">Total Deuda Facturas:</label>
         {{ receiptStoreCustomer[5] }}
         <span id="total_debt" class="small-input">
-            {{ "{:,.2f}".format(receiptDetails | sum(attribute=1)).replace(".", "X").replace(",", ".").replace("X", ",") }}
+            {{ "{:,.2f}".format(total_sin_nc).replace(".", "X").replace(",", ".").replace("X", ",") }}
         </span>
     </div>
 
@@ -79,7 +80,7 @@
             <input id="general_discount" type="number" name="discount" step="0.01" class="input-field small-input" value="0.00"  onchange="applyDiscount()">
         </span>
         <div class="inline-label">
-            <label for="total_balance">Total a pagar:</label>
+            <label for="total_balance">Total a Pagar:</label>
             {{ receiptStoreCustomer[5] }}
             <span id="total_balance" class="small-input">
                 {{ "{:,.2f}".format(receiptDetails | sum(attribute=1)).replace(".", "X").replace(",", ".").replace("X", ",") }}
