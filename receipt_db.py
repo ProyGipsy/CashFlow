@@ -258,8 +258,8 @@ def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_i
     cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.PaidAmount, C.Description, D.DocumentType
                    FROM Commission_Receipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = 19111 AND isRembd = 0 AND StoreID = 911
-						AND (D.Amount-D.PaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.SalesRepID = 1
+                   WHERE CustomerID = %s AND isRembd = %s AND StoreID = %s
+						AND (D.Amount-D.PaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.SalesRepID = %s
                    ORDER BY D.N_CTA''',
                    (customer_id, customer_isRembd, store_id, salesRep_id))
     invoices = cursor.fetchall()    
