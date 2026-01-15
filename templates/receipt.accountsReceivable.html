@@ -91,27 +91,36 @@
             const storeName = button.textContent.toLowerCase();
             const storeId = button.getAttribute('onclick').match(/'([^']+)'/)[1];
             const sellersDiv = document.getElementById('sellers-' + storeId);
-            const sellers = sellersDiv.getElementsByTagName('p');
+            
+            // Cambio clave: Seleccionamos los contenedores que incluyen al cliente y su separador
+            const customerContainers = sellersDiv.querySelectorAll('.customer-container');
 
             let storeMatches = storeName.includes(searchTerm.toLowerCase());
-            let sellerMatches = false;
+            let anyCustomerMatches = false;
 
-            for (let seller of sellers) {
-                const sellerName = seller.textContent.toLowerCase();
-                if (sellerName.includes(searchTerm.toLowerCase())) {
-                    sellerMatches = true;
-                    seller.style.display = '';
+            customerContainers.forEach(container => {
+                // Buscamos el texto dentro del párrafo del contenedor
+                const customerText = container.querySelector('p').textContent.toLowerCase();
+                
+                if (customerText.includes(searchTerm.toLowerCase())) {
+                    anyCustomerMatches = true;
+                    container.style.display = ''; // Mostramos el contenedor completo (con el separador)
                 } else {
-                    seller.style.display = 'none';
+                    container.style.display = 'none'; // Ocultamos el contenedor completo
                 }
-            }
+            });
 
-            if (storeMatches || sellerMatches) {
+            // Si la tienda coincide o algún cliente de esa tienda coincide
+            if (storeMatches || anyCustomerMatches) {
                 button.style.display = '';
-                sellersDiv.style.display = 'block';
+                // Solo expandimos automáticamente si hay un término de búsqueda, 
+                // para no abrir todas las tiendas si borran el texto.
+                if (searchTerm.length > 0) {
+                    sellersDiv.style.display = 'block';
+                }
             } else {
                 button.style.display = 'none';
-                sellersDiv.style.display = 'none'
+                sellersDiv.style.display = 'none';
             }
         });
     } 
