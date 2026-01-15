@@ -282,3 +282,37 @@
 .save-button:hover {
     background-color: #4068f8;
 }
+
+/* Estilos para el filtro de tipo de documento en el modal */
+.filter-container {
+    margin: 15px 0;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.filter-container label {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.filter-container select {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background-color: white;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    min-width: 180px;
+    transition: border-color 0.2s;
+}
+
+.filter-container select:focus {
+    outline: none;
+    border-color: #007bff;
+}

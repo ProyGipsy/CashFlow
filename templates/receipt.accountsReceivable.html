@@ -51,6 +51,15 @@
     <div class="modal-content">
         <span class="close" onclick="closeModal()">&times;</span>
         <h2>Facturas del Cliente</h2>
+        
+        <!-- Contenedor del filtro dinámico -->
+        <div class="filter-container" id="docFilterContainer" style="display: none;">
+            <label for="docTypeFilter">Filtrar por Tipo de Documento:</label>
+            <select id="docTypeFilter" onchange="applyDocFilter()">
+                <option value="ALL">Todos los documentos</option>
+            </select>
+        </div>
+
         <table class="styled-table">
             <thead>
                 <tr>
@@ -59,7 +68,6 @@
                     <th>Moneda</th>
                     <th>Monto Original</th>
                     <th>Monto Abonado</th>
-                    <!--<th>Monto IVA Retenido</th>-->
                     <th>Monto Restante</th>
                     <th>Registrar</th>
                 </tr>
@@ -88,7 +96,6 @@
             let storeMatches = storeName.includes(searchTerm.toLowerCase());
             let sellerMatches = false;
 
-            // Mostrar u ocultar vendedores según el término de búsqueda
             for (let seller of sellers) {
                 const sellerName = seller.textContent.toLowerCase();
                 if (sellerName.includes(searchTerm.toLowerCase())) {
@@ -99,7 +106,6 @@
                 }
             }
 
-            // Mostrar u ocultar la tienda según si coincide con el término de búsqueda o tiene vendedores que coincidan
             if (storeMatches || sellerMatches) {
                 button.style.display = '';
                 sellersDiv.style.display = 'block';
@@ -117,7 +123,6 @@
         });
     });
 
-    // Formateo español para las cantidades
     function formatSpanishNumber(number) {
         return number.toFixed(2)
             .replace(".", "X")
@@ -125,10 +130,26 @@
             .replace("X", ",");
     }
 
+    /**
+     * Nueva función: Aplica el filtro de tipo de documento en la tabla del modal
+     */
+    function applyDocFilter() {
+        const filterValue = document.getElementById("docTypeFilter").value;
+        const rows = document.querySelectorAll("#modal .styled-table tbody tr");
+        
+        rows.forEach(row => {
+            const docType = row.getAttribute("data-doc-type");
+            if (filterValue === "ALL" || docType === filterValue) {
+                row.style.display = "";
+            } else {
+                row.style.display = "none";
+            }
+        });
+    }
+
     /*Listado de Facturas*/
     function openModal(customerId, customerIsRembd, customerName, customerLastName, storeId, storeName) {
-
-        selectedAccountIDs = []; // Limpiando selección de facturas
+        selectedAccountIDs = []; 
 
         const modal = document.getElementById("modal");
         modal.style.display = "block";
@@ -136,15 +157,20 @@
         const modalTitle = modal.querySelector("h2");
         modalTitle.textContent = `Facturas de ${customerName} ${customerLastName}`;
 
-        // Carga de la tabla
         const table = modal.querySelector(".styled-table");
         const button = modal.querySelector(".save-button");
+        
+        // Elementos del Filtro
+        const filterContainer = document.getElementById("docFilterContainer");
+        const filterSelect = document.getElementById("docTypeFilter");
 
-        // Eliminar mensajes anteriores (carga, error o "no tiene facturas")
+        // Reiniciar estado del filtro
+        filterContainer.style.display = "none";
+        filterSelect.innerHTML = '<option value="ALL">Todos los documentos</option>';
+
         const existingMessages = modal.querySelectorAll("#loadingMessage, .no-invoices-message");
         existingMessages.forEach(message => message.remove());
 
-        // Crear y mostrar el mensaje de carga
         const loadingMessage = document.createElement("p");
         loadingMessage.id = "loadingMessage";
         loadingMessage.textContent = "Cargando facturas...";
@@ -152,29 +178,30 @@
         button.style.display = "none";
         modal.querySelector(".modal-content").insertBefore(loadingMessage, table);
 
-        // Cuerpo de la tabla
         const tableBody = table.querySelector("tbody");
         tableBody.innerHTML = "";
 
         fetch(`/get_invoices/${customerId}/${customerIsRembd}/${storeId}`)
             .then(response => {
-                if (!response.ok) {
-                    throw new Error("Error al obtener las facturas");
-                }
+                if (!response.ok) throw new Error("Error al obtener las facturas");
                 return response.json();
             })
             .then(data => {
                 const invoices = data.invoices;
-                // const pendingInvoices = invoices.filter(invoice => invoice.Remaining > 0 || invoice.DocumentType === 'N/C');
-                const pendingInvoices = invoices;
-
-                // Eliminar el mensaje de carga
                 document.getElementById("loadingMessage").remove();
 
-                if (pendingInvoices.length > 0) { // Mostrar facturas pendientes
+                if (invoices.length > 0) {
                     table.style.display = "table";
-                    pendingInvoices.forEach(invoice => {
+                    filterContainer.style.display = "block"; // Mostrar filtro si hay datos
+                    
+                    const docTypesFound = new Set(); // Para recolectar tipos únicos
+
+                    invoices.forEach(invoice => {
+                        docTypesFound.add(invoice.DocumentType);
                         const row = document.createElement("tr");
+                        
+                        // Guardamos el tipo de documento en un atributo de datos para filtrar
+                        row.setAttribute("data-doc-type", invoice.DocumentType);
 
                         row.innerHTML = `
                             <td>${invoice.N_CTA}</td>
@@ -182,45 +209,40 @@
                             <td>${invoice.Currency}</td>
                             <td>${formatSpanishNumber(invoice.Amount)}</td>
                             <td>${formatSpanishNumber(invoice.Balance)}</td>
-                            <!--<td>${formatSpanishNumber(invoice.IVA)}</td>-->
                             <td>${formatSpanishNumber(invoice.Remaining)}</td>
                             <td><input type="checkbox" class="invoice-checkbox" data-account-id="${invoice.AccountID}" /></td>
                         `;
-
                         tableBody.appendChild(row);
                     });
+
+                    // Llenar el select solo con los tipos que existen en este modal
+                    docTypesFound.forEach(type => {
+                        const option = document.createElement("option");
+                        option.value = type;
+                        option.textContent = type;
+                        filterSelect.appendChild(option);
+                    });
+
                     button.style.display = "block";
                 } else {
-                    // Eliminar cualquier mensaje anterior antes de agregar uno nuevo
-                    const existingNoInvoicesMessage = modal.querySelector(".no-invoices-message");
-                    if (existingNoInvoicesMessage) {
-                        existingNoInvoicesMessage.remove();
-                    }
-
-                    // Crear y mostrar el mensaje "No tiene facturas pendientes"
                     const noInvoicesMessage = document.createElement("p");
-                    noInvoicesMessage.className = "no-invoices-message"; // Agregar una clase para identificarlo
+                    noInvoicesMessage.className = "no-invoices-message";
                     noInvoicesMessage.textContent = "Este cliente no tiene facturas pendientes.";
                     modal.querySelector(".modal-content").appendChild(noInvoicesMessage);
                 }
             })
             .catch(error => {
                 console.error("Error al cargar las facturas:", error);
-
-                // Actualizar el mensaje de carga con el mensaje de error
                 const loadingMessage = document.getElementById("loadingMessage");
-                if (loadingMessage) {
-                    loadingMessage.textContent = "No se pudieron cargar las facturas.";
-                }
+                if (loadingMessage) loadingMessage.textContent = "No se pudieron cargar las facturas.";
             });
     }
 
     function closeModal() {
         document.getElementById("modal").style.display = "none";
-        selectedAccountIDs = []; // Limpiando selección de facturas
+        selectedAccountIDs = []; 
     }
 
-    // Manejo de Selección de Facturas
     document.addEventListener("change", function(event) {
         if (event.target.classList.contains("invoice-checkbox")) {
             const accountID = event.target.getAttribute("data-account-id");
@@ -233,13 +255,12 @@
     });
 
     function registerCollections() {
-
         if (selectedAccountIDs.length > 0) {
-
             sessionStorage.setItem("selectedAccountIDs", JSON.stringify(selectedAccountIDs));
             let selectedCurrencies = new Set();
             for (const accountID of selectedAccountIDs) {
-                const invoice = document.querySelector(`.invoice-checkbox[data-account-id="${accountID}"]`).closest("tr");
+                const checkbox = document.querySelector(`.invoice-checkbox[data-account-id="${accountID}"]`);
+                const invoice = checkbox.closest("tr");
                 const currency = invoice.querySelector("td:nth-child(3)").textContent.trim();
                 selectedCurrencies.add(currency);
                 if (selectedCurrencies.size > 1) {
@@ -247,15 +268,11 @@
                     return;
                 }
             }
-
             const accountIdsString = selectedAccountIDs.join('-');
             window.location.href = "{{ url_for('accountsForm', account_ids='ACCOUNT_IDS') }}".replace('ACCOUNT_IDS', accountIdsString);
-        
         } else {
             alert("Por favor, selecciona al menos una factura.");
         }
     }
-
-    
 </script>
 {% endblock %}
