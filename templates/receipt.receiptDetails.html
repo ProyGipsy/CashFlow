@@ -54,6 +54,35 @@
             </tr>
             {% endfor %}
         </table>
+
+        {% set total_sin_nc = invoices | rejectattr(8, 'equalto', 'N/C') | sum(attribute=1) %}
+        <div class="inline-label">
+            <label for="total_debt"><strong>Deuda Facturas:</strong></label>
+            {{ invoices[0][6] }}
+            <span id="total_debt" class="small-input">
+                {{ "{:,.2f}".format(total_sin_nc).replace(".", "X").replace(",", ".").replace("X", ",") }}
+            </span>
+        </div>
+
+        <!-- Descuento por N/C -->
+        {% set total_nc = invoices | selectattr(8, 'equalto', 'N/C') | sum(attribute=1) %}
+        {% if total_nc != 0 %}
+        <div class="inline-label">
+            <label for="total_nc_discount"><strong>Descuento por N/C:</strong></label>
+            {{ invoices[0][6] }}
+            <span id="total_nc_discount" class="small-input">
+                {{ "{:,.2f}".format(-total_nc).replace(".", "X").replace(",", ".").replace("X", ",") }}
+            </span>
+        </div>
+        {% endif %}
+
+        <div class="inline-label">
+            <label for="total_balance"><strong>Total a Pagar:</strong></label>
+            {{ invoices[0][6] }}
+            <span id="total_balance" class="small-input">
+                {{ "{:,.2f}".format(invoices | sum(attribute=1)).replace(".", "X").replace(",", ".").replace("X", ",") }}
+            </span>
+        </div>
     
         <br> 
         <div id="formas-de-pago"> 
@@ -84,7 +113,7 @@
             </table>
         </div> 
         <div class="inline-label">
-            <label for="total_paid">Monto total del Recibo:</label>
+            <label for="total_paid"><strong>Monto total del Recibo:</strong></label>
             {{ invoices[0][6] }}
             <span id="total_paid" class="small-input">{{ "{:,.2f}".format(receipts[pagination-1][1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</span> 
         </div> 
@@ -121,7 +150,7 @@
             {% endfor %}
         </table>
         <div class="inline-label">
-            <label for="total_comm">Comisión Total:</label>
+            <label for="total_comm"><strong>Comisión Total:</strong></label>
             <span id="total_comm" class="small-input">
                 {% if receipts[pagination-1][2] != 0 %}
                     Bs {{ "{:,.2f}".format(receipts[pagination-1][2]).replace(".", "X").replace(",", ".").replace("X", ",") }}
@@ -142,7 +171,7 @@
         
         <br><br><br>
         <div class="file-upload-container">
-            <label>Comprobante(s):</label><br><br>
+            <label><strong>Comprobante(s):</strong></label><br><br>
             {% if paymentEntries %}
                 {% for paymentEntry in paymentEntries %}
                     {% if paymentEntry[7] %}
