@@ -165,7 +165,8 @@
             })
             .then(data => {
                 const invoices = data.invoices;
-                const pendingInvoices = invoices.filter(invoice => invoice.Remaining > 0);
+                // const pendingInvoices = invoices.filter(invoice => invoice.Remaining > 0 || invoice.DocumentType === 'N/C');
+                const pendingInvoices = invoices;
 
                 // Eliminar el mensaje de carga
                 document.getElementById("loadingMessage").remove();

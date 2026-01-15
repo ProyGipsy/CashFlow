@@ -34,7 +34,10 @@
         {% for receipt in receiptDetails %}
         <tr> 
             <td><p>{{ receipt[0] }}</p></td>
-            <td><p>{{ receipt[6] }}</p></td>
+            <td>
+                <p>{{ receipt[6] }}</p>
+                <input type="hidden" name="document_type" value="{{ receipt[6] }}">
+            </td>
             <td>
                 <p>{{ receiptStoreCustomer[5] }} {{ "{:,.2f}".format(receipt[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p>
                 <input type="hidden" name="original_amount[]" value="{{ "%.2f"|format(receipt[1]) }}" />
@@ -48,13 +51,26 @@
         </tr> 
         {% endfor %}
     </table>
+    {% set total_sin_nc = receiptDetails | rejectattr(6, 'equalto', 'N/C') | sum(attribute=1) %}
     <div class="inline-label">
         <label for="total_debt">Total Deuda Facturas:</label>
         {{ receiptStoreCustomer[5] }}
         <span id="total_debt" class="small-input">
-            {{ "{:,.2f}".format(receiptDetails | sum(attribute=1)).replace(".", "X").replace(",", ".").replace("X", ",") }}
+            {{ "{:,.2f}".format(total_sin_nc).replace(".", "X").replace(",", ".").replace("X", ",") }}
         </span>
     </div>
+
+    <!-- Descuento por N/C -->
+    {% set total_nc = receiptDetails | selectattr(6, 'equalto', 'N/C') | sum(attribute=1) %}
+    {% if total_nc != 0 %}
+    <div class="inline-label">
+        <label for="total_nc_discount">Total Descuento por N/C:</label>
+        {{ receiptStoreCustomer[5] }}
+        <span id="total_nc_discount" class="small-input">
+            {{ "{:,.2f}".format(-total_nc).replace(".", "X").replace(",", ".").replace("X", ",") }}
+        </span>
+    </div>
+    {% endif %}
 
     <br> 
     <div id="formas-de-pago"> 
@@ -64,7 +80,7 @@
             <input id="general_discount" type="number" name="discount" step="0.01" class="input-field small-input" value="0.00"  onchange="applyDiscount()">
         </span>
         <div class="inline-label">
-            <label for="total_balance">Total a pagar:</label>
+            <label for="total_balance">Total a Pagar:</label>
             {{ receiptStoreCustomer[5] }}
             <span id="total_balance" class="small-input">
                 {{ "{:,.2f}".format(receiptDetails | sum(attribute=1)).replace(".", "X").replace(",", ".").replace("X", ",") }}
@@ -137,19 +153,22 @@
     
     <br>
     <table class="styled-table heading-table"> 
-        <tr> 
+        <tr>
+            <th>Tipo</th> 
             <th>N_CTA</th>
             <th>Importe Adeudado</th>
-            <th>Días Transcurridos</th>
-            <th>Comisión</th>
+            <th class="col-daysElapsed">Días Transcurridos</th>
+            <th class="col-commission">Comisión</th>
         </tr> 
         {% for receipt in receiptDetails %}
-        <tr> 
+        <!-- Ocultando visualmente filas de documentos que sean N/C -->
+        <tr class="{% if receipt[6] == 'N/C' %}hidden-nc{% endif %}">
+            <td><p>{{ receipt[6] }}</p></td> 
             <td><p>{{ receipt[0] }}</p></td>
             <td><p id="balance_calculation" data-original-value="{{ "%.2f"|format(receipt[1] - receipt[4]) }}" data-due-date="{{ receipt[3] }}">{{ "{:,.2f}".format(receipt[1] - receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
             <td><p id="days_passed"></p></td>
             <td><p id="commission_received"></p></td>
-        </tr> 
+        </tr>
         {% endfor %}
     </table>
 
@@ -560,6 +579,52 @@
         distributeBalanceAcrossReceipts(balanceNoteValue);
     }
 
+    // Distribución de N/C como si fueran pagos del vendedor
+    function applyCreditNotesAsPayments(receiptData) {
+        // Separar facturas positivas y N/C
+        const invoices = receiptData.filter(r => r.docType !== "N/C");
+        const creditNotes = receiptData.filter(r => r.docType === "N/C");
+        const paymentDate = new Date();
+
+        creditNotes.forEach(nc => {
+            let remainingCredit = Math.abs(nc.originalValue);  // monto positivo de la N/C
+
+            // Recorre las facturas en orden y aplica la N/C
+            for (const inv of invoices) {
+                if (remainingCredit <= 0) break;
+
+                const invRemaining = inv.discountedValue - inv.amountPaid;
+                if (invRemaining <= 0) continue;
+
+                const amountToApply = Math.min(invRemaining, remainingCredit);
+
+                // Calculo de días transcurridos
+                const dueDate = new Date(inv.element.getAttribute('data-due-date'));
+                const daysElapsed = Math.floor((paymentDate - dueDate) / (1000 * 60 * 60 * 24));
+                
+                // Registrar este “pago automático” sobre la factura
+                inv.payments.push({
+                    amount: amountToApply,
+                    paymentDate: new Date(),
+                    daysElapsed: daysElapsed,
+                    realDays: daysElapsed,
+                    paymentRowIdx: -1,
+                    reference: 'N/C',
+                    calculateCommission: false
+                });
+
+                inv.amountPaid = parseFloat((inv.amountPaid + amountToApply).toFixed(2));
+                inv.remaining = parseFloat((inv.discountedValue - inv.amountPaid).toFixed(2));
+
+                remainingCredit = parseFloat((remainingCredit - amountToApply).toFixed(2));
+            }
+
+            // La N/C se considera aplicada totalmente como “pago”
+            nc.amountPaid = Math.abs(nc.originalValue);
+            nc.remaining = 0;
+        });
+    }
+
     // Cálculo de Impuesto Adeudado. Días Transcurridos y Comisión para las demás filas
     function distributeBalanceAcrossReceipts(balanceNote) {
         const balanceCalculationFields = document.querySelectorAll('#balance_calculation');
@@ -620,6 +685,10 @@
                 payments: [] // Arreglo de pagos aplicados a la factura
             };
         });
+
+        // Distribución de N/C como si fueran pagos del vendedor
+        applyCreditNotesAsPayments(receiptData)
+
         // Distribuir pagos y retenciones a facturas en orden
         let paymentIndex = 0;
         let invoiceIndex = 0;
@@ -731,6 +800,7 @@
                 const payCurrencyId = paymentData[paymentRowIdx]?.currencyId || receiptCurrency;
                 const payCurrencyCode = getCurrencyCodeById(payCurrencyId);
 
+                if (payment.calculateCommission !== false) {
                     for (let i=0; i<businessRules.length; i++){
                         const comm = businessRules[i];
                         if (!commissionApplied) {
@@ -755,6 +825,11 @@
                                     }
                                 }
 
+                                // Commisión = (Base Imponible - Descuentos) * reglaNegocio 
+                                // Base Imponible = MontoPagado / 1.16
+                                // Los descuentos ya se restan del monto total, debido a que en los cálculos se muestra el
+                                // importe adeudado actualizado y con base en eso se toma el monto pagado de esa factura.
+                                // OJO: Las N/E no tienen IVA, por tanto no se divide entre 1.16
                                 if (amountForCommissionInPayCurrency < 0) amountForCommissionInPayCurrency = 0;
                                 let commissionAmountForPayment = 0;
                                 if (invoice.docType === 'FAC') {
@@ -769,7 +844,7 @@
                             }
                         }
                     }
-
+                }
                 //console.log(`Comisión por moneda para la factura ${invoice.docType} N_CTA ${document.querySelectorAll('.heading-table tr')[idx + 1]?.children[0].textContent.trim()}:`, commissionPerCurrency);
             });
 
@@ -964,6 +1039,13 @@
         });
         formData.append('all_account_ids', JSON.stringify(allAccountIds));
 
+        // Tipos de documento por factura (en el mismo orden que account_id)
+        const documentTypes = [];
+        document.querySelectorAll('input[name=document_type]').forEach(input => {
+            documentTypes.push(input.value);
+        });
+        formData.append('document_types', JSON.stringify(documentTypes));
+
         // Saldo Nota y Comisión Total
         formData.append('balance_note', cleanNumberForServer(document.getElementById('balance_note').textContent));
         //formData.append('commission_note', cleanNumberForServer(document.getElementById('commission_note').textContent));
@@ -1069,6 +1151,10 @@
                 payments: [] // Arreglo de pagos aplicados a la factura
             };
         });
+        
+        // Distribución de N/C como si fueran pagos del vendedor
+        applyCreditNotesAsPayments(receiptData)
+
         // Reconstruir los pagos aplicados a cada factura usando la misma lógica
         let paymentIndex = 0;
         let invoiceIndex = 0;
@@ -1122,23 +1208,25 @@
                 let commissionAmount = 0;
                 let commissionApplied = false;
 
-                for (let i=0; i<businessRules.length; i++){
-                    const comm = businessRules[i];
-                    if (!commissionApplied) {
-                        const isLastRule = (i === businessRules.length - 1);
-                        const conditionMet = isLastRule 
-                            ? payment.daysElapsed >= comm[2]
-                            : payment.daysElapsed <= comm[2];
-                        if (conditionMet && comm[3] == 1) {
-                            let amountForCommission = payment.amount;
-                            if (amountForCommission < 0) amountForCommission = 0;
-                            if (invoice.docType === 'FAC') {
-                                commissionAmount = amountForCommission / 1.16 * (comm[1] / 100);
-                            } else if (invoice.docType === 'N/E') {
-                                commissionAmount = amountForCommission * (comm[1] / 100);
+                if (payment.calculateCommission !== false) {
+                    for (let i=0; i<businessRules.length; i++){
+                        const comm = businessRules[i];
+                        if (!commissionApplied) {
+                            const isLastRule = (i === businessRules.length - 1);
+                            const conditionMet = isLastRule 
+                                ? payment.daysElapsed >= comm[2]
+                                : payment.daysElapsed <= comm[2];
+                            if (conditionMet && comm[3] == 1) {
+                                let amountForCommission = payment.amount;
+                                if (amountForCommission < 0) amountForCommission = 0;
+                                if (invoice.docType === 'FAC') {
+                                    commissionAmount = amountForCommission / 1.16 * (comm[1] / 100);
+                                } else if (invoice.docType === 'N/E') {
+                                    commissionAmount = amountForCommission * (comm[1] / 100);
+                                }
+                                commissionId = comm[0];
+                                commissionApplied = true;
                             }
-                            commissionId = comm[0];
-                            commissionApplied = true;
                         }
                     }
                 }
@@ -1167,22 +1255,24 @@
                     }
 
                     // Aplicar las reglas de negocio para hallar la comisión sobre amountForCommissionInPaymentCurrency
-                    for (let i=0; i<businessRules.length; i++){
-                        const comm = businessRules[i];
-                        if (!commissionIdForThisPayment) {
-                            const isLastRule = (i === businessRules.length - 1);
-                            const conditionMet = isLastRule ? payment.daysElapsed >= comm[2] : payment.daysElapsed <= comm[2];
-                            if (conditionMet && comm[3] == 1) {
-                                let amountBase = amountForCommissionInPaymentCurrency;
-                                if (amountBase < 0) amountBase = 0;
-                                let commissionCalc = 0;
-                                if (invoice.docType === 'FAC') {
-                                    commissionCalc = amountBase / 1.16 * (comm[1] / 100);
-                                } else if (invoice.docType === 'N/E') {
-                                    commissionCalc = amountBase * (comm[1] / 100);
+                    if (payment.calculateCommission !== false) {
+                        for (let i=0; i<businessRules.length; i++){
+                            const comm = businessRules[i];
+                            if (!commissionIdForThisPayment) {
+                                const isLastRule = (i === businessRules.length - 1);
+                                const conditionMet = isLastRule ? payment.daysElapsed >= comm[2] : payment.daysElapsed <= comm[2];
+                                if (conditionMet && comm[3] == 1) {
+                                    let amountBase = amountForCommissionInPaymentCurrency;
+                                    if (amountBase < 0) amountBase = 0;
+                                    let commissionCalc = 0;
+                                    if (invoice.docType === 'FAC') {
+                                        commissionCalc = amountBase / 1.16 * (comm[1] / 100);
+                                    } else if (invoice.docType === 'N/E') {
+                                        commissionCalc = amountBase * (comm[1] / 100);
+                                    }
+                                    commissionPerCurrency[payCurrencyCode] = (commissionPerCurrency[payCurrencyCode] || 0) + parseFloat(commissionCalc.toFixed(2));
+                                    commissionIdForThisPayment = comm[0];
                                 }
-                                commissionPerCurrency[payCurrencyCode] = (commissionPerCurrency[payCurrencyCode] || 0) + parseFloat(commissionCalc.toFixed(2));
-                                commissionIdForThisPayment = comm[0];
                             }
                         }
                     }
