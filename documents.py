@@ -1425,7 +1425,6 @@ def send_documents(user_id, email_data, full_documents_data):
 
     try:
         # --- 1. PREPARACIÓN Y LIMPIEZA DE DATOS ---
-        
         # Destinatarios
         recipients_list = email_data.get('recipients', [])
         if not isinstance(recipients_list, list):
@@ -1544,9 +1543,9 @@ def get_suggested_emails(user_id):
         rows = cursor.fetchall()
 
         # Estructuras para procesar los datos
-        email_frequency = Counter()      # Para contar cuántas veces se ha enviado
-        email_last_seen = {}             # Para saber cuándo fue la última vez (orden de recencia)
-        unique_emails_ordered = []       # Lista auxiliar para mantener el orden cronológico puro
+        email_frequency = Counter()
+        email_last_seen = {}
+        unique_emails_ordered = []
 
         for row in rows:
             raw_recipient = row['Recipient']
@@ -1560,10 +1559,10 @@ def get_suggested_emails(user_id):
                 if '@' not in clean_email or '.' not in clean_email:
                     continue
                 
-                # 1. Contamos frecuencia (para los "Top 2 Contactados")
+                # 1. Contamos frecuencia (para los  2 Contactados")
                 email_frequency[clean_email] += 1
                 
-                # 2. Registramos orden de llegada (para los "Últimos 3")
+                # 2. Registramos los Últimos 3
                 if clean_email not in email_last_seen:
                     email_last_seen[clean_email] = row['DeliveryDate']
                     unique_emails_ordered.append(clean_email)
@@ -1591,6 +1590,120 @@ def get_suggested_emails(user_id):
         print(f"Error en get_suggested_emails_by_user: {e}")
         return []
     
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+def insert_contact_db(user_id, alias, emails_list):
+    connection = None
+    cursor = None
+    
+    # 1. Convertir lista de emails a string (CSV) para la BD
+    # Si viene ['a@a.com', 'b@b.com'] -> "a@a.com, b@b.com"
+    if isinstance(emails_list, list):
+        emails_str = ", ".join([e.strip() for e in emails_list])
+    else:
+        emails_str = str(emails_list).strip()
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+            INSERT INTO Documents.Contacts (Alias, Emails, UserID)
+            OUTPUT INSERTED.ContactID
+            VALUES (%s, %s, %s)
+        """
+        
+        cursor.execute(sql, (alias, emails_str, user_id))
+        row = cursor.fetchone()
+        
+        if row:
+            connection.commit()
+            return row['ContactID']
+        else:
+            raise Exception("No se pudo obtener el ID del nuevo contacto.")
+
+    except Exception as e:
+        if connection: connection.rollback()
+        raise e
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+
+def update_contact_db(contact_id, user_id, alias, emails_list):
+    connection = None
+    cursor = None
+    
+    # 1. Convertir lista de emails a string
+    if isinstance(emails_list, list):
+        emails_str = ", ".join([e.strip() for e in emails_list])
+    else:
+        emails_str = str(emails_list).strip()
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor()
+
+        # IMPORTANTE: El WHERE incluye UserID para seguridad. 
+        sql = """
+            UPDATE Documents.Contacts
+            SET Alias = %s, Emails = %s
+            WHERE ContactID = %s AND UserID = %s
+        """
+        
+        cursor.execute(sql, (alias, emails_str, contact_id, user_id))
+        connection.commit()
+
+        return cursor.rowcount
+
+    except Exception as e:
+        if connection: connection.rollback()
+        raise e
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+def get_contacts_by_user_db(user_id):
+    connection = None
+    cursor = None
+    contacts_list = []
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        # Seleccionamos solo los contactos de este usuario
+        sql = """
+            SELECT ContactID, Alias, Emails 
+            FROM Documents.Contacts 
+            WHERE UserID = %s
+            ORDER BY Alias ASC
+        """
+        
+        cursor.execute(sql, (user_id,))
+        rows = cursor.fetchall()
+
+        for row in rows:
+            raw_emails = row['Emails']
+            emails_array = []
+            
+            if raw_emails:
+                # Separamos por coma y quitamos espacios en blanco extra
+                emails_array = [e.strip() for e in raw_emails.split(',') if e.strip()]
+
+            contacts_list.append({
+                'id': row['ContactID'],
+                'alias': row['Alias'],
+                'emails': emails_array # Ahora es un array real para el Frontend
+            })
+
+        return contacts_list
+
+    except Exception as e:
+        print(f"Error en get_contacts_by_user_db: {e}")
+        raise e 
     finally:
         if cursor: cursor.close()
         if connection: connection.close()

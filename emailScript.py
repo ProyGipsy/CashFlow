@@ -13,44 +13,43 @@ load_dotenv()
 # --- FUNCIÓN DE ENVÍO DE CORREO ---
 def send_email(subject, body_html, sender_email, email_password, receiver_emails, attachments=None, bcc=None):
     
-    # Aseguramos que receiver_emails sea una lista
+    # 1. Aseguramos que receiver_emails sea una lista
     if isinstance(receiver_emails, str):
         receiver_emails = [receiver_emails]
 
-    print(f"Iniciando envío de correo a: {', '.join(receiver_emails)}")
+    print(f"--- INTENTO DE ENVÍO ---")
+    print(f"De: {sender_email}")
+    print(f"Para: {receiver_emails}")
     
-    # Preparar lista de BCC
+    # 2. Preparar lista de BCC (Copia Oculta)
     bcc_list = []
     if bcc:
         if isinstance(bcc, str):
             bcc_list = [bcc]
         elif isinstance(bcc, list):
             bcc_list = bcc
-        print(f"Incluyendo copia oculta (BCC) a: {', '.join(bcc_list)}")
+        print(f"BCC: {bcc_list}")
 
-    print(f"Asunto: {subject}")
-
-    mail_server = os.environ.get("MAIL_SERVER_DOCUMENTS", "smtp.office365.com") # Valor por defecto seguro
+    # 3. Configuración del Servidor (Variables de Entorno o Defaults)
+    mail_server = os.environ.get("MAIL_SERVER_DOCUMENTS", "smtp.office365.com")
     mail_port = int(os.environ.get("EMAIL_PORT", 587))
 
+    # 4. Construcción del Mensaje
     msg = EmailMessage()
     msg['From'] = sender_email
     msg['To'] = ", ".join(receiver_emails)
     msg['Subject'] = subject
     
-    # NOTA: No agregamos msg['Bcc'] para mantener la privacidad total.
+    # NOTA: No agregamos msg['Bcc'] aquí para que los destinatarios no vean la lista oculta.
 
-    # Contenido HTML
-    msg.set_content("Este es un correo con contenido HTML. Por favor, use un cliente de correo compatible para ver el contenido completo.")
+    msg.set_content("Este es un correo con contenido HTML.")
     msg.add_alternative(body_html, subtype='html')
 
-    # --- Inserción del logotipo corporativo ---
-    # Nota: Esto asume que la estructura es multipart/alternative y el HTML es la segunda parte (índice 1)
+    # --- INSERCIÓN DE LOGO (Mantenemos tu lógica original) ---
     logo_path = Path("static/IMG/Gipsy_imagotipo_color.png")
     if logo_path.exists():
         try:
             with open(logo_path, "rb") as img:
-                # Adjuntamos la imagen relacionada al contenido HTML
                 msg.get_payload()[1].add_related(
                     img.read(), 
                     maintype="image", 
@@ -59,56 +58,65 @@ def send_email(subject, body_html, sender_email, email_password, receiver_emails
                     filename="GrupoGipsy_Logo.png"
                 )
         except Exception as e:
-            print(f"Error adjuntando logo: {e}")
-    else:
-        print(f"Advertencia: No se encontró el logo en {logo_path}")
+            print(f"Advertencia: Error adjuntando logo: {e}")
 
-    # --- Archivos Adjuntos (PDFs u otros) ---
+    # --- ARCHIVOS ADJUNTOS (Mantenemos tu lógica original) ---
     if attachments:
         print(f"Adjuntando {len(attachments)} archivo(s)...")
         for file_path in attachments:
+            if not file_path: continue # Saltar nulos
+            
             file_path_obj = Path(file_path)
             if not file_path_obj.exists():
-                print(f"Advertencia: El archivo adjunto {file_path} no existe. Omitiendo.")
+                print(f"Advertencia: El archivo {file_path} no existe. Omitiendo.")
                 continue
             
-            # Adivinar el tipo MIME
+            # Adivinar MIME
             ctype, encoding = mimetypes.guess_type(file_path_obj)
             if ctype is None or encoding is not None:
-                ctype = 'application/octet-stream'  # Default genérico
+                ctype = 'application/octet-stream'
             
             maintype, subtype = ctype.split('/', 1)
             
             try:
                 with open(file_path_obj, "rb") as f:
                     file_data = f.read()
-                
                 msg.add_attachment(file_data, maintype=maintype, subtype=subtype, filename=file_path_obj.name)
-                print(f"Archivo {file_path_obj.name} adjuntado exitosamente.")
             except Exception as e:
-                print(f"Error al leer o adjuntar el archivo {file_path_obj.name}: {e}")
+                print(f"Error al adjuntar {file_path_obj.name}: {e}")
 
-    # --- PREPARACIÓN DE DESTINATARIOS PARA SMTP ---
-    # Combinamos Para (To) + Ocultos (BCC) para el "sobre" de envío
+    # --- 5. ENVÍO REAL (CORRECCIÓN CRÍTICA) ---
+    # Combinamos todos los destinatarios para el "sobre" SMTP (Envelope)
     all_recipients = receiver_emails + bcc_list
-
     context = ssl.create_default_context()
 
     try:
+        print(f"Conectando a SMTP: {mail_server}:{mail_port}...")
+        
         with smtplib.SMTP(mail_server, mail_port) as smtp:
             smtp.starttls(context=context)
             smtp.login(sender_email, email_password)
             
-            # AQUÍ ES DONDE OCURRE LA MAGIA: Enviamos a 'all_recipients'
-            smtp.sendmail(sender_email, all_recipients, msg.as_string())
+            # sendmail devuelve un diccionario con los correos que FALLARON
+            refused = smtp.sendmail(sender_email, all_recipients, msg.as_string())
             
-        print(f"Correo enviado exitosamente a destinatarios y copias ocultas!\n")
+            if refused:
+                print(f"⚠ ALERTA SMTP: El servidor rechazó estos destinatarios: {refused}")
+                # Aquí podrías decidir si lanzar error si fallan todos, o dejarlo pasar.
+                # Si refused contiene todos los destinatarios, entonces el envío falló totalmente.
+                if len(refused) == len(all_recipients):
+                    raise Exception(f"Envío fallido. Todos los destinatarios fueron rechazados: {refused}")
+            else:
+                print(f"✅ SMTP confirmó recepción del mensaje para entrega.")
+                
         return True
 
+    except smtplib.SMTPAuthenticationError:
+        print("❌ Error de Autenticación SMTP: Usuario o contraseña incorrectos.")
+        raise # Re-lanzamos para que el endpoint lo detecte
     except Exception as e:
-        print(f"Error al enviar el correo: {e}\n")
+        print(f"❌ Error CRÍTICO al enviar correo: {e}")
         raise e
-
 
 # --- ESTILO CSS BASE PARA GIPSY DOCUMENTOS ---
 
