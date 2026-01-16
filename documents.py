@@ -586,7 +586,7 @@ def get_roles():
         LEFT JOIN AccessControl.Users U ON UR.userId = U.userId
         -- Filtramos explícitamente
         WHERE P.isDocumentsModule = 1 
-        AND RP.isActive = 1 -- (Opcional) Recomendado si manejas borrado lógico
+        AND UR.isActive = 1 -- (Opcional) Recomendado si manejas borrado lógico
         ORDER BY R.roleId;
         """
         cursor.execute(sql_only_documents_roles)
@@ -699,7 +699,7 @@ def get_user_by_id(id):
         -- Filtramos explícitamente
         WHERE P.isDocumentsModule = 1 
         AND U.userId = %s
-        AND RP.isActive = 1 -- (Opcional) Recomendado si manejas borrado lógico
+        AND UR.isActive = 1 -- (Opcional) Recomendado si manejas borrado lógico
         ORDER BY R.roleId;
         """
         cursor.execute(roles_sql, (id))
@@ -797,27 +797,28 @@ def edit_role(data):
         """
         cursor.execute(sql_update_role, (data['name'], data['id']))
 
+        """
         # 2. GESTIÓN DE PERMISOS (Estrategia Soft Delete + Upsert)
         
         # A. "Resetear": Marcar todos los permisos actuales como inactivos
-        sql_deactivate_perms = """
+        sql_deactivate_perms = 
             UPDATE Documents.RolePermissions 
             SET isActive = 0, lastUpdate = GETDATE() 
             WHERE roleId = %s
-        """
+        
         cursor.execute(sql_deactivate_perms, (data['id'],))
 
         # B. "Upsert": Reactivar los seleccionados o insertar nuevos
-        sql_update_perm = """
+        sql_update_perm = 
             UPDATE Documents.RolePermissions
             SET isActive = 1, lastUpdate = GETDATE()
             WHERE roleId = %s AND permissionId = %s
-        """
         
-        sql_insert_perm = """
+        
+        sql_insert_perm = 
             INSERT INTO Documents.RolePermissions (roleId, permissionId, isActive, lastUpdate)
             VALUES (%s, %s, 1, GETDATE())
-        """
+        
 
         for permiso in data.get('permisos', []):
             permission_id = permiso['id']
@@ -828,6 +829,7 @@ def edit_role(data):
             # Si rowcount es 0, significa que la relación no existía, así que insertamos
             if cursor.rowcount == 0:
                 cursor.execute(sql_insert_perm, (data['id'], permission_id))
+        """
 
         # 3. GESTIÓN DE USUARIOS (Misma estrategia)
         # A. "Resetear": Marcar todos los usuarios actuales como inactivos
