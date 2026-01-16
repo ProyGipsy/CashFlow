@@ -43,7 +43,7 @@ def get_receiptStores_DebtAccount(salesRep_id):
     cursor.execute('''SELECT DISTINCT(S.ID), S.Name
                     FROM Main.Store S
                     JOIN Commission_Receipt.DebtAccount D ON S.ID = D.StoreID
-                    WHERE S.ID != 0 AND (D.Amount-D.PaidAmount) > 0 AND D.SalesRepID=%s
+                    WHERE S.ID != 0 AND (D.Amount-D.PaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.SalesRepID=%s
                    ''', (salesRep_id))
     stores = cursor.fetchall()
     conn.close()
@@ -55,7 +55,7 @@ def get_receiptStores_DebtAccount_admin():
     cursor.execute('''SELECT DISTINCT(S.ID), S.Name
                     FROM Main.Store S
                     JOIN Commission_Receipt.DebtAccount D ON S.ID = D.StoreID
-                    WHERE S.ID != 0 AND (D.Amount-D.PaidAmount) > 0 ''',)
+                    WHERE S.ID != 0 AND (D.Amount-D.PaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) ''',)
     stores = cursor.fetchall()
     conn.close()
     return stores
@@ -259,7 +259,7 @@ def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_i
                    FROM Commission_Receipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
                    WHERE CustomerID = %s AND isRembd = %s AND StoreID = %s
-						AND D.Amount-D.PaidAmount > 0 AND D.SalesRepID = %s
+						AND (D.Amount-D.PaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.SalesRepID = %s
                    ORDER BY D.N_CTA''',
                    (customer_id, customer_isRembd, store_id, salesRep_id))
     invoices = cursor.fetchall()    
@@ -272,7 +272,7 @@ def get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id):
     cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.PaidAmount, C.Description, D.DocumentType
                    FROM Commission_Receipt.DebtAccount D
                    JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = %s AND isRembd = %s AND StoreID = %s AND D.Amount-D.PaidAmount > 0
+                   WHERE CustomerID = %s AND isRembd = %s AND StoreID = %s AND (D.Amount-D.PaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0))
                    ORDER BY D.N_CTA''',
                    (customer_id, customer_isRembd, store_id))
     invoices = cursor.fetchall()    
@@ -545,6 +545,7 @@ def set_paymentReceipt(cursor, total_receipt_amount, commission_bs, commission_u
 
 
 def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, proof_path): 
+    print("Estoy en set_paymentEntry")
     cursor.execute('''
         INSERT INTO Commission_Receipt.PaymentReceiptEntry
         (ReceiptID, PaymentDate, Amount, Discount, Reference, PaymentDestinationID, TenderID, isRetail, ProofOfPaymentPath)
@@ -559,6 +560,7 @@ def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, referen
     
 
 def set_paymentEntryCommission(cursor, receipt_id, paymentEntry_id, debtaccount_id, payment_date, amount, days_elapsed, commission_id, bs_commission, usd_commission):
+    print("set_paymentEntryCommission")
     cursor.execute('''
         INSERT INTO Commission_Receipt.PaymentEntryCommission
         (ReceiptID, PaymentReceiptEntryID, DebtAccountID, PaymentDate, Amount, DaysElapsed, CommissionID, CommissionAmount_Bs, CommissionAmount_USD)
@@ -610,20 +612,14 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
 
 
 def set_invoicePaidAmount(cursor, account_id, amount_to_add):
+    print("Estoy en set_invoicePaidAmount")
     cursor.execute('''
                    UPDATE Commission_Receipt.DebtAccount
                    SET PaidAmount = PaidAmount + %s
                    WHERE AccountID = %s
                    ''', (amount_to_add, account_id))
     
-# Query anterior (tomando cálculo de Python)
-# def set_invoicePaidAmount(cursor, account_id, new_paidAmount):
-#     cursor.execute('''
-#                    UPDATE Commission_Receipt.DebtAccount
-#                    SET PaidAmount = %s
-#                    WHERE AccountID = %s
-#                    ''', (new_paidAmount, account_id))
-    
+
 def revert_invoicePaidAmount(account_id, new_paidAmount):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -637,6 +633,7 @@ def revert_invoicePaidAmount(account_id, new_paidAmount):
     
 
 def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount):
+    print("Estoy en set_DebtPaymentRelation")
     cursor.execute('''
                     INSERT INTO Commission_Receipt.DebtPaymentRelation
                     (DebtAccountID, PaymentReceiptID, isRetail, PaidAmount)
@@ -645,6 +642,7 @@ def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount):
 
 
 def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission):
+    print("Estoy en set_SalesRepCommission")
     cursor.execute('''
                     INSERT INTO Commission_Receipt.SalesRepCommission
                     (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CreatedAt, ReceiptID, CommissionAmount_Bs, CommissionAmount_USD)
@@ -721,13 +719,29 @@ def check_already_paid_invoices(cursor, account_ids):
     
     placeholders = ','.join(['%s'] * len(account_ids))
     query = f'''
-        SELECT da.AccountID, da.PaidAmount, da.Amount
+        SELECT da.AccountID, da.PaidAmount, da.Amount, da.DocumentType
         FROM Commission_Receipt.DebtAccount da
         WHERE da.AccountID IN ({placeholders})
         AND da.PaidAmount >= da.Amount
     '''
     cursor.execute(query, account_ids)
-    return cursor.fetchall()
+    rows = cursor.fetchall()
+    
+    paid_invoices = []
+    for row in rows:
+        account_id, paid_amount, amount, doc_type = row
+        if doc_type == 'N/C':
+            print("Verificando una N/C")
+            # Para N/C: considera pagada si PaidAmount >= Amount * (-1)
+            if paid_amount >= amount * -1:
+                paid_invoices.append(account_id)
+        else:
+            print("Verificando documento")
+            # Para otros documentos: PaidAmount >= Amount
+            if paid_amount >= amount:
+                paid_invoices.append(account_id)
+
+    return paid_invoices
 
 
 def find_candidate_receipts_by_amount_and_count(cursor, total_amount, relation_count):

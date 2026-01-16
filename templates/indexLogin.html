@@ -17,10 +17,13 @@
                     <h2>Inicie Sesión</h2>
                 </div>
                 <form id="loginForm" action="{{ url_for('login') }}" method="POST">
-                    <input type="text" name="User" placeholder="Usuario" required>
+                    <div class="input-container">
+                        <input type="text" name="User" placeholder="Usuario" required>
+                    </div>
                     <br>
                     <div class="password-container">
-                        <input type="password" name="Password" placeholder="Contraseña" required>
+                        <input id="password" type="password" name="Password" placeholder="Contraseña" required>
+                        <img id="togglePassword" class="eye-toggle" src="{{ url_for('static', filename='IMG/eye.png') }}" alt="Mostrar contraseña">
                     </div>
                     <br>
                     <input type="submit" value="Ingresar">
@@ -32,5 +35,17 @@
             </div>
         </div>
      </main>  
+    <script>
+        (function(){
+            var toggle = document.getElementById('togglePassword');
+            var pwd = document.getElementById('password');
+            if(!toggle || !pwd) return;
+            toggle.addEventListener('click', function(){
+                var type = pwd.getAttribute('type') === 'password' ? 'text' : 'password';
+                pwd.setAttribute('type', type);
+                toggle.classList.toggle('active');
+            });
+        })();
+    </script>
    </body>
 </html>

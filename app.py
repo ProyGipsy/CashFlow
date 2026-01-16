@@ -178,8 +178,6 @@ def login():
     if request.method == 'POST':
         username = request.form.get('User')
         password = request.form.get('Password')
-        print('username: ', username)
-        print('password: ', password)
 
         user_data = get_user_data(username, password)
         print('user_data: ', user_data)
@@ -825,10 +823,15 @@ def submit_receipt():
         original_amounts = request.form.getlist('original_amount[]')
         invoice_paid_amounts = request.form.getlist('invoice_paid_amounts[]')
 
+        # Tipos de documento (mismo orden que los ids de documentos)
+        document_types_json = request.form.get('document_types', '[]')
+        document_types = json.loads(document_types_json)
+
         # Validación de consistencia
         if not (len(original_amounts) == len(invoice_paid_amounts) == len(all_account_ids)):
             raise ValueError("Inconsistencia en los datos recibidos")
-
+        
+        # Procesamiento por factura
         for index in range(len(all_account_ids)):
             account_id = all_account_ids[index]
 
@@ -845,12 +848,16 @@ def submit_receipt():
             set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission)
 
             # Actualización de factura
+            doc_type = document_types[index]
+            original_amount = float(original_amounts[index])
             invoice_paidAmount = float(invoice_paid_amounts[index])
-            # Anteriormente se realizaba el cálculo en Python
-            #new_amount_paid = float(original_amounts[index]) - balance_amount
-            # Ahora se realiza en el mismo query para evitar inconsistencias
+            # Si es N/C, marcar como "utilizadas" actualizando su paidAmount
+            if doc_type == 'N/C':
+                invoice_paidAmount = original_amount * -1
+
             set_invoicePaidAmount(cursor, account_id, invoice_paidAmount)
             # Relación factura-recibo
+            # DESCOMENTAR AL ENVIAR A PRODUCCIÓN
             set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount)
 
         # Confirmación la transacción
@@ -936,7 +943,13 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
 
     msg.html = body
 
-    mail.send(msg)
+    # Envío del correo
+    try:
+        mail.send(msg)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error enviando correo: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
     return jsonify({'success': True})
 
@@ -996,9 +1009,13 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
 
     msg.html = body
 
-    mail.send(msg)
-
-    return jsonify({'success': True})
+    # Envío del correo
+    try:
+        mail.send(msg)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error enviando correo: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 
 def send_receipt_PaymentProofNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_bs, commission_usd, currency, ncta_str):
@@ -1241,9 +1258,13 @@ def send_rejectionEmail():
     """
     msg.html = html_body
 
-    mail.send(msg)
-
-    return jsonify({'success': True})
+    # Envío del correo
+    try:
+        mail.send(msg)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error enviando correo: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 
 @app.route('/send_validateReceipt_email', methods=['POST'])
