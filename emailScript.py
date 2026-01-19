@@ -11,61 +11,112 @@ from email.message import EmailMessage
 load_dotenv()
 
 # --- FUNCIÓN DE ENVÍO DE CORREO ---
-def send_email(subject, body_html, sender_email, email_password, receiver_emails, attachments=None):
+def send_email(subject, body_html, sender_email, email_password, receiver_emails, attachments=None, bcc=None):
     
-    print(f"Iniciando envío de correo a: {', '.join(receiver_emails)}")
-    print(f"Asunto: {subject}")
+    # 1. Aseguramos que receiver_emails sea una lista
+    if isinstance(receiver_emails, str):
+        receiver_emails = [receiver_emails]
 
-    mail_server = os.environ.get("MAIL_SERVER_DOCUMENTS")
-    mail_port = os.environ.get("EMAIL_PORT", 587) # Puerto estándar para STARTTLS
+    print(f"--- INTENTO DE ENVÍO ---")
+    print(f"De: {sender_email}")
+    print(f"Para: {receiver_emails}")
+    
+    # 2. Preparar lista de BCC (Copia Oculta)
+    bcc_list = []
+    if bcc:
+        if isinstance(bcc, str):
+            bcc_list = [bcc]
+        elif isinstance(bcc, list):
+            bcc_list = bcc
+        print(f"BCC: {bcc_list}")
 
+    # 3. Configuración del Servidor (Variables de Entorno o Defaults)
+    mail_server = os.environ.get("MAIL_SERVER_DOCUMENTS", "smtp.office365.com")
+    mail_port = int(os.environ.get("EMAIL_PORT", 587))
+
+    # 4. Construcción del Mensaje
     msg = EmailMessage()
     msg['From'] = sender_email
     msg['To'] = ", ".join(receiver_emails)
     msg['Subject'] = subject
     
-    # Contenido HTML
-    msg.set_content("Este es un correo con contenido HTML. Por favor, use un cliente de correo compatible para ver el contenido completo.")
+    # NOTA: No agregamos msg['Bcc'] aquí para que los destinatarios no vean la lista oculta.
+
+    msg.set_content("Este es un correo con contenido HTML.")
     msg.add_alternative(body_html, subtype='html')
 
-    # --- Archivos Adjuntos (PDFs u otros) ---
+    # --- INSERCIÓN DE LOGO (Mantenemos tu lógica original) ---
+    logo_path = Path("static/IMG/Gipsy_imagotipo_color.png")
+    if logo_path.exists():
+        try:
+            with open(logo_path, "rb") as img:
+                msg.get_payload()[1].add_related(
+                    img.read(), 
+                    maintype="image", 
+                    subtype="png", 
+                    cid="logo_gipsy",
+                    filename="GrupoGipsy_Logo.png"
+                )
+        except Exception as e:
+            print(f"Advertencia: Error adjuntando logo: {e}")
+
+    # --- ARCHIVOS ADJUNTOS (Mantenemos tu lógica original) ---
     if attachments:
         print(f"Adjuntando {len(attachments)} archivo(s)...")
         for file_path in attachments:
+            if not file_path: continue # Saltar nulos
+            
             file_path_obj = Path(file_path)
             if not file_path_obj.exists():
-                print(f"Advertencia: El archivo adjunto {file_path} no existe. Omitiendo.")
+                print(f"Advertencia: El archivo {file_path} no existe. Omitiendo.")
                 continue
             
-            # Adivinar el tipo MIME
+            # Adivinar MIME
             ctype, encoding = mimetypes.guess_type(file_path_obj)
             if ctype is None or encoding is not None:
-                ctype = 'application/octet-stream'  # Default genérico
+                ctype = 'application/octet-stream'
             
             maintype, subtype = ctype.split('/', 1)
             
             try:
                 with open(file_path_obj, "rb") as f:
                     file_data = f.read()
-                
                 msg.add_attachment(file_data, maintype=maintype, subtype=subtype, filename=file_path_obj.name)
-                print(f"Archivo {file_path_obj.name} adjuntado exitosamente.")
             except Exception as e:
-                print(f"Error al leer o adjuntar el archivo {file_path_obj.name}: {e}")
+                print(f"Error al adjuntar {file_path_obj.name}: {e}")
 
+    # --- 5. ENVÍO REAL (CORRECCIÓN CRÍTICA) ---
+    # Combinamos todos los destinatarios para el "sobre" SMTP (Envelope)
+    all_recipients = receiver_emails + bcc_list
     context = ssl.create_default_context()
 
     try:
-        # Usar SMTP con STARTTLS (más común que SSL directo)
-        # Si tu servidor usa el puerto 465 (SMTPO_SSL), cambia smtplib.SMTP a smtplib.SMTP_SSL y quita smtp.starttls()
+        print(f"Conectando a SMTP: {mail_server}:{mail_port}...")
+        
         with smtplib.SMTP(mail_server, mail_port) as smtp:
             smtp.starttls(context=context)
             smtp.login(sender_email, email_password)
-            smtp.sendmail(sender_email, receiver_emails, msg.as_string())
-        print(f"Correo enviado exitosamente a {', '.join(receiver_emails)}!\n")
-    except Exception as e:
-        print(f"Error al enviar el correo a {', '.join(receiver_emails)}: {e}\n")
+            
+            # sendmail devuelve un diccionario con los correos que FALLARON
+            refused = smtp.sendmail(sender_email, all_recipients, msg.as_string())
+            
+            if refused:
+                print(f"⚠ ALERTA SMTP: El servidor rechazó estos destinatarios: {refused}")
+                # Aquí podrías decidir si lanzar error si fallan todos, o dejarlo pasar.
+                # Si refused contiene todos los destinatarios, entonces el envío falló totalmente.
+                if len(refused) == len(all_recipients):
+                    raise Exception(f"Envío fallido. Todos los destinatarios fueron rechazados: {refused}")
+            else:
+                print(f"✅ SMTP confirmó recepción del mensaje para entrega.")
+                
+        return True
 
+    except smtplib.SMTPAuthenticationError:
+        print("❌ Error de Autenticación SMTP: Usuario o contraseña incorrectos.")
+        raise # Re-lanzamos para que el endpoint lo detecte
+    except Exception as e:
+        print(f"❌ Error CRÍTICO al enviar correo: {e}")
+        raise e
 
 # --- ESTILO CSS BASE PARA GIPSY DOCUMENTOS ---
 
@@ -102,6 +153,29 @@ def get_base_email_style():
             color: #421d83; /* Color lila oscuro */
             font-size: 24px;
             font-weight: bold;
+        }
+        .brand-container {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .logo-img {
+            height: 40px;
+            width: auto;
+            display: block;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            margin-bottom: 10px;
+            padding-right: 40px !important; 
+            border: 0;
+        }
+        .brand-name {
+            display: block;
+            font-size: 14px;
+            font-weight: bold;
+            color: #421d83;
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         .body-content {
             color: #333; /* Texto gris oscuro */
@@ -181,6 +255,10 @@ def create_doc_type_html(data):
     <body>
         <div class="container">
             <div class="header">
+                <div class="brand-container">
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                    <span class="brand-name">Grupo Gipsy</span>
+                </div>
                 <h2>Gipsy Documentos - Nuevo Tipo de Documento</h2>
             </div>
             <div class="body-content">
@@ -271,6 +349,10 @@ def create_new_doc_html(data):
     <body>
         <div class="container">
             <div class="header">
+                <div class="brand-container">
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                    <span class="brand-name">Grupo Gipsy</span>
+                </div>
                 <h2>Gipsy Documentos - Nuevo Documento</h2>
             </div>
             <div class="body-content">
@@ -316,6 +398,7 @@ def generate_document_content_html(doc_data):
     # Colores extraídos del CSS base:
     COLOR_DARK_LILA = "#421d83"
     COLOR_PRIMARY_LILA = "#8b56ed"
+    COLOR_PRIMARY_RED = "#DD030E"
     COLOR_TEXT_DARK = "#333"
     COLOR_BG_DETAIL = "#f9f9f9"
     COLOR_BORDER = "#e0e0e0"
@@ -343,7 +426,7 @@ def generate_document_content_html(doc_data):
             
             # Creamos el botón/enlace HTML
             attachment_display = f"""
-            <a href="{annex_url}" target="_blank" style="color: {COLOR_PRIMARY_LILA}; text-decoration: none; font-weight: bold;">
+            <a href="{annex_url}" target="_blank" style="color: {COLOR_PRIMARY_RED}; font-size: 15px; text-decoration: none; font-weight: bold;">
                 📄 Click aquí para Ver/Descargar el archivo
             </a>
             """
@@ -470,6 +553,10 @@ def create_custom_email_html(custom_email_data, document_data_list=None):
                         <tr>
                             <td style="padding: 20px 30px;">
                                 <div class="header" style="text-align: left; border-bottom: 2px solid #8b56ed; padding-bottom: 15px; margin-bottom: 20px;">
+                                    <div class="brand-container">
+                                        <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                                        <span class="brand-name">Grupo Gipsy</span>
+                                    </div>
                                     <h2 style="color: #421d83; font-size: 24px; margin: 0;">Envío de Documentos</h2>
                                 </div>
                                 
@@ -525,6 +612,10 @@ def create_send_notification_html(data):
     <body>
         <div class="container">
             <div class="header">
+                <div class="brand-container">
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
+                    <span class="brand-name">Grupo Gipsy</span>
+                </div>
                 <h2>Gipsy Documentos - Notificación de Envío</h2>
             </div>
             <div class="body-content">

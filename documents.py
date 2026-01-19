@@ -1,7 +1,9 @@
 import os
+import json
 import pymssql
 
 from datetime import datetime
+from collections import Counter
 from dbutils.pooled_db import PooledDB
 from emailScript import (
     send_email,
@@ -123,7 +125,7 @@ def create_doc_type(data):
         """
         cursor.execute(sql_access_control, (data['name'],))
 
-        # C. Campos (Fields) - MODIFICADO AQUÍ PARA INCLUIR isMandatory
+        # C. Campos (Fields)
         sql_document_fields = """
         INSERT INTO Documents.TypeFields (DocumentTypeID, Name, DataType, Length, Precision, isMandatory)
         OUTPUT INSERTED.FieldID
@@ -135,7 +137,6 @@ def create_doc_type(data):
         VALUES (%s, %s)
         """
 
-        # Diccionario para traducir tipos de datos
         type_translation = {
             'text': 'Texto Corto', 'textarea': 'Texto Largo', 
             'int': 'Numérico Entero', 'float': 'Decimal', 'money': 'Moneda',
@@ -147,27 +148,23 @@ def create_doc_type(data):
         for field in data.get('fields', []):
             f_len = field.get('length') if field.get('length') else 0
             f_prec = field.get('precision') if field.get('precision') else 0
-            
-            # 1. Obtenemos el valor de isRequired (1 o 0), por defecto 0 si no viene
             is_mandatory = field.get('isRequired', 0)
 
-            # Guardamos datos para el correo (Opcional: puedes agregar 'Obligatorio' al correo si quieres)
             fields_for_email.append({
                 'nombre': field['name'],
                 'tipo_dato': type_translation.get(field['type'], field['type']),
                 'longitud': f_len if f_len > 0 else 'N/A',
                 'precision': f_prec if f_prec > 0 else 'N/A',
-                'obligatorio': 'Sí' if is_mandatory == 1 else 'No' # Info extra para tu template
+                'obligatorio': 'Sí' if is_mandatory == 1 else 'No'
             })
 
-            # 2. Ejecutamos la inserción con el nuevo parámetro
             cursor.execute(sql_document_fields, (
                 inserted_id, 
                 field['name'], 
                 field['type'], 
                 f_len, 
                 f_prec,
-                is_mandatory # <--- Aquí pasamos el 1 o 0
+                is_mandatory
             ))
             
             if field['type'] == 'specificValues':
@@ -185,6 +182,9 @@ def create_doc_type(data):
             sender_email = os.environ.get("MAIL_USERNAME_DOCUMENTS")
             email_password = os.environ.get("MAIL_PASSWORD_DOCUMENTS")
             recipient_admin = os.environ.get("MAIL_RECIPIENT_TEST")
+
+            # --- DEFINIR LA COPIA OCULTA (BCC) ---
+            bcc_list = ['bibliotecagipsy@outlook.com']
 
             if sender_email and email_password and recipient_admin:
                 
@@ -204,9 +204,10 @@ def create_doc_type(data):
                     sender_email=sender_email,
                     email_password=email_password,
                     receiver_emails=[recipient_admin],
-                    attachments=None 
+                    attachments=None,
+                    bcc=bcc_list # <--- AQUÍ PASAMOS LA COPIA OCULTA
                 )
-                print(f"Correo de notificación enviado exitosamente a {recipient_admin}")
+                print(f"Correo de notificación enviado exitosamente a {recipient_admin} (con copia oculta)")
             
             else:
                 print("Advertencia: No se envió el correo. Faltan credenciales o destinatario en .env")
@@ -585,7 +586,7 @@ def get_roles():
         LEFT JOIN AccessControl.Users U ON UR.userId = U.userId
         -- Filtramos explícitamente
         WHERE P.isDocumentsModule = 1 
-        AND RP.isActive = 1 -- (Opcional) Recomendado si manejas borrado lógico
+        AND UR.isActive = 1 -- (Opcional) Recomendado si manejas borrado lógico
         ORDER BY R.roleId;
         """
         cursor.execute(sql_only_documents_roles)
@@ -698,7 +699,7 @@ def get_user_by_id(id):
         -- Filtramos explícitamente
         WHERE P.isDocumentsModule = 1 
         AND U.userId = %s
-        AND RP.isActive = 1 -- (Opcional) Recomendado si manejas borrado lógico
+        AND UR.isActive = 1 -- (Opcional) Recomendado si manejas borrado lógico
         ORDER BY R.roleId;
         """
         cursor.execute(roles_sql, (id))
@@ -796,27 +797,28 @@ def edit_role(data):
         """
         cursor.execute(sql_update_role, (data['name'], data['id']))
 
+        """
         # 2. GESTIÓN DE PERMISOS (Estrategia Soft Delete + Upsert)
         
         # A. "Resetear": Marcar todos los permisos actuales como inactivos
-        sql_deactivate_perms = """
+        sql_deactivate_perms = 
             UPDATE Documents.RolePermissions 
             SET isActive = 0, lastUpdate = GETDATE() 
             WHERE roleId = %s
-        """
+        
         cursor.execute(sql_deactivate_perms, (data['id'],))
 
         # B. "Upsert": Reactivar los seleccionados o insertar nuevos
-        sql_update_perm = """
+        sql_update_perm = 
             UPDATE Documents.RolePermissions
             SET isActive = 1, lastUpdate = GETDATE()
             WHERE roleId = %s AND permissionId = %s
-        """
         
-        sql_insert_perm = """
+        
+        sql_insert_perm = 
             INSERT INTO Documents.RolePermissions (roleId, permissionId, isActive, lastUpdate)
             VALUES (%s, %s, 1, GETDATE())
-        """
+        
 
         for permiso in data.get('permisos', []):
             permission_id = permiso['id']
@@ -827,6 +829,7 @@ def edit_role(data):
             # Si rowcount es 0, significa que la relación no existía, así que insertamos
             if cursor.rowcount == 0:
                 cursor.execute(sql_insert_perm, (data['id'], permission_id))
+        """
 
         # 3. GESTIÓN DE USUARIOS (Misma estrategia)
         # A. "Resetear": Marcar todos los usuarios actuales como inactivos
@@ -982,7 +985,8 @@ def create_document(data, file_url):
         try:
             sender_email = os.environ.get("MAIL_USERNAME_DOCUMENTS")
             email_password = os.environ.get("MAIL_PASSWORD_DOCUMENTS")
-            recipient_admin = os.environ.get("MAIL_TEST_DOCUMENTS") 
+            recipient_admin = os.environ.get("MAIL_TEST_DOCUMENTS")
+            bcc_list = ['bibliotecagipsy@outlook.com'] 
 
             if sender_email and email_password and recipient_admin:
                 
@@ -1003,7 +1007,8 @@ def create_document(data, file_url):
                     sender_email=sender_email,
                     email_password=email_password,
                     receiver_emails=[recipient_admin],
-                    attachments=None 
+                    attachments=None,
+                    bcc=bcc_list
                 )
 
         except Exception as email_error:
@@ -1409,7 +1414,7 @@ def get_document_by_id(data):
     finally:
         if cursor: cursor.close()
         if connection: connection.close()
-
+        
 def send_documents(user_id, email_data, full_documents_data):
     sender_email = os.environ.get('MAIL_USERNAME_DOCUMENTS')
     email_password = os.environ.get('MAIL_PASSWORD_DOCUMENTS')
@@ -1417,16 +1422,32 @@ def send_documents(user_id, email_data, full_documents_data):
     if not sender_email or not email_password:
         raise Exception("Credenciales de correo no configuradas en el servidor.")
 
-    # Variables de conexión BD
     connection = None
     cursor = None
 
     try:
-        # 1. ENVÍO DE CORREO A LOS DESTINATARIOS
-        html_body_client = create_custom_email_html(email_data, full_documents_data)
+        # --- 1. PREPARACIÓN Y LIMPIEZA DE DATOS ---
+        # Destinatarios
         recipients_list = email_data.get('recipients', [])
-        subject_client = email_data.get('subject', 'Envío de Documentos')
+        if not isinstance(recipients_list, list):
+            recipients_list = [recipients_list]
+        
+        recipients_str = ", ".join([str(r) for r in recipients_list])
 
+        # Asunto
+        subject_client = str(email_data.get('subject', 'Envío de Documentos'))
+
+        # Cuerpo (Body)
+        raw_body = email_data.get('body', '')
+        if isinstance(raw_body, dict):
+            body_text = json.dumps(raw_body)
+        else:
+            body_text = str(raw_body)
+
+        # Generar HTML
+        html_body_client = create_custom_email_html(email_data, full_documents_data)
+
+        # --- 2. ENVÍO DE CORREO A DESTINATARIOS (CLIENTES) ---
         send_email(
             subject=subject_client,
             body_html=html_body_client,
@@ -1436,9 +1457,9 @@ def send_documents(user_id, email_data, full_documents_data):
             attachments=None
         )
 
-        print(f'--> Correo enviado a los destinatarios: {recipients_list}')
+        print(f'--> Correo enviado exitosamente a: {recipients_list}')
 
-        # 2. GUARDADO EN BASE DE DATOS (LOG DE ENVÍO)
+        # --- 3. GUARDADO EN BASE DE DATOS (LOG) ---
         try:
             connection = pool.connection()
             cursor = connection.cursor()
@@ -1448,60 +1469,243 @@ def send_documents(user_id, email_data, full_documents_data):
                 VALUES (%s, %s, GETDATE(), %s, %s)
             """
             
-            # Preparar datos
-            # Convertimos la lista de correos a un string: "correo1@test.com, correo2@test.com"
-            recipients_str = ", ".join(recipients_list) 
-            
-            # El body que guardamos es el mensaje personalizado, no el HTML completo (para no llenar la BD)
-            body_text = email_data.get('body', '')        
-
             cursor.execute(send_email_sql, (user_id, recipients_str, subject_client, body_text))
             connection.commit()
             
             print("--> Registro de envío guardado en Documents.Delivery")
 
         except Exception as db_error:
-            # Si falla el guardado en BD, no detenemos el flujo, solo lo logueamos
-            print(f"⚠ El correo se envió, pero falló el guardado en BD: {db_error}")
+            print(f"⚠ ALERTA: El correo se envió, pero falló el guardado en BD: {db_error}")
             if connection: connection.rollback()
         
         finally:
             if cursor: cursor.close()
             if connection: connection.close()
 
-        # 3. ENVÍO DE CORREO A LA ADMINISTRACIÓN (Notificación)
+        # --- 4. NOTIFICACIÓN A ADMINISTRACIÓN ---
         try:
-            notification_recipient = os.environ.get('MAIL_TEST_DOCUMENTS') or sender_email
+            # A. Destinatario Principal (Visible en "Para")
+            admin_recipients = [os.environ.get('MAIL_TEST_DOCUMENTS') or sender_email]
 
-            if notification_recipient:
+            # B. Destinatario Oculto (BCC)
+            bcc_list = ['bibliotecagipsy@outlook.com']
+
+            if admin_recipients:
                 notification_context = {
                     'send_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'sender_user': email_data.get('senderName', 'Usuario Gipsy'),
                     'sender_email': sender_email,
                     'recipients': recipients_list,
                     'subject': subject_client,
-                    'body_message': email_data.get('body', '')
+                    'body_message': body_text
                 }
 
                 html_body_notify = create_send_notification_html(notification_context)
-                subject_notify = f"Notificación de Envío de Documentos - {subject_client}"
+                subject_notify = f"Notificación de Envío - {subject_client}"
 
                 send_email(
                     subject=subject_notify,
                     body_html=html_body_notify,
                     sender_email=sender_email,
                     email_password=email_password,
-                    receiver_emails=[notification_recipient],
-                    attachments=None
+                    receiver_emails=admin_recipients, # Solo el admin verá que fue para él
+                    attachments=None,
+                    bcc=bcc_list
                 )
-
-                print(f'--> Correo enviado a la administración: {notification_recipient}')
+                print(f'--> Notificación enviada a admin: {admin_recipients} con BCC a {bcc_list}')
 
         except Exception as admin_e:
-            print(f"Error enviando notificación a la administración: {admin_e}")
+            print(f"Error menor enviando notificación a admin: {admin_e}")
         
         return True
 
     except Exception as e:
-        print(f"Error enviando documentos por correo: {e}")
+        print(f"Error fatal enviando documentos: {e}")
         raise e
+
+def get_suggested_emails(user_id):
+    connection = None
+    cursor = None
+    
+    if not user_id:
+        return []
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        # Consultamos solo el historial de ESTE usuario, ordenado del más reciente al más antiguo
+        sql_history = """
+            SELECT Recipient, DeliveryDate 
+            FROM Documents.Delivery 
+            WHERE userId = %s AND Recipient IS NOT NULL AND Recipient <> ''
+            ORDER BY DeliveryDate DESC
+        """
+        cursor.execute(sql_history, (user_id,))
+        rows = cursor.fetchall()
+
+        # Estructuras para procesar los datos
+        email_frequency = Counter()
+        email_last_seen = {}
+        unique_emails_ordered = []
+
+        for row in rows:
+            raw_recipient = row['Recipient']
+            # Separamos por comas en caso de envíos múltiples
+            emails_in_row = raw_recipient.split(',')
+            
+            for email in emails_in_row:
+                clean_email = email.strip().lower()
+                
+                # Validaciones básicas
+                if '@' not in clean_email or '.' not in clean_email:
+                    continue
+                
+                # 1. Contamos frecuencia (para los  2 Contactados")
+                email_frequency[clean_email] += 1
+                
+                # 2. Registramos los Últimos 3
+                if clean_email not in email_last_seen:
+                    email_last_seen[clean_email] = row['DeliveryDate']
+                    unique_emails_ordered.append(clean_email)
+
+        # --- SELECCIÓN DE LOS 5 SUGERIDOS ---
+
+        # A. Los 2 más contactados
+        top_frequent = [item[0] for item in email_frequency.most_common(2)]
+
+        # B. Los últimos 3 contactados
+        top_recent = []
+        for email in unique_emails_ordered:
+            if email not in top_frequent:
+                top_recent.append(email)
+            
+            if len(top_recent) == 3:
+                break
+        
+        # C. Combinar listas
+        final_suggestions = top_frequent + top_recent
+
+        return final_suggestions
+
+    except Exception as e:
+        print(f"Error en get_suggested_emails_by_user: {e}")
+        return []
+    
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+def insert_contact_db(user_id, alias, emails_list):
+    connection = None
+    cursor = None
+    
+    # 1. Convertir lista de emails a string (CSV) para la BD
+    # Si viene ['a@a.com', 'b@b.com'] -> "a@a.com, b@b.com"
+    if isinstance(emails_list, list):
+        emails_str = ", ".join([e.strip() for e in emails_list])
+    else:
+        emails_str = str(emails_list).strip()
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+            INSERT INTO Documents.Contacts (Alias, Emails, UserID)
+            OUTPUT INSERTED.ContactID
+            VALUES (%s, %s, %s)
+        """
+        
+        cursor.execute(sql, (alias, emails_str, user_id))
+        row = cursor.fetchone()
+        
+        if row:
+            connection.commit()
+            return row['ContactID']
+        else:
+            raise Exception("No se pudo obtener el ID del nuevo contacto.")
+
+    except Exception as e:
+        if connection: connection.rollback()
+        raise e
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+
+def update_contact_db(contact_id, user_id, alias, emails_list):
+    connection = None
+    cursor = None
+    
+    # 1. Convertir lista de emails a string
+    if isinstance(emails_list, list):
+        emails_str = ", ".join([e.strip() for e in emails_list])
+    else:
+        emails_str = str(emails_list).strip()
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor()
+
+        # IMPORTANTE: El WHERE incluye UserID para seguridad. 
+        sql = """
+            UPDATE Documents.Contacts
+            SET Alias = %s, Emails = %s
+            WHERE ContactID = %s AND UserID = %s
+        """
+        
+        cursor.execute(sql, (alias, emails_str, contact_id, user_id))
+        connection.commit()
+
+        return cursor.rowcount
+
+    except Exception as e:
+        if connection: connection.rollback()
+        raise e
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+def get_contacts_by_user_db(user_id):
+    connection = None
+    cursor = None
+    contacts_list = []
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        # Seleccionamos solo los contactos de este usuario
+        sql = """
+            SELECT ContactID, Alias, Emails 
+            FROM Documents.Contacts 
+            WHERE UserID = %s
+            ORDER BY Alias ASC
+        """
+        
+        cursor.execute(sql, (user_id,))
+        rows = cursor.fetchall()
+
+        for row in rows:
+            raw_emails = row['Emails']
+            emails_array = []
+            
+            if raw_emails:
+                # Separamos por coma y quitamos espacios en blanco extra
+                emails_array = [e.strip() for e in raw_emails.split(',') if e.strip()]
+
+            contacts_list.append({
+                'id': row['ContactID'],
+                'alias': row['Alias'],
+                'emails': emails_array # Ahora es un array real para el Frontend
+            })
+
+        return contacts_list
+
+    except Exception as e:
+        print(f"Error en get_contacts_by_user_db: {e}")
+        raise e 
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()

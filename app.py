@@ -115,25 +115,29 @@ from accessControl import (
 
 #Funciones para la obtención de datos desde BD para Documentos
 from documents import (
-    get_docs_by_type,
-    get_doc_type_full,
-    get_docs_companies,
-    create_doc_type,
-    edit_doc_type,
-    create_document,
-    edit_document,
-    get_documents_by_type_id,
-    get_all_documents_lists,
-    get_document_by_id,
-    create_company,
-    update_company,
-    get_roles,
-    create_role,
     edit_role,
-    get_permissions,
+    get_roles,
     get_users,
+    create_role,
+    edit_doc_type,
+    edit_document,
     get_user_by_id,
     send_documents,
+    create_company,
+    update_company,
+    get_permissions,
+    create_doc_type,
+    create_document,
+    get_docs_by_type,
+    insert_contact_db,
+    update_contact_db,
+    get_doc_type_full,
+    get_document_by_id,
+    get_docs_companies,
+    get_suggested_emails,
+    get_contacts_by_user_db,
+    get_all_documents_lists,    
+    get_documents_by_type_id,
     )
 
 app = Flask(__name__)
@@ -174,8 +178,6 @@ def login():
     if request.method == 'POST':
         username = request.form.get('User')
         password = request.form.get('Password')
-        print('username: ', username)
-        print('password: ', password)
 
         user_data = get_user_data(username, password)
         print('user_data: ', user_data)
@@ -821,10 +823,15 @@ def submit_receipt():
         original_amounts = request.form.getlist('original_amount[]')
         invoice_paid_amounts = request.form.getlist('invoice_paid_amounts[]')
 
+        # Tipos de documento (mismo orden que los ids de documentos)
+        document_types_json = request.form.get('document_types', '[]')
+        document_types = json.loads(document_types_json)
+
         # Validación de consistencia
         if not (len(original_amounts) == len(invoice_paid_amounts) == len(all_account_ids)):
             raise ValueError("Inconsistencia en los datos recibidos")
-
+        
+        # Procesamiento por factura
         for index in range(len(all_account_ids)):
             account_id = all_account_ids[index]
 
@@ -841,12 +848,16 @@ def submit_receipt():
             set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission)
 
             # Actualización de factura
+            doc_type = document_types[index]
+            original_amount = float(original_amounts[index])
             invoice_paidAmount = float(invoice_paid_amounts[index])
-            # Anteriormente se realizaba el cálculo en Python
-            #new_amount_paid = float(original_amounts[index]) - balance_amount
-            # Ahora se realiza en el mismo query para evitar inconsistencias
+            # Si es N/C, marcar como "utilizadas" actualizando su paidAmount
+            if doc_type == 'N/C':
+                invoice_paidAmount = original_amount * -1
+
             set_invoicePaidAmount(cursor, account_id, invoice_paidAmount)
             # Relación factura-recibo
+            # DESCOMENTAR AL ENVIAR A PRODUCCIÓN
             set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_paidAmount)
 
         # Confirmación la transacción
@@ -876,7 +887,6 @@ def submit_receipt():
     finally:
         cursor.close()
         conn.close()
-
 
 def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_bs, commission_usd, currency, ncta_str):
 
@@ -933,7 +943,13 @@ def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_na
 
     msg.html = body
 
-    mail.send(msg)
+    # Envío del correo
+    try:
+        mail.send(msg)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error enviando correo: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
     return jsonify({'success': True})
 
@@ -993,9 +1009,13 @@ def send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer
 
     msg.html = body
 
-    mail.send(msg)
-
-    return jsonify({'success': True})
+    # Envío del correo
+    try:
+        mail.send(msg)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error enviando correo: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 
 def send_receipt_PaymentProofNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_bs, commission_usd, currency, ncta_str):
@@ -1238,9 +1258,13 @@ def send_rejectionEmail():
     """
     msg.html = html_body
 
-    mail.send(msg)
-
-    return jsonify({'success': True})
+    # Envío del correo
+    try:
+        mail.send(msg)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error enviando correo: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 
 @app.route('/send_validateReceipt_email', methods=['POST'])
@@ -2203,45 +2227,196 @@ def sendDocuments():
     data = request.get_json()
 
     if not data:
-        return jsonify({
-            'error': 'No se proporcionaron datos'
-            }), 400
+        return jsonify({'error': 'No se proporcionaron datos'}), 400
 
-    user_id = data.get('userId', None)
-    doc_ids = data.get('documentIds', [])
+    # 1. EXTRACCIÓN Y LIMPIEZA DE USER_ID
+    user_id_raw = data.get('userId')
     email_data = data.get('emailData', {})
+    
+    if user_id_raw is None:
+        user_id_raw = email_data.get('userId')
 
-    if not doc_ids or not email_data:
-        return jsonify({
-            'error': 'Faltan IDs de documentos o datos de correo electrónico'
-        }), 400
+    final_user_id = None
+    
+    if isinstance(user_id_raw, dict):
+        final_user_id = user_id_raw.get('id') or user_id_raw.get('userId')
+    elif user_id_raw is not None:
+        try:
+            final_user_id = int(user_id_raw)
+        except (ValueError, TypeError):
+            final_user_id = None
+            print(f"DEBUG: No se pudo convertir user_id {user_id_raw} a entero")
+
+    # 1.5 LÓGICA DE REGISTRO DE NUEVO CONTACTO
+    # Verificamos si el frontend envió la instrucción de guardar un contacto
+    new_contact_data = email_data.get('newContact')
+    
+    if new_contact_data and final_user_id:
+        print("DEBUG: Se detectó solicitud para guardar nuevo contacto.")
+        try:
+            nc_alias = new_contact_data.get('alias')
+            nc_emails = new_contact_data.get('emails')
+            
+            # Validamos que existan los datos esenciales antes de llamar a la BD
+            if nc_alias and nc_emails:
+                new_id = insert_contact_db(final_user_id, nc_alias, nc_emails)
+                print(f"DEBUG: Contacto '{nc_alias}' guardado exitosamente con ID: {new_id}")
+            else:
+                print("DEBUG: Faltan datos (alias o emails) para el nuevo contacto. Omitiendo guardado.")
+                
+        except Exception as e_contact:
+            print(f"ADVERTENCIA: Falló el guardado del contacto nuevo: {e_contact}")
+
+    # 2. PROCESAMIENTO DE DOCUMENTOS
+    doc_ids_raw = data.get('documentIds', [])
+    print(f"DEBUG: IDs recibidos crudos: {doc_ids_raw}")
+
+    if not doc_ids_raw or not email_data:
+        return jsonify({'error': 'Faltan IDs de documentos o datos de correo'}), 400
 
     try:
         full_documents_data = []
 
-        for doc_id in doc_ids:
-            details = get_document_by_id({'id': doc_id})
+        for item in doc_ids_raw:
+            actual_doc_id = item
+            
+            # Si el item es un diccionario, extraemos el ID usando las claves posibles
+            if isinstance(item, dict):
+                actual_doc_id = item.get('id') or item.get('DocumentID') or item.get('document_id')
+            
+            print(f"DEBUG: ID Extraído para procesar: {actual_doc_id}")
+
+            if not actual_doc_id:
+                print("DEBUG: ID vacío o nulo encontrado, saltando registro...")
+                continue
+
+            try:
+                search_id = int(actual_doc_id)
+            except (ValueError, TypeError):
+                print(f"DEBUG: El ID {actual_doc_id} no es un número válido.")
+                continue
+
+            details = get_document_by_id({'id': search_id})
 
             if details:
                 full_documents_data.append(details)
+            else:
+                print(f"DEBUG: get_document_by_id devolvió None para el ID {search_id}")
 
         if not full_documents_data:
             return jsonify({
-                'error': 'No se encontraron los documentos en la base de datos.'
+                'error': 'No se encontraron los documentos en la base de datos para los IDs proporcionados.'
             }), 404
 
-        result = send_documents(user_id, email_data, full_documents_data)
+        result = send_documents(final_user_id, email_data, full_documents_data)
 
         if result:
-            return jsonify({
-                'success': True
-            }), 200
+            return jsonify({'success': True}), 200
 
     except Exception as e:
-        print(f'Error enviando documentos por correo: {e}')
+        print(f'Error crítico en endpoint sendDocuments: {e}')
         return jsonify({
             'error': f'Error en el servidor: {str(e)}'
         }), 500
 
+@app.route('/documents/getSuggestedEmails', methods=['GET'])
+def getSuggestedEmails():
+    try:
+        # Obtenemos el userId de la URL: /getSuggestedEmails?userId=123
+        user_id = request.args.get('userId')
+
+        if not user_id:
+            # Si no hay usuario, retornamos lista vacía en lugar de error
+            return jsonify([]), 200
+
+        # Llamamos a la nueva función
+        emails = get_suggested_emails(user_id)
+        
+        return jsonify(emails), 200
+
+    except Exception as e:
+        print(f"Error obteniendo correos sugeridos: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/documents/createContact', methods=['POST'])
+def createContact():
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'error': 'No se recibieron datos'}), 400
+
+    # Validamos campos obligatorios
+    user_id = data.get('userId') # OJO: Asegúrate de enviar esto desde el front
+    alias = data.get('alias')
+    emails = data.get('emails')
+
+    if not user_id or not alias or not emails:
+        return jsonify({'error': 'Faltan campos obligatorios (userId, alias, emails)'}), 400
+
+    try:
+        new_contact_id = insert_contact_db(user_id, alias, emails)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Contacto creado exitosamente',
+            'id': new_contact_id,
+            'alias': alias,
+            'emails': emails
+        }), 201
+
+    except Exception as e:
+        print(f"Error creando contacto: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/documents/updateContact', methods=['PUT'])
+def updateContact():
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'error': 'No se recibieron datos'}), 400
+
+    contact_id = data.get('id')
+    user_id = data.get('userId') # Necesario para verificar propiedad
+    alias = data.get('alias')
+    emails = data.get('emails')
+
+    if not contact_id or not user_id:
+        return jsonify({'error': 'Faltan identificadores (id, userId)'}), 400
+
+    try:
+        rows_affected = update_contact_db(contact_id, user_id, alias, emails)
+        
+        if rows_affected == 0:
+            return jsonify({'error': 'No se encontró el contacto o no pertenece al usuario'}), 404
+
+        return jsonify({
+            'success': True,
+            'message': 'Contacto actualizado exitosamente',
+            'id': contact_id
+        }), 200
+
+    except Exception as e:
+        print(f"Error actualizando contacto: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/documents/getContacts', methods=['GET'])
+def getContacts():
+    try:
+        # Obtenemos el userId de los parámetros de la URL
+        user_id = request.args.get('userId')
+
+        if not user_id:
+            return jsonify({'error': 'Falta el parámetro userId'}), 400
+
+        # Llamamos a la función de base de datos
+        contacts = get_contacts_by_user_db(user_id)
+        
+        return jsonify(contacts), 200
+
+    except Exception as e:
+        print(f"Error obteniendo contactos: {e}")
+        return jsonify({'error': str(e)}), 500
+    
 if __name__ == '__main__':
    app.run()
