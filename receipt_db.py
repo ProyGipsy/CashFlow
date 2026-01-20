@@ -128,7 +128,7 @@ def get_customers(store_id, salesRep_id):
     cursor.execute('''  SELECT DISTINCT (C.ID), C.FirstName, C.LastName, C.isRembd
                     FROM Commission_Receipt.Customer C
                     JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
-                    WHERE C.isRetail = 0 AND (Amount-PaidAmount) > 0
+                    WHERE C.isRetail = 0 AND ((D.Amount - D.PaidAmount) > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0))
 						AND D.StoreID = %s AND D.SalesRepID = %s
                    ''', (store_id, salesRep_id))
     sellers = cursor.fetchall()
@@ -141,7 +141,7 @@ def get_customers_admin(store_id):
     cursor.execute('''SELECT DISTINCT (C.ID), C.FirstName, C.LastName, C.isRembd
                     FROM Commission_Receipt.Customer C
                     JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
-                    WHERE C.isRetail = 0 AND (Amount-PaidAmount) > 0 AND D.StoreID = %s
+                    WHERE C.isRetail = 0 AND ((D.Amount - D.PaidAmount) > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.StoreID = %s
                    ''', (store_id))
     sellers = cursor.fetchall()
     conn.close()
@@ -156,7 +156,7 @@ def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
                                 COUNT(DISTINCT CONCAT(CAST(D.CustomerID AS NVARCHAR), CAST(D.isRembd AS NVARCHAR))) AS CountCustomers,
                                 SUM(D.Amount - D.PaidAmount) AS Balance
                             FROM Commission_Receipt.DebtAccount D
-                            WHERE (D.Amount - D.PaidAmount) > 0 AND D.StoreID = %s AND D.SalesRepID = %s
+                            WHERE ((D.Amount - D.PaidAmount) > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.StoreID = %s AND D.SalesRepID = %s
                             GROUP BY D.CurrencyID
                         ) AS T
                         JOIN Main.Currency M ON T.CurrencyID = M.ID;''', (store_id, salesRep_id))
@@ -175,7 +175,7 @@ def get_count_customers_with_accountsReceivable_admin(store_id):
                             COUNT(DISTINCT CONCAT(CAST(D.CustomerID AS NVARCHAR), CAST(D.isRembd AS NVARCHAR))) AS CountCustomers,
                             SUM(D.Amount - D.PaidAmount) AS Balance
                         FROM Commission_Receipt.DebtAccount D
-                        WHERE (D.Amount - D.PaidAmount) > 0 AND D.StoreID = %s
+                        WHERE ((D.Amount - D.PaidAmount) > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.StoreID = %s
                         GROUP BY D.CurrencyID
                     ) AS T
                     JOIN Main.Currency M ON T.CurrencyID = M.ID;''', (store_id))
