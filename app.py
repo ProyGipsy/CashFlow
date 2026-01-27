@@ -702,11 +702,13 @@ def get_invoices(customer_id, customer_isRembd, store_id):
     ]
     return jsonify({'invoices': formatted_invoices})
 
+# Formulario de Cobranzas
 @app.route('/accountsForm/<string:account_ids>')
 def accountsForm(account_ids):
     account_ids_list = account_ids.split('-')
     receiptStoreCustomer = get_receiptsStoreCustomer(account_ids_list)
-    currencies = get_currency()
+    today = datetime.now().strftime('%Y-%m-%d')
+    currencies = get_currency(today)
     receiptsInfo = get_receiptsInfo(account_ids_list)
     bankAccounts = []
     commissions = get_commissions()
@@ -720,6 +722,23 @@ def accountsForm(account_ids):
         commissions=commissions,
         currencies=currencies
     )
+
+# Obtención de tasa de cambio según fecha
+@app.route('/get_exchange_rate')
+def get_exchange_rate():
+    # Leer parámetros de query string
+    date = request.args.get('date')
+
+    # Si no se provee fecha, usar hoy
+    if not date:
+        date = datetime.now().strftime('%Y-%m-%d')
+
+    currencies = get_currency(date)
+    if not currencies:
+        return jsonify({'success': False, 'message': 'Tasa no encontrada'}), 404
+
+    first = currencies[0]
+    return jsonify({'success': True, 'rate': float(first[2]), 'code': first[1]})
 
 # Obtención de formas de pago según moneda
 @app.route('/get_tenders/<int:currency_id>')
