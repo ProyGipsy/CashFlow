@@ -666,7 +666,9 @@ def homeSeller():
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
-    if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    print(session['roles']);
+    # if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    if (0 in session['roles'] and 1 in session['roles']):
         stores = get_receiptStores_DebtAccount_admin()
         customers_by_store = {store[0]: get_customers_admin(store[0]) for store in stores}
         count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable_admin(store[0]) for store in stores}
@@ -683,7 +685,8 @@ def accountsReceivable():
 
 @app.route('/get_invoices/<customer_id>/<customer_isRembd>/<store_id>')
 def get_invoices(customer_id, customer_isRembd, store_id):
-    if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    # if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    if (0 in session['roles'] and 1 in session['roles']):
         invoices = get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id)
     else: 
         invoices = get_invoices_by_customer(customer_id, customer_isRembd, store_id, session['salesRep_id'])
