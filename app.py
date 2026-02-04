@@ -103,7 +103,8 @@ from receipt_db import (
     check_already_paid_invoices, 
     check_duplicate_receipt,
     set_DebtSettlement,
-    get_all_related_receipts
+    get_all_related_receipts,
+    set_SyncStatus
     )
     
 from accessControl import (
@@ -1330,12 +1331,31 @@ def send_validationEmail():
     set_isReviewedReceipt(receipt_id)
     set_isApprovedReceipt(receipt_id)
 
-    # Si el recibo validado paga la totalidad de una factura, se registra en DebtSettlement
+    # Para cada factura asociada al recibo:
+    # - Se verifica y actualiza su estado respecto al sistema fuente GáLac
+    # - Si el recibo validado paga la totalidad de una factura, se registra en DebtSettlement
     for invoice in invoices:
         total_debt = invoice[1]
-        paid_amount = invoice[4]
+        app_paid_amount = invoice[4]
+        print("APP Paid Amount:", app_paid_amount)
         account_id = invoice[5]
-        if(total_debt == paid_amount):
+        galac_paid_amount = invoice[9]
+        print("GáLac Paid Amount:", galac_paid_amount)
+
+        # Actualizar el estado de la sincronización
+        diff = app_paid_amount - galac_paid_amount
+        print("Diferencia:", diff)
+        if diff == 0: # MATCHED. StatusID 1
+            syncStatus = 1
+        elif diff > 0.01: # APP_AHEAD. StatusID 2
+            syncStatus = 2
+        elif diff < -0.01: # GALAC_AHEAD. StatusID 3
+            syncStatus = 3
+        print("Sync Status:", syncStatus)
+        set_SyncStatus(account_id, syncStatus)
+
+        # Facturas pagadas en su totalidad
+        if(total_debt == app_paid_amount):
             related_receipt_ids = get_all_related_receipts(account_id)
             for r_id in related_receipt_ids:
                 set_DebtSettlement(account_id, r_id)

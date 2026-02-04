@@ -41,10 +41,26 @@ def get_receiptStores_Sellers():
 def get_receiptStores_DebtAccount(salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(S.ID), S.Name
+    cursor.execute('''SELECT DISTINCT S.ID, S.Name
                     FROM Main.Store S
                     JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON S.ID = D.StoreID
-                    WHERE S.ID != 0 AND D.GalacCxcStatus IN ('ABO', 'P/C') AND (D.Amount-D.AppPaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.AppPaidAmount<0)) AND D.SalesRepID=%s
+                    CROSS APPLY (
+                        -- Definimos dinámicamente qué monto comparar según el status
+                        SELECT CASE 
+                            WHEN SyncStatusID IN (1, 2) THEN D.AppPaidAmount
+                            WHEN SyncStatusID = 3 THEN D.GalacPaidAmount
+                            ELSE D.AppPaidAmount
+                        END AS SelectedPaidAmount
+                    ) AS Calc
+                    WHERE S.ID != 0 AND D.GalacCxcStatus IN ('ABO', 'P/C')
+                    AND D.SalesRepID = %s
+                    AND Calc.SelectedPaidAmount IS NOT NULL
+                    AND (
+                        (D.Amount - Calc.SelectedPaidAmount > 0) 
+                        OR 
+                        (D.DocumentType = 'N/C' AND D.Amount - Calc.SelectedPaidAmount < 0)
+                    )
+                    ORDER BY S.Name;
                    ''', (salesRep_id))
     stores = cursor.fetchall()
     conn.close()
@@ -53,10 +69,26 @@ def get_receiptStores_DebtAccount(salesRep_id):
 def get_receiptStores_DebtAccount_admin():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(S.ID), S.Name
+    cursor.execute('''SELECT DISTINCT S.ID, S.Name
                     FROM Main.Store S
                     JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON S.ID = D.StoreID
-                    WHERE S.ID != 0 AND D.GalacCxcStatus IN ('ABO', 'P/C') AND (D.Amount-D.AppPaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.AppPaidAmount<0)) ''',)
+                    CROSS APPLY (
+                        -- Definimos dinámicamente qué monto comparar según el status
+                        SELECT CASE 
+                            WHEN SyncStatusID IN (1, 2) THEN D.AppPaidAmount
+                            WHEN SyncStatusID = 3 THEN D.GalacPaidAmount
+                            ELSE NULL 
+                        END AS SelectedPaidAmount
+                    ) AS Calc
+                    WHERE S.ID != 0 AND D.GalacCxcStatus IN ('ABO', 'P/C')
+                    AND Calc.SelectedPaidAmount IS NOT NULL
+                    AND (
+                        (D.Amount - Calc.SelectedPaidAmount > 0) 
+                        OR 
+                        (D.DocumentType = 'N/C' AND D.Amount - Calc.SelectedPaidAmount < 0)
+                    )
+                    ORDER BY S.Name;
+                   ''',)
     stores = cursor.fetchall()
     conn.close()
     return stores
@@ -123,22 +155,32 @@ def get_customer_by_id(customer_id, customer_isRembd):
     conn.close()
     return sellers
 
+
 def get_customers(store_id, salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT C.ID, C.FirstName, C.LastName, C.isRembd
-        FROM Commission_Receipt.Customer C
-        JOIN Commission_Receipt.DebtAccount_Copia27012026 D 
-            ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
-        WHERE C.isRetail = 0
-          AND (
-                (D.Amount > D.AppPaidAmount) 
-             OR (D.DocumentType = 'N/C' AND D.Amount <> -D.AppPaidAmount)
-          )
-          AND D.StoreID = %s AND D.SalesRepID = %s AND D.GalacCxcStatus IN ('ABO', 'P/C')
-        GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
-    ''', (store_id, salesRep_id))
+                    SELECT C.ID, C.FirstName, C.LastName, C.isRembd
+                    FROM Commission_Receipt.Customer C
+                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D 
+                        ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
+                    CROSS APPLY (
+                        SELECT CASE 
+                            WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
+                            WHEN D.SyncStatusID = 3 THEN D.GalacPaidAmount
+                            ELSE D.AppPaidAmount -- Valor por defecto en caso de otros estados
+                        END AS EffectivePaidAmount
+                    ) AS Calc
+                    WHERE C.isRetail = 0
+                    AND D.StoreID = %s 
+                    AND D.SalesRepID = %s 
+                    AND D.GalacCxcStatus IN ('ABO', 'P/C')
+                    AND (
+                            (D.Amount > Calc.EffectivePaidAmount)
+                        OR (D.DocumentType = 'N/C' AND D.Amount <> Calc.EffectivePaidAmount)
+                    )
+                    GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
+                    ''', (store_id, salesRep_id))
     sellers = cursor.fetchall()
     conn.close()
     return sellers
@@ -147,18 +189,26 @@ def get_customers_admin(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT C.ID, C.FirstName, C.LastName, C.isRembd
-        FROM Commission_Receipt.Customer C
-        JOIN Commission_Receipt.DebtAccount_Copia27012026 D 
-            ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
-        WHERE C.isRetail = 0
-          AND (
-                (D.Amount > D.AppPaidAmount) 
-             OR (D.DocumentType = 'N/C' AND D.Amount <> -D.AppPaidAmount)
-          )
-          AND D.StoreID = %s AND D.GalacCxcStatus IN ('ABO', 'P/C')
-        GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
-    ''', (store_id))
+                    SELECT C.ID, C.FirstName, C.LastName, C.isRembd
+                    FROM Commission_Receipt.Customer C
+                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D 
+                        ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
+                    CROSS APPLY (
+                        SELECT CASE 
+                            WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
+                            WHEN D.SyncStatusID = 3 THEN D.GalacPaidAmount
+                            ELSE D.AppPaidAmount -- Valor por defecto en caso de otros estados
+                        END AS EffectivePaidAmount
+                    ) AS Calc
+                    WHERE C.isRetail = 0
+                    AND D.StoreID = %s 
+                    AND D.GalacCxcStatus IN ('ABO', 'P/C')
+                    AND (
+                            (D.Amount > Calc.EffectivePaidAmount)
+                        OR (D.DocumentType = 'N/C' AND D.Amount <> Calc.EffectivePaidAmount)
+                    )
+                    GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
+                    ''', (store_id))
     sellers = cursor.fetchall()
     conn.close()
     return sellers
@@ -167,21 +217,31 @@ def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT T.CountCustomers, T.Balance, M.Code AS Currency
-        FROM (
-            SELECT D.CurrencyID,
-                   COUNT(DISTINCT D.CustomerID) AS CountCustomers,
-                   SUM(D.Amount - D.AppPaidAmount) AS Balance
-            FROM Commission_Receipt.DebtAccount_Copia27012026 D
-            WHERE (
-                    (D.Amount > D.AppPaidAmount) 
-                 OR (D.DocumentType = 'N/C' AND D.Amount <> -D.AppPaidAmount)
-                  )
-              AND D.StoreID = %s AND D.SalesRepID = %s AND D.GalacCxcStatus IN ('ABO', 'P/C')
-            GROUP BY D.CurrencyID
-        ) AS T
-        JOIN Main.Currency M ON T.CurrencyID = M.ID;
-    ''', (store_id, salesRep_id))
+                    SELECT T.CountCustomers, T.Balance, M.Code AS Currency
+                    FROM (
+                        SELECT 
+                            D.CurrencyID,
+                            COUNT(DISTINCT D.CustomerID) AS CountCustomers,
+                            SUM(D.Amount - Calc.EffectivePaidAmount) AS Balance
+                        FROM Commission_Receipt.DebtAccount_Copia27012026 D
+                        CROSS APPLY (
+                            SELECT CASE 
+                                WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
+                                WHEN D.SyncStatusID = 3 THEN D.GalacPaidAmount
+                                ELSE D.AppPaidAmount 
+                            END AS EffectivePaidAmount
+                        ) AS Calc
+                        WHERE D.StoreID = %s 
+                        AND D.SalesRepID = %s 
+                        AND D.GalacCxcStatus IN ('ABO', 'P/C')
+                        AND (
+                                (D.Amount > Calc.EffectivePaidAmount) 
+                            OR (D.DocumentType = 'N/C' AND D.Amount <> Calc.EffectivePaidAmount)
+                        )
+                        GROUP BY D.CurrencyID
+                    ) AS T
+                    JOIN Main.Currency M ON T.CurrencyID = M.ID;
+                ''', (store_id, salesRep_id))
     sellers = list(cursor.fetchone())
     formattedSum = "{:,.2f}".format(sellers[1]).replace(".", "X").replace(",", ".").replace("X", ",")
     sellers[1] = formattedSum
@@ -192,21 +252,30 @@ def get_count_customers_with_accountsReceivable_admin(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT T.CountCustomers, T.Balance, M.Code AS Currency
-        FROM (
-            SELECT D.CurrencyID,
-                   COUNT(DISTINCT D.CustomerID) AS CountCustomers,
-                   SUM(D.Amount - D.AppPaidAmount) AS Balance
-            FROM Commission_Receipt.DebtAccount_Copia27012026 D
-            WHERE (
-                    (D.Amount > D.AppPaidAmount) 
-                 OR (D.DocumentType = 'N/C' AND D.Amount <> -D.AppPaidAmount)
-                  )
-              AND D.StoreID = %s AND D.GalacCxcStatus IN ('ABO', 'P/C')
-            GROUP BY D.CurrencyID
-        ) AS T
-        JOIN Main.Currency M ON T.CurrencyID = M.ID;
-    ''', (store_id))
+                    SELECT T.CountCustomers, T.Balance, M.Code AS Currency
+                    FROM (
+                        SELECT 
+                            D.CurrencyID,
+                            COUNT(DISTINCT D.CustomerID) AS CountCustomers,
+                            SUM(D.Amount - Calc.EffectivePaidAmount) AS Balance
+                        FROM Commission_Receipt.DebtAccount_Copia27012026 D
+                        CROSS APPLY (
+                            SELECT CASE 
+                                WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
+                                WHEN D.SyncStatusID = 3 THEN D.GalacPaidAmount
+                                ELSE D.AppPaidAmount 
+                            END AS EffectivePaidAmount
+                        ) AS Calc
+                        WHERE D.StoreID = %s 
+                        AND D.GalacCxcStatus IN ('ABO', 'P/C')
+                        AND (
+                                (D.Amount > Calc.EffectivePaidAmount) 
+                            OR (D.DocumentType = 'N/C' AND D.Amount <> Calc.EffectivePaidAmount)
+                        )
+                        GROUP BY D.CurrencyID
+                    ) AS T
+                    JOIN Main.Currency M ON T.CurrencyID = M.ID;
+                    ''', (store_id))
     sellers = list(cursor.fetchone())
     formattedSum = "{:,.2f}".format(sellers[1]).replace(".", "X").replace(",", ".").replace("X", ",")
     sellers[1] = formattedSum
@@ -307,16 +376,32 @@ def get_commissionsRules():
     conn.close()
     return rules
 
-
 def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.AppPaidAmount, C.Description, D.DocumentType
-                   FROM Commission_Receipt.DebtAccount_Copia27012026 D
-                   JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = %s AND isRembd = %s AND StoreID = %s AND D.GalacCxcStatus IN ('ABO', 'P/C')
-						AND (D.Amount-D.AppPaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.AppPaidAmount<0)) AND D.SalesRepID = %s
-                   ORDER BY D.N_CTA''',
+    cursor.execute('''SELECT DISTINCT D.AccountID, D.N_CTA, D.Amount, 
+                        Calc.EffectivePaidAmount AS PaidAmount, -- Se muestra el monto según el SyncStatus
+                        C.Description, D.DocumentType
+                    FROM Commission_Receipt.DebtAccount_Copia27012026 D
+                    JOIN Main.Currency C ON D.CurrencyID = C.ID
+                    CROSS APPLY (
+                        SELECT CASE 
+                            WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
+                            WHEN D.SyncStatusID = 3 THEN D.GalacPaidAmount
+                            ELSE D.AppPaidAmount 
+                        END AS EffectivePaidAmount
+                    ) AS Calc
+                    WHERE D.CustomerID = %s 
+                    AND D.isRembd = %s 
+                    AND D.StoreID = %s 
+                    AND D.SalesRepID = %s
+                    AND D.GalacCxcStatus IN ('ABO', 'P/C')
+                    AND (
+                            (D.Amount - Calc.EffectivePaidAmount > 0) 
+                        OR 
+                            (D.DocumentType IN ('N/C') AND D.Amount + Calc.EffectivePaidAmount < 0)
+                    )
+                    ORDER BY D.N_CTA;''',
                    (customer_id, customer_isRembd, store_id, salesRep_id))
     invoices = cursor.fetchall()    
     conn.close()
@@ -325,11 +410,28 @@ def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_i
 def get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(D.AccountID), D.N_CTA, D.Amount, D.AppPaidAmount, C.Description, D.DocumentType
-                   FROM Commission_Receipt.DebtAccount_Copia27012026 D
-                   JOIN Main.Currency C ON D.CurrencyID = C.ID
-                   WHERE CustomerID = %s AND isRembd = %s AND StoreID = %s AND D.GalacCxcStatus IN ('ABO', 'P/C') AND (D.Amount-D.AppPaidAmount > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.AppPaidAmount<0))
-                   ORDER BY D.N_CTA''',
+    cursor.execute('''SELECT DISTINCT D.AccountID, D.N_CTA, D.Amount, 
+                        Calc.EffectivePaidAmount AS PaidAmount, -- Se muestra el monto según el SyncStatus
+                        C.Description, D.DocumentType
+                    FROM Commission_Receipt.DebtAccount_Copia27012026 D
+                    JOIN Main.Currency C ON D.CurrencyID = C.ID
+                    CROSS APPLY (
+                        SELECT CASE 
+                            WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
+                            WHEN D.SyncStatusID = 3 THEN D.GalacPaidAmount
+                            ELSE D.AppPaidAmount 
+                        END AS EffectivePaidAmount
+                    ) AS Calc
+                    WHERE D.CustomerID = %s 
+                    AND D.isRembd = %s 
+                    AND D.StoreID = %s 
+                    AND D.GalacCxcStatus IN ('ABO', 'P/C')
+                    AND (
+                            (D.Amount - Calc.EffectivePaidAmount > 0) 
+                        OR 
+                            (D.DocumentType IN ('N/C') AND D.Amount - Calc.EffectivePaidAmount < 0)
+                    )
+                    ORDER BY D.N_CTA;''',
                    (customer_id, customer_isRembd, store_id))
     invoices = cursor.fetchall()    
     conn.close()
@@ -387,7 +489,7 @@ def get_unvalidated_receipts_by_customer(customer_id, customer_isRembd):
 def get_invoices_by_receipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(D.N_CTA), D.Amount, D.DueDate, D.DueDate, D.AppPaidAmount, D.AccountID, C.Description, D.SalesRepID, D.DocumentType
+    cursor.execute('''SELECT DISTINCT(D.N_CTA), D.Amount, D.DueDate, D.DueDate, D.AppPaidAmount, D.AccountID, C.Description, D.SalesRepID, D.DocumentType, D.GalacPaidAmount
                     FROM Commission_Receipt.DebtAccount_Copia27012026 D
                     JOIN Commission_Receipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID
                     JOIN Main.Currency C ON D.CurrencyID = C.ID
@@ -666,6 +768,17 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
 
     return saved_file_paths
 
+
+def set_SyncStatus(account_id, sync_status):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+                   UPDATE Commission_Receipt.DebtAccount_Copia27012026
+                   SET SyncStatusID = %s
+                   WHERE AccountID = %s
+                   ''', (sync_status, account_id))
+    conn.commit()
+    conn.close()
 
 def set_invoicePaidAmount(cursor, account_id, amount_to_add):
     print("Estoy en set_invoicePaidAmount")
