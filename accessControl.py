@@ -58,7 +58,7 @@ def get_user_data(username, password):
                     FROM AccessControl.Users U
                     JOIN Documents.UserRoles R ON U.userId = R.userId
                     JOIN Documents.RolePermissions P ON R.roleId = P.roleId
-                    WHERE U.username=%s AND U.passwordHash=%s
+                    WHERE U.username=%s AND U.passwordHash=%s AND R.isActive = 1
                    ''', (username, password))
 
     results_module3 = cursor.fetchone()

@@ -3,6 +3,7 @@ import pymssql
 from dbutils.pooled_db import PooledDB
 from onedrive import get_onedrive_headers
 import requests
+from datetime import datetime
 
 # Configuración del pool de conexiones
 
@@ -122,63 +123,153 @@ def get_customer_by_id(customer_id, customer_isRembd):
     conn.close()
     return sellers
 
+# def get_customers(store_id, salesRep_id):
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#     cursor.execute('''  SELECT DISTINCT (C.ID), C.FirstName, C.LastName, C.isRembd
+#                     FROM Commission_Receipt.Customer C
+#                     JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
+#                     WHERE C.isRetail = 0 AND ((D.Amount - D.PaidAmount) > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0))
+# 						AND D.StoreID = %s AND D.SalesRepID = %s
+#                    ''', (store_id, salesRep_id))
+#     sellers = cursor.fetchall()
+#     conn.close()
+#     return sellers
+
 def get_customers(store_id, salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''  SELECT DISTINCT (C.ID), C.FirstName, C.LastName, C.isRembd
-                    FROM Commission_Receipt.Customer C
-                    JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
-                    WHERE C.isRetail = 0 AND (Amount-PaidAmount) > 0
-						AND D.StoreID = %s AND D.SalesRepID = %s
-                   ''', (store_id, salesRep_id))
+    cursor.execute('''
+        SELECT C.ID, C.FirstName, C.LastName, C.isRembd
+        FROM Commission_Receipt.Customer C
+        JOIN Commission_Receipt.DebtAccount D 
+            ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
+        WHERE C.isRetail = 0
+          AND (
+                (D.Amount > D.PaidAmount) 
+             OR (D.DocumentType = 'N/C' AND D.Amount <> -D.PaidAmount)
+          )
+          AND D.StoreID = %s AND D.SalesRepID = %s
+        GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
+    ''', (store_id, salesRep_id))
     sellers = cursor.fetchall()
     conn.close()
     return sellers
+
+# def get_customers_admin(store_id):
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#     cursor.execute('''SELECT DISTINCT (C.ID), C.FirstName, C.LastName, C.isRembd
+#                     FROM Commission_Receipt.Customer C
+#                     JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
+#                     WHERE C.isRetail = 0 AND ((D.Amount - D.PaidAmount) > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.StoreID = %s
+#                    ''', (store_id))
+#     sellers = cursor.fetchall()
+#     conn.close()
+#     return sellers
 
 def get_customers_admin(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT (C.ID), C.FirstName, C.LastName, C.isRembd
-                    FROM Commission_Receipt.Customer C
-                    JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
-                    WHERE C.isRetail = 0 AND (Amount-PaidAmount) > 0 AND D.StoreID = %s
-                   ''', (store_id))
+    cursor.execute('''
+        SELECT C.ID, C.FirstName, C.LastName, C.isRembd
+        FROM Commission_Receipt.Customer C
+        JOIN Commission_Receipt.DebtAccount D 
+            ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
+        WHERE C.isRetail = 0
+          AND (
+                (D.Amount > D.PaidAmount) 
+             OR (D.DocumentType = 'N/C' AND D.Amount <> -D.PaidAmount)
+          )
+          AND D.StoreID = %s
+        GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
+    ''', (store_id))
     sellers = cursor.fetchall()
     conn.close()
     return sellers
 
+# def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#     cursor.execute('''  SELECT DISTINCT T.CountCustomers, T.Balance, M.Code AS Currency
+#                         FROM (
+#                             SELECT D.CurrencyID,
+#                                 COUNT(DISTINCT CONCAT(CAST(D.CustomerID AS NVARCHAR), CAST(D.isRembd AS NVARCHAR))) AS CountCustomers,
+#                                 SUM(D.Amount - D.PaidAmount) AS Balance
+#                             FROM Commission_Receipt.DebtAccount D
+#                             WHERE ((D.Amount - D.PaidAmount) > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.StoreID = %s AND D.SalesRepID = %s
+#                             GROUP BY D.CurrencyID
+#                         ) AS T
+#                         JOIN Main.Currency M ON T.CurrencyID = M.ID;''', (store_id, salesRep_id))
+#     sellers = list(cursor.fetchone())
+#     formattedSum = "{:,.2f}".format(sellers[1]).replace(".", "X").replace(",", ".").replace("X", ",")
+#     sellers[1] = formattedSum
+#     conn.close()
+#     return sellers
+
 def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''  SELECT DISTINCT T.CountCustomers, T.Balance, M.Code AS Currency
-                        FROM (
-                            SELECT D.CurrencyID,
-                                COUNT(DISTINCT CONCAT(CAST(D.CustomerID AS NVARCHAR), CAST(D.isRembd AS NVARCHAR))) AS CountCustomers,
-                                SUM(D.Amount - D.PaidAmount) AS Balance
-                            FROM Commission_Receipt.DebtAccount D
-                            WHERE (D.Amount - D.PaidAmount) > 0 AND D.StoreID = %s AND D.SalesRepID = %s
-                            GROUP BY D.CurrencyID
-                        ) AS T
-                        JOIN Main.Currency M ON T.CurrencyID = M.ID;''', (store_id, salesRep_id))
+    cursor.execute('''
+        SELECT T.CountCustomers, T.Balance, M.Code AS Currency
+        FROM (
+            SELECT D.CurrencyID,
+                   COUNT(DISTINCT D.CustomerID) AS CountCustomers,
+                   SUM(D.Amount - D.PaidAmount) AS Balance
+            FROM Commission_Receipt.DebtAccount D
+            WHERE (
+                    (D.Amount > D.PaidAmount) 
+                 OR (D.DocumentType = 'N/C' AND D.Amount <> -D.PaidAmount)
+                  )
+              AND D.StoreID = %s AND D.SalesRepID = %s
+            GROUP BY D.CurrencyID
+        ) AS T
+        JOIN Main.Currency M ON T.CurrencyID = M.ID;
+    ''', (store_id, salesRep_id))
     sellers = list(cursor.fetchone())
     formattedSum = "{:,.2f}".format(sellers[1]).replace(".", "X").replace(",", ".").replace("X", ",")
     sellers[1] = formattedSum
     conn.close()
     return sellers
 
+# def get_count_customers_with_accountsReceivable_admin(store_id):
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#     cursor.execute('''SELECT DISTINCT T.CountCustomers, T.Balance, M.Code AS Currency
+#                     FROM (
+#                         SELECT D.CurrencyID, 
+#                             COUNT(DISTINCT CONCAT(CAST(D.CustomerID AS NVARCHAR), CAST(D.isRembd AS NVARCHAR))) AS CountCustomers,
+#                             SUM(D.Amount - D.PaidAmount) AS Balance
+#                         FROM Commission_Receipt.DebtAccount D
+#                         WHERE ((D.Amount - D.PaidAmount) > 0 OR (D.DocumentType IN ('N/C') AND D.Amount+D.PaidAmount<0)) AND D.StoreID = %s
+#                         GROUP BY D.CurrencyID
+#                     ) AS T
+#                     JOIN Main.Currency M ON T.CurrencyID = M.ID;''', (store_id))
+#     sellers = list(cursor.fetchone())
+#     formattedSum = "{:,.2f}".format(sellers[1]).replace(".", "X").replace(",", ".").replace("X", ",")
+#     sellers[1] = formattedSum
+#     conn.close()
+#     return sellers
+
 def get_count_customers_with_accountsReceivable_admin(store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT T.CountCustomers, T.Balance, M.Code AS Currency
-                    FROM (
-                        SELECT D.CurrencyID, 
-                            COUNT(DISTINCT CONCAT(CAST(D.CustomerID AS NVARCHAR), CAST(D.isRembd AS NVARCHAR))) AS CountCustomers,
-                            SUM(D.Amount - D.PaidAmount) AS Balance
-                        FROM Commission_Receipt.DebtAccount D
-                        WHERE (D.Amount - D.PaidAmount) > 0 AND D.StoreID = %s
-                        GROUP BY D.CurrencyID
-                    ) AS T
-                    JOIN Main.Currency M ON T.CurrencyID = M.ID;''', (store_id))
+    cursor.execute('''
+        SELECT T.CountCustomers, T.Balance, M.Code AS Currency
+        FROM (
+            SELECT D.CurrencyID,
+                   COUNT(DISTINCT D.CustomerID) AS CountCustomers,
+                   SUM(D.Amount - D.PaidAmount) AS Balance
+            FROM Commission_Receipt.DebtAccount D
+            WHERE (
+                    (D.Amount > D.PaidAmount) 
+                 OR (D.DocumentType = 'N/C' AND D.Amount <> -D.PaidAmount)
+                  )
+              AND D.StoreID = %s
+            GROUP BY D.CurrencyID
+        ) AS T
+        JOIN Main.Currency M ON T.CurrencyID = M.ID;
+    ''', (store_id))
     sellers = list(cursor.fetchone())
     formattedSum = "{:,.2f}".format(sellers[1]).replace(".", "X").replace(",", ".").replace("X", ",")
     sellers[1] = formattedSum
@@ -216,13 +307,41 @@ def get_count_customers_with_unvalidated_receipts(store_id):
     conn.close()
     return customer_count
 
-def get_currency():
+# Reconversión a la tasa del día
+def get_currency(payment_date_str):
+    """
+    Decide si buscar en la tabla operativa (hoy) o en el DW (histórico).
+    """
+    today_str = datetime.now().strftime('%Y-%m-%d')
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT DISTINCT(ID), Code, OficialExchangeRate FROM Main.Currency WHERE ID != 0 AND isRetail = 0 AND ID IN (1, 2)')
-    currencies = cursor.fetchall()
-    conn.close()
-    return currencies
+    
+    try:
+        # CASO A: Si la fecha es HOY, usamos Main.Currency
+        if payment_date_str == today_str:
+            query = '''SELECT DISTINCT(ID), Code, OficialExchangeRate
+                       FROM Main.Currency
+                       WHERE ID != 0 AND isRetail = 0 AND ID IN (1, 2)'''
+            cursor.execute(query)
+            
+        # CASO B: Si la fecha es PASADA, usamos el DW
+        else:
+            query = '''SELECT DISTINCT(C.ID), C.Code, ER.OficialExchangeRate
+                   FROM Main.Currency C
+				   JOIN DW.DimCurrency DC ON C.ID = DC.ID AND C.isRetail = DC.isRetail
+				   JOIN DW.FactExchangeRate ER ON DC.SKDimCurrency = ER.SKDimCurrency
+				   JOIN DW.DimTime T ON ER.SKDimTime = T.SKDimTime
+                   WHERE C.ID != 0 AND C.isRetail = 0 AND C.ID IN (1, 2)
+						AND T.Fulldate = %s -- Fecha de pago en formato AAAA-MM-DD'''
+            cursor.execute(query, (payment_date_str,))
+            
+        currencies = cursor.fetchall()
+        return currencies
+    except Exception as e:
+        print(f"Error obteniendo tasa: {e}")
+        return []
+    finally:
+        conn.close()
 
 def get_tender(currency_id):
     conn = get_db_connection()

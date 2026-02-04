@@ -221,6 +221,13 @@
 
 {% block extra_js %}
 <script>
+    // Global lista de monedas disponible para funciones de conversión
+    const CURRENCIES_LIST = JSON.parse('{{ currencies | tojson | safe }}') || [];
+    function getCurrencyCodeById(id){
+        if (!CURRENCIES_LIST) return String(id);
+        const found = CURRENCIES_LIST.find(c => String(c[0]) == String(id));
+        return found ? (found[1] || String(found[0])) : String(id);
+    }
     // Filtro de Formas de Pago
     function handleCurrencyChange(event) {
         const currencyId = event.target.value;
@@ -392,6 +399,13 @@
         // Carga de tenders default
         const defaultCurrencyId = '1';
         loadTenders(defaultCurrencyId, newPagoRow);
+        // Inicializar tasa de conversión para la nueva fila según la fecha (si existe)
+        (async function(){
+            const dateVal = newPagoRow.querySelector('input[name="date_operation"]').value || maxDate;
+            const currencyIdNew = newPagoRow.querySelector('select[name="currency"]')?.value || defaultCurrencyId;
+            const rate = await fetchExchangeRate(dateVal, currencyIdNew);
+            newPagoRow.dataset.exchangeRate = rate;
+        })();
         
         // Establecer listeners para los nuevos inputs
         addInputListeners();
@@ -416,15 +430,74 @@
 
     // Reconversión monetaria para formas de pago de diferente moneda
     function convertAmount(receiptCurrency, amount){
-        const exchangeRate = "{{ currencies[0][2] }}"
+        // Deprecated synchronous conversion kept for compatibility; prefer per-row rate.
+        const exchangeRate = parseFloat("{{ currencies[0][2] }}") || 1;
 
-        convertedAmount = 0;
-        if(receiptCurrency == '1'){
-            convertedAmount = parseFloat(amount) * parseFloat(exchangeRate)
+        let convertedAmount = 0;
+        if (receiptCurrency == '1') {
+            convertedAmount = parseFloat(amount) * (exchangeRate || 1);
         } else if (receiptCurrency == '2') {
-            convertedAmount = parseFloat(amount) / parseFloat(exchangeRate) 
+            convertedAmount = parseFloat(amount) / (exchangeRate || 1);
         }
         return convertedAmount;
+    }
+
+    // Fetch exchange rate for a given date and currency. Returns numeric rate.
+    async function fetchExchangeRate(dateStr, currencyId) {
+        const defaultRate = parseFloat("{{ currencies[0][2] }}") || 1;
+        if (!dateStr) return defaultRate;
+        // Use Flask url_for to build the endpoint (must exist in app.py)
+        const endpoint = "{{ url_for('get_exchange_rate') }}";
+        const params = `?date=${encodeURIComponent(dateStr)}&currency_id=${encodeURIComponent(currencyId)}`;
+        try {
+            let resp = await fetch(endpoint + params);
+            if (resp.status === 404) {
+                // Try fallback without url_for (in case route differs)
+                console.warn('get_exchange_rate returned 404 for', endpoint + params, 'trying fallback /get_exchange_rate');
+                resp = await fetch('/get_exchange_rate' + params);
+            }
+            if (!resp.ok) {
+                console.warn('Exchange rate fetch failed, status:', resp.status);
+                return defaultRate;
+            }
+            const data = await resp.json();
+            const rate = (typeof data === 'object' && data.rate !== undefined) ? parseFloat(data.rate) : parseFloat(data);
+            return isNaN(rate) ? defaultRate : rate;
+        } catch (e) {
+            console.error('Error fetching exchange rate:', e);
+            return defaultRate;
+        }
+    }
+
+    // Modern convertAmount that accepts an optional per-row rate
+    // Convert amount from paymentCurrency to receiptCurrency using provided rate.
+    // paymentCurrency: id of the currency in which `amount` is provided.
+    function convertAmountWithRate(receiptCurrency, paymentCurrency, amount, rate) {
+        const exchangeRate = (rate !== undefined && rate !== null) ? parseFloat(rate) : (parseFloat("{{ currencies[0][2] }}") || 1);
+        const amt = parseFloat(amount) || 0;
+        // If same currency, no conversion
+        if (String(receiptCurrency) === String(paymentCurrency)) return amt;
+
+        // Try to detect USD by currency code (robust to id mappings)
+        const payCode = String(getCurrencyCodeById(paymentCurrency)).toUpperCase();
+        const receiptCode = String(getCurrencyCodeById(receiptCurrency)).toUpperCase();
+
+        // Common rule: exchangeRate is expressed as Bs per 1 USD
+        // If payment is USD and receipt is Bs -> multiply
+        if (payCode.indexOf('USD') !== -1 && receiptCode.indexOf('USD') === -1) {
+            return amt * (exchangeRate || 1);
+        }
+        // If payment is Bs and receipt is USD -> divide
+        if (payCode.indexOf('USD') === -1 && receiptCode.indexOf('USD') !== -1) {
+            return amt / (exchangeRate || 1);
+        }
+
+        // Fallback to previous id-based heuristic if codes not available
+        if (String(receiptCurrency) == '1') {
+            return amt * (exchangeRate || 1);
+        } else {
+            return amt / (exchangeRate || 1);
+        }
     }
 
     // Selección de Comprobantes de Pago
@@ -511,8 +584,20 @@
 
         addInputListeners();
 
-        updateDaysAndCommission();
-        updateBalanceNote();
+        // Fetch initial exchange rates per row (use existing date value if present)
+        (async function initRowRates(){
+            const paymentRows = document.querySelectorAll('.payment-row');
+            for (const row of paymentRows) {
+                const dateVal = row.querySelector('input[name="date_operation"]').value;
+                const currencyId = row.querySelector('select[name="currency"]')?.value;
+                if (currencyId) {
+                    const rate = await fetchExchangeRate(dateVal, currencyId);
+                    row.dataset.exchangeRate = rate;
+                }
+            }
+            updateDaysAndCommission();
+            updateBalanceNote();
+        })();
     });
 
     function addInputListeners() {
@@ -524,27 +609,44 @@
             const currencySelect = row.querySelector('select[name="currency"]');
             const dateInput = row.querySelector('input[name="date_operation"]');
             
-            // Eliminar listeners existentes para evitar duplicados
-            amountInput.removeEventListener('input', updateBalanceNote);
-            amountInput.removeEventListener('input', updateDaysAndCommission);
-            currencySelect.removeEventListener('change', handleCurrencyChange);
-            dateInput.removeEventListener('change', updateDaysAndCommission);
-            dateInput.removeEventListener('input', updateDaysAndCommission);
-            
-            // Agregar nuevos listeners con lógica unificada
-            amountInput.addEventListener('input', function() {
+            // Remove previously bound handlers if present
+            if (amountInput._onInput) amountInput.removeEventListener('input', amountInput._onInput);
+            if (currencySelect._onChange) currencySelect.removeEventListener('change', currencySelect._onChange);
+            if (dateInput._onChange) dateInput.removeEventListener('change', dateInput._onChange);
+            if (dateInput._onInput) dateInput.removeEventListener('input', dateInput._onInput);
+
+            // Add handlers and keep references to allow removal later
+            amountInput._onInput = function() {
                 updateBalanceNote();
                 updateDaysAndCommission(); // Actualizar días y comisión cuando cambia el monto
-            });
-            
-            currencySelect.addEventListener('change', function(e) {
-                handleCurrencyChange(e); // Manejar cambio de moneda
+            };
+            amountInput.addEventListener('input', amountInput._onInput);
+
+            currencySelect._onChange = async function(e) {
+                handleCurrencyChange(e); // Manejar cambio de moneda (carga tenders)
+                // Also refresh rate for this row according to current date
+                const rowEl = this.closest('.payment-row');
+                const dateVal = rowEl.querySelector('input[name="date_operation"]').value;
+                const curId = this.value;
+                const rate = await fetchExchangeRate(dateVal, curId);
+                rowEl.dataset.exchangeRate = rate;
                 updateBalanceNote();    // Actualizar saldo
                 updateDaysAndCommission(); // Actualizar días y comisión
-            });
-            
-            dateInput.addEventListener('change', updateDaysAndCommission);
-            dateInput.addEventListener('input', updateDaysAndCommission);
+            };
+            currencySelect.addEventListener('change', currencySelect._onChange);
+
+            dateInput._onChange = async function(e) {
+                const rowEl = this.closest('.payment-row');
+                const currencyId = rowEl.querySelector('select[name="currency"]')?.value;
+                const dateVal = this.value;
+                const rate = await fetchExchangeRate(dateVal, currencyId);
+                rowEl.dataset.exchangeRate = rate;
+                updateBalanceNote();
+                updateDaysAndCommission();
+            };
+            dateInput._onInput = dateInput._onChange;
+            dateInput.addEventListener('change', dateInput._onChange);
+            dateInput.addEventListener('input', dateInput._onInput);
         });
     }
 
@@ -561,7 +663,8 @@
             
             // Conversión solo si la moneda de la fila es diferente a la del recibo
             if (currencySelect.value != receiptCurrency) {
-                const convertedAmount = convertAmount(receiptCurrency, amount);
+                const rate = row.dataset.exchangeRate ? parseFloat(row.dataset.exchangeRate) : null;
+                const convertedAmount = convertAmountWithRate(receiptCurrency, currencySelect.value, amount, rate);
                 totalBalance += convertedAmount;
             } else {
                 totalBalance += amount;
@@ -649,8 +752,9 @@
             let convertedAmount = entryAmount;
             const paymentMethodSelect = row.querySelector('select[name="payment_method"]');
             const paymentMethodText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex]?.text || '';
-            if(currencySelect.value != receiptCurrency){
-                convertedAmount = convertAmount(receiptCurrency, entryAmount);
+            if (currencySelect.value != receiptCurrency) {
+                const rate = row.dataset.exchangeRate ? parseFloat(row.dataset.exchangeRate) : null;
+                convertedAmount = convertAmountWithRate(receiptCurrency, currencySelect.value, entryAmount, rate);
             }
             return {
                 // amount: usado para asignación en moneda del recibo (convertido si aplica)
@@ -1116,8 +1220,9 @@
             let convertedAmount = entryAmount;
             const paymentMethodSelect = row.querySelector('select[name="payment_method"]');
             const paymentMethodText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex]?.text || '';
-            if(currencySelect.value != receiptCurrency){
-                convertedAmount = convertAmount(receiptCurrency, entryAmount);
+            if (currencySelect.value != receiptCurrency) {
+                const rate = row.dataset.exchangeRate ? parseFloat(row.dataset.exchangeRate) : null;
+                convertedAmount = convertAmountWithRate(receiptCurrency, currencySelect.value, entryAmount, rate);
             }
             return {
                 amount: parseFloat(convertedAmount) || 0,
@@ -1244,7 +1349,12 @@
                     // del monto original de la forma de pago que corresponde al 'payment.amount' aplicado.
                     let amountForCommissionInPaymentCurrency = payment.amount; // default (cuando misma moneda)
                     if (String(payCurrencyId) !== String(receiptCurrency)) {
-                        const originalTotalConverted = convertAmount(receiptCurrency, paymentData[paymentRowIdx].originalAmount);
+                        const originalTotalConverted = convertAmountWithRate(
+                            receiptCurrency,
+                            paymentData[paymentRowIdx].currencyId,
+                            paymentData[paymentRowIdx].originalAmount,
+                            paymentData[paymentRowIdx] && paymentData[paymentRowIdx].row ? parseFloat(paymentData[paymentRowIdx].row.dataset.exchangeRate) : null
+                        );
                         if (originalTotalConverted > 0) {
                             const proportion = payment.amount / originalTotalConverted;
                             amountForCommissionInPaymentCurrency = paymentData[paymentRowIdx].originalAmount * proportion;
@@ -1282,8 +1392,13 @@
                 const payCurrencyCodeForLog = getCurrencyCodeById(payCurrencyIdForLog);
                 // amountAppliedInPaymentCurrency corresponde a la base usada para la comisión
                 let amountAppliedInPaymentCurrency = payment.amount;
-                if (String(payCurrencyIdForLog) !== String(receiptCurrency)) {
-                    const originalTotalConverted = convertAmount(receiptCurrency, paymentData[paymentRowIdx].originalAmount);
+                    if (String(payCurrencyIdForLog) !== String(receiptCurrency)) {
+                    const originalTotalConverted = convertAmountWithRate(
+                        receiptCurrency,
+                        paymentData[paymentRowIdx].currencyId,
+                        paymentData[paymentRowIdx].originalAmount,
+                        paymentData[paymentRowIdx] && paymentData[paymentRowIdx].row ? parseFloat(paymentData[paymentRowIdx].row.dataset.exchangeRate) : null
+                    );
                     if (originalTotalConverted > 0) {
                         const proportion = payment.amount / originalTotalConverted;
                         amountAppliedInPaymentCurrency = paymentData[paymentRowIdx].originalAmount * proportion;

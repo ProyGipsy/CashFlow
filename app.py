@@ -129,10 +129,13 @@ from documents import (
     create_doc_type,
     create_document,
     get_docs_by_type,
+    insert_contact_db,
+    update_contact_db,
     get_doc_type_full,
     get_document_by_id,
     get_docs_companies,
     get_suggested_emails,
+    get_contacts_by_user_db,
     get_all_documents_lists,    
     get_documents_by_type_id,
     )
@@ -699,11 +702,13 @@ def get_invoices(customer_id, customer_isRembd, store_id):
     ]
     return jsonify({'invoices': formatted_invoices})
 
+# Formulario de Cobranzas
 @app.route('/accountsForm/<string:account_ids>')
 def accountsForm(account_ids):
     account_ids_list = account_ids.split('-')
     receiptStoreCustomer = get_receiptsStoreCustomer(account_ids_list)
-    currencies = get_currency()
+    today = datetime.now().strftime('%Y-%m-%d')
+    currencies = get_currency(today)
     receiptsInfo = get_receiptsInfo(account_ids_list)
     bankAccounts = []
     commissions = get_commissions()
@@ -717,6 +722,23 @@ def accountsForm(account_ids):
         commissions=commissions,
         currencies=currencies
     )
+
+# Obtención de tasa de cambio según fecha
+@app.route('/get_exchange_rate')
+def get_exchange_rate():
+    # Leer parámetros de query string
+    date = request.args.get('date')
+
+    # Si no se provee fecha, usar hoy
+    if not date:
+        date = datetime.now().strftime('%Y-%m-%d')
+
+    currencies = get_currency(date)
+    if not currencies:
+        return jsonify({'success': False, 'message': 'Tasa no encontrada'}), 404
+
+    first = currencies[0]
+    return jsonify({'success': True, 'rate': float(first[2]), 'code': first[1]})
 
 # Obtención de formas de pago según moneda
 @app.route('/get_tenders/<int:currency_id>')
@@ -884,7 +906,6 @@ def submit_receipt():
     finally:
         cursor.close()
         conn.close()
-
 
 def send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, total_receipt_amount, commission_bs, commission_usd, currency, ncta_str):
 
@@ -2245,6 +2266,26 @@ def sendDocuments():
             final_user_id = None
             print(f"DEBUG: No se pudo convertir user_id {user_id_raw} a entero")
 
+    # 1.5 LÓGICA DE REGISTRO DE NUEVO CONTACTO
+    # Verificamos si el frontend envió la instrucción de guardar un contacto
+    new_contact_data = email_data.get('newContact')
+    
+    if new_contact_data and final_user_id:
+        print("DEBUG: Se detectó solicitud para guardar nuevo contacto.")
+        try:
+            nc_alias = new_contact_data.get('alias')
+            nc_emails = new_contact_data.get('emails')
+            
+            # Validamos que existan los datos esenciales antes de llamar a la BD
+            if nc_alias and nc_emails:
+                new_id = insert_contact_db(final_user_id, nc_alias, nc_emails)
+                print(f"DEBUG: Contacto '{nc_alias}' guardado exitosamente con ID: {new_id}")
+            else:
+                print("DEBUG: Faltan datos (alias o emails) para el nuevo contacto. Omitiendo guardado.")
+                
+        except Exception as e_contact:
+            print(f"ADVERTENCIA: Falló el guardado del contacto nuevo: {e_contact}")
+
     # 2. PROCESAMIENTO DE DOCUMENTOS
     doc_ids_raw = data.get('documentIds', [])
     print(f"DEBUG: IDs recibidos crudos: {doc_ids_raw}")
@@ -2316,5 +2357,85 @@ def getSuggestedEmails():
         print(f"Error obteniendo correos sugeridos: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/documents/createContact', methods=['POST'])
+def createContact():
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'error': 'No se recibieron datos'}), 400
+
+    # Validamos campos obligatorios
+    user_id = data.get('userId') # OJO: Asegúrate de enviar esto desde el front
+    alias = data.get('alias')
+    emails = data.get('emails')
+
+    if not user_id or not alias or not emails:
+        return jsonify({'error': 'Faltan campos obligatorios (userId, alias, emails)'}), 400
+
+    try:
+        new_contact_id = insert_contact_db(user_id, alias, emails)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Contacto creado exitosamente',
+            'id': new_contact_id,
+            'alias': alias,
+            'emails': emails
+        }), 201
+
+    except Exception as e:
+        print(f"Error creando contacto: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/documents/updateContact', methods=['PUT'])
+def updateContact():
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'error': 'No se recibieron datos'}), 400
+
+    contact_id = data.get('id')
+    user_id = data.get('userId') # Necesario para verificar propiedad
+    alias = data.get('alias')
+    emails = data.get('emails')
+
+    if not contact_id or not user_id:
+        return jsonify({'error': 'Faltan identificadores (id, userId)'}), 400
+
+    try:
+        rows_affected = update_contact_db(contact_id, user_id, alias, emails)
+        
+        if rows_affected == 0:
+            return jsonify({'error': 'No se encontró el contacto o no pertenece al usuario'}), 404
+
+        return jsonify({
+            'success': True,
+            'message': 'Contacto actualizado exitosamente',
+            'id': contact_id
+        }), 200
+
+    except Exception as e:
+        print(f"Error actualizando contacto: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/documents/getContacts', methods=['GET'])
+def getContacts():
+    try:
+        # Obtenemos el userId de los parámetros de la URL
+        user_id = request.args.get('userId')
+
+        if not user_id:
+            return jsonify({'error': 'Falta el parámetro userId'}), 400
+
+        # Llamamos a la función de base de datos
+        contacts = get_contacts_by_user_db(user_id)
+        
+        return jsonify(contacts), 200
+
+    except Exception as e:
+        print(f"Error obteniendo contactos: {e}")
+        return jsonify({'error': str(e)}), 500
+    
 if __name__ == '__main__':
    app.run()
