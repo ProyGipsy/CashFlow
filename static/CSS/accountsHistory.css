@@ -1,0 +1,117 @@
+.main-content {
+    color: #324bab;
+    display: flex;
+    flex-direction: column;
+}
+
+.content{
+    padding: 0% 3% 3% 3%;
+}
+
+.title-container {
+    padding: 2%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.back {
+    margin-right: auto;
+}
+
+.title-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.title-container a.back img, .company-sellers p a img {
+    width: 24px;
+    height: auto;
+}
+
+.title-container h2 {
+    margin: 0;
+}
+
+
+/* Estilos para la fila de filtros */
+.filter-row-container {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #d0ebff;
+    margin-bottom: 20px;
+}
+
+.history-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+    justify-content: center;
+    width: 100%;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    color: #324bab;
+    font-weight: bold;
+    align-items: center;
+}
+
+.filter-group select {
+    padding: 8px;
+    border: 1px solid #324bab;
+    border-radius: 4px;
+    color: #324bab;
+    min-width: 120px;
+    /* text-align: center; */
+}
+
+.btn-filter {
+    background-color: #324bab;
+    color: white;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    height: fit-content;
+}
+
+.btn-filter:hover {
+    background-color: #4068f8;
+}
+
+/* Estilos de tabla */
+
+.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.styled-table th, .styled-table td {
+    border: 1px solid #324bab;
+    padding: 10px;
+    text-align: left;
+}
+
+.styled-table th {
+    background-color: #d0ebff;
+    color: #324bab;
+}
+
+/* Estilos de Status Badge */
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+.status-badge.paid { background-color: #d4edda; color: #155724; }
+.status-badge.partial { background-color: #fff3cd; color: #856404; }
+.status-badge.pending { background-color: #f8d7da; color: #721c24; }

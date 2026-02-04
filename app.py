@@ -664,6 +664,12 @@ def businessRules():
 def homeSeller():
     return render_template('receipt.homeSeller.html', page='homeSeller', active_page='homeSeller')
 
+@app.route('/accountsHistory')
+def accountsHistory():
+    return render_template('receipt.accountsHistory.html',
+                           page='accountsHistory',
+                           active_page='accountsHistory')
+
 @app.route('/accountsReceivable')
 def accountsReceivable():
     if (session['salesRep_id'] == '99' or session['user_id'] == 20):

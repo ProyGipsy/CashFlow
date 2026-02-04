@@ -1,0 +1,141 @@
+{% extends "receipt.sellerBase.html" %}
+
+{% block title %}Gipsy - Historial de Cuentas{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/accountsHistory.css') }}"/>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="title-container">
+        <a class="back" href="{{ url_for('homeSeller') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <div class="title-center">
+            <h2>Historial de Cuentas</h2>
+        </div>
+    </div>
+
+    <div class="filter-row-container">
+        <form action="#" method="GET" class="history-filters">
+            <div class="filter-group">
+                <label for="year">Año:</label>
+                <select id="year" name="year">
+                    <option value="ALL">Todos</option>
+                    <option value="2024">2024</option>
+                    <option value="2023">2023</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="month">Mes:</label>
+                <select id="month" name="month">
+                    <option value="ALL">Todos</option>
+                    <option value="01">Enero</option>
+                    <option value="02">Febrero</option>
+                    <option value="03">Marzo</option>
+                    </select>
+            </div>
+            <div class="filter-group">
+                <label for="store">Tienda:</label>
+                <select id="store" name="store">
+                    <option value="ALL">Todas</option>
+                    <option value="S01">Sucursal Principal</option>
+                    <option value="S02">Sucursal Norte</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="customer">Cliente:</label>
+                <select id="customer" name="customer">
+                    <option value="ALL">Todos</option>
+                    <option value="C01">Distribuidora Global C.A.</option>
+                    <option value="C02">Inversiones Maracay</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="currency">Moneda:</label>
+                <select id="currency" name="currency">
+                    <option value="ALL">Todas</option>
+                    <option value="USD">Bs</option>
+                    <option value="VEF">USD</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="docType">Tipo Doc:</label>
+                <select id="docType" name="docType">
+                    <option value="ALL">Todos</option>
+                    <option value="FAC">FAC</option>
+                    <option value="NC">N/C</option>
+                    <option value="ND">N/D</option>
+                    <option value="NE">N/E</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="status">Estatus:</label>
+                <select id="status" name="status">
+                    <option value="ALL">Todos</option>
+                    <option value="PAID">Pagado</option>
+                    <option value="PARTIAL">Abonado</option>
+                    <option value="PENDING">Pendiente</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-filter">Filtrar</button>
+        </form>
+    </div>
+
+    <div class="table-container">
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>N_CTA</th>
+                    <th>Tipo</th>
+                    <th>Tienda</th>
+                    <th>Cliente</th>
+                    <th>Monto Total</th>
+                    <th>Monto Abonado</th>
+                    <th>Recibos</th>
+                    <th>Status Pago</th>
+                    <th>F. Cierre de Ciclo</th>
+                    <th>Pago de Comisión</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>00123</td>
+                    <td>FAC</td>
+                    <td>Sucursal Principal</td>
+                    <td>Distribuidora Global C.A.</td>
+                    <td>USD 1,500.00</td>
+                    <td>USD 500.00</td>
+                    <td>501, 542</td>
+                    <td><span class="status-badge partial">Abonado</span></td>
+                    <td> -- </td>
+                    <td> -- </td>
+                </tr>
+                <tr>
+                    <td>00124</td>
+                    <td>FAC</td>
+                    <td>Sucursal Norte</td>
+                    <td>Inversiones Maracay</td>
+                    <td>Bs 800.00</td>
+                    <td>Bs 800.00</td>
+                    <td>480</td>
+                    <td><span class="status-badge paid">Pagado</span></td>
+                    <td>2024-05-15</td>
+                    <td> Mayo 2024 </td>
+                </tr>
+                <tr>
+                    <td>9901</td>
+                    <td>ND</td>
+                    <td>Sucursal Principal</td>
+                    <td>Comercializadora J.J</td>
+                    <td>USD 200.00</td>
+                    <td>USD 0.00</td>
+                    <td>--</td>
+                    <td><span class="status-badge pending">Pendiente</span></td>
+                    <td> -- </td>
+                    <td> -- </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
