@@ -92,12 +92,15 @@
     width: 100%;
     border-collapse: collapse;
     margin: 20px 0;
+    font-size: 0.85rem;
 }
 
 .styled-table th, .styled-table td {
     border: 1px solid #324bab;
     padding: 10px;
     text-align: left;
+    font-size: 0.9rem;
+    /* white-space: nowrap; */
 }
 
 .styled-table th {
@@ -115,3 +118,25 @@
 .status-badge.paid { background-color: #d4edda; color: #155724; }
 .status-badge.partial { background-color: #fff3cd; color: #856404; }
 .status-badge.pending { background-color: #f8d7da; color: #721c24; }
+
+/* Estilos básicos para paginación */
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+    padding-bottom: 30px;
+}
+
+.pagination a {
+    padding: 8px 12px;
+    border: 1px solid #324bab;
+    color: #324bab;
+    text-decoration: none;
+    border-radius: 4px;
+}
+
+.pagination .active {
+    background-color: #324bab;
+    color: white;
+}

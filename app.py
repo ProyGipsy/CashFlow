@@ -103,7 +103,8 @@ from receipt_db import (
     check_already_paid_invoices, 
     check_duplicate_receipt,
     set_DebtSettlement,
-    get_all_related_receipts
+    get_all_related_receipts,
+    get_accountsHistory
     )
     
 from accessControl import (
@@ -666,9 +667,24 @@ def homeSeller():
 
 @app.route('/accountsHistory')
 def accountsHistory():
+    page_num = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    all_accounts = get_accountsHistory(session['salesRep_id'])
+    
+    total = len(all_accounts)
+    start = (page_num - 1) * per_page
+    end = start + per_page
+    paginated_accounts = all_accounts[start:end]
+    
+    total_pages = (total + per_page - 1) // per_page
+
     return render_template('receipt.accountsHistory.html',
                            page='accountsHistory',
-                           active_page='accountsHistory')
+                           active_page='accountsHistory',
+                           accounts_history=paginated_accounts,
+                           current_page=page_num,
+                           total_pages=total_pages)
 
 @app.route('/accountsReceivable')
 def accountsReceivable():

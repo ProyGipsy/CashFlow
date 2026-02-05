@@ -113,6 +113,95 @@ def get_seller_details(seller_id):
     conn.close()
     return seller
 
+def get_accountsHistory(salesRep_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # cursor.execute('''
+    #                 SET LANGUAGE Spanish
+    #                 SELECT 
+    #                     D.AccountID, 
+    #                     D.N_CTA, 
+    #                     D.DocumentType,
+    #                     S.Name AS StoreName,
+    #                     C.FirstName + ' ' + C.LastName AS CustomerName,
+    #                     M.Code, 
+    #                     D.Amount, 
+    #                     Calc.EffectivePaidAmount AS PaidAmount, -- Monto dinámico según SyncStatusID
+    #                     STRING_AGG(DPR.PaymentReceiptID, ', ') AS PaymentReceiptIDs,
+    #                     CASE 
+    #                         WHEN D.DocumentType = 'N/C' THEN
+    #                             CASE 
+    #                                 WHEN Calc.EffectivePaidAmount = 0 THEN 'Disponible'
+    #                                 WHEN ABS(Calc.EffectivePaidAmount) >= ABS(D.Amount) THEN 'Usada'
+    #                                 ELSE 'Parcialmente Usada'
+    #                             END
+    #                         ELSE
+    #                             CASE 
+    #                                 WHEN Calc.EffectivePaidAmount >= D.Amount THEN 'Pagada'
+    #                                 WHEN Calc.EffectivePaidAmount > 0 AND Calc.EffectivePaidAmount < D.Amount THEN 'Abonada'
+    #                                 ELSE 'Pendiente'
+    #                             END
+    #                     END AS PaymentStatus,
+    #                     FORMAT(DS.CompletionDate, 'dd-MM-yyyy') AS DebtSettlementDate,
+    #                     DATENAME(month, DS.CompletionDate) AS CommissionPaymentDate
+    #                 FROM Commission_Receipt.DebtAccount_Copia27012026 D -- Tabla actualizada
+    #                 JOIN Main.Store S ON D.StoreID = S.ID 
+    #                 JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd
+    #                 JOIN Main.Currency M ON D.CurrencyID = M.ID AND D.isRetail = M.isRetail
+    #                 LEFT JOIN Commission_Receipt.DebtPaymentRelation DPR ON D.AccountID = DPR.DebtAccountID
+    #                 LEFT JOIN Commission_Receipt.DebtSettlement DS ON D.AccountID = DS.AccountID
+    #                 CROSS APPLY (
+    #                     -- Lógica de selección de monto abonado basada en el estatus de sincronización
+    #                     SELECT CASE 
+    #                         WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
+    #                         WHEN D.SyncStatusID = 3 THEN D.GalacPaidAmount
+    #                         ELSE D.AppPaidAmount 
+    #                     END AS EffectivePaidAmount
+    #                 ) AS Calc
+    #                 WHERE D.SalesRepID = %s
+    #                 GROUP BY 
+    #                     D.AccountID, D.N_CTA, D.DocumentType, S.Name, C.FirstName, C.LastName, 
+    #                     M.Code, D.Amount, Calc.EffectivePaidAmount, DS.CompletionDate
+    #                 ORDER BY DS.CompletionDate DESC, N_CTA;
+    #                ''', (salesRep_id,))
+    cursor.execute('''
+                    SET LANGUAGE Spanish
+                    SELECT D.AccountID, D.N_CTA, D.DocumentType,
+                        S.Name AS StoreName,
+                        C.FirstName + ' ' + C.LastName AS CustomerName,
+                        M.Code, D.Amount, D.PaidAmount,
+                        STRING_AGG(DPR.PaymentReceiptID, ', ') AS PaymentReceiptIDs,
+                        CASE 
+                            WHEN D.DocumentType = 'N/C' THEN
+                                CASE 
+                                    WHEN D.PaidAmount = 0 THEN 'Disponible'
+                                    WHEN D.PaidAmount >= D.Amount THEN 'Usada'
+                                    ELSE 'Parcialmente Usada'
+                                END
+                            ELSE
+                                CASE 
+                                    WHEN D.PaidAmount >= D.Amount THEN 'Pagada'
+                                    WHEN D.PaidAmount > 0 AND D.PaidAmount < D.Amount THEN 'Abonada'
+                                    ELSE 'Pendiente'
+                                END
+                        END AS PaymentStatus,
+                        FORMAT (DS.CompletionDate, 'dd-MM-yyyy') AS DebtSettlementDate,
+                        DATENAME(month, DS.CompletionDate) AS CommissionPaymentDate
+                    FROM Commission_Receipt.DebtAccount D
+                    JOIN Main.Store S ON D.StoreID = S.ID 
+                    JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd
+                    JOIN Main.Currency M ON D.CurrencyID = M.ID AND D.isRetail = M.isRetail
+                    LEFT JOIN Commission_Receipt.DebtPaymentRelation DPR ON D.AccountID = DPR.DebtAccountID
+                    LEFT JOIN Commission_Receipt.DebtSettlement DS ON D.AccountID = DS.AccountID
+                    WHERE D.SalesRepID = %s
+                    GROUP BY D.AccountID, D.N_CTA, D.DocumentType, S.Name, C.FirstName, C.LastName, 
+                            M.Code, D.Amount, D.PaidAmount, DS.CompletionDate
+                    ORDER BY DS.CompletionDate DESC, N_CTA;
+                   ''', (salesRep_id,))
+    accounts_history = cursor.fetchall()
+    conn.close()
+    return accounts_history
+
 def get_customer_by_id(customer_id, customer_isRembd):
     conn = get_db_connection()
     cursor = conn.cursor()

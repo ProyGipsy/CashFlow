@@ -98,44 +98,52 @@
                 </tr>
             </thead>
             <tbody>
+                {% for account in accounts_history %}
                 <tr>
-                    <td>00123</td>
-                    <td>FAC</td>
-                    <td>Sucursal Principal</td>
-                    <td>Distribuidora Global C.A.</td>
-                    <td>USD 1,500.00</td>
-                    <td>USD 500.00</td>
-                    <td>501, 542</td>
-                    <td><span class="status-badge partial">Abonado</span></td>
-                    <td> -- </td>
-                    <td> -- </td>
+                    <td>{{ account[1] }}</td>
+                    <td>{{ account[2] }}</td>
+                    <td>{{ account[3] }}</td>
+                    <td>{{ account[4] }}</td>
+                    <td>{{ account[5] }} {{account[6] }}</td>
+                    <td>{{ account[5] }} {{ account[7] }}</td>
+                    <td>{{ account[8] }}</td>
+                    <td>
+                        {% set status_class = '' %}
+                        {% if account[9] in ['Pagada', 'Usada'] %}
+                            {% set status_class = 'paid' %}
+                        {% elif account[9] in ['Abonada', 'Parcialmente Usada'] %}
+                            {% set status_class = 'partial' %}
+                        {% elif account[9] in ['Pendiente', 'Disponible'] %}
+                            {% set status_class = 'pending' %}
+                        {% endif %}
+                        <span class="status-badge {{ status_class }}">
+                            {{ account[9] }}
+                        </span>
+                    </td>                  
+                    <td>{{ account[10] or ' -- ' }}</td>
+                    <td>{{ account[11] or ' -- ' }}</td>
                 </tr>
-                <tr>
-                    <td>00124</td>
-                    <td>FAC</td>
-                    <td>Sucursal Norte</td>
-                    <td>Inversiones Maracay</td>
-                    <td>Bs 800.00</td>
-                    <td>Bs 800.00</td>
-                    <td>480</td>
-                    <td><span class="status-badge paid">Pagado</span></td>
-                    <td>2024-05-15</td>
-                    <td> Mayo 2024 </td>
-                </tr>
-                <tr>
-                    <td>9901</td>
-                    <td>ND</td>
-                    <td>Sucursal Principal</td>
-                    <td>Comercializadora J.J</td>
-                    <td>USD 200.00</td>
-                    <td>USD 0.00</td>
-                    <td>--</td>
-                    <td><span class="status-badge pending">Pendiente</span></td>
-                    <td> -- </td>
-                    <td> -- </td>
-                </tr>
+                {% endfor %}                
             </tbody>
         </table>
+    </div>
+
+    <div class="pagination">
+        {% if current_page > 1 %}
+            <a href="{{ url_for('accountsHistory', page=current_page-1) }}">Anterior</a>
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == current_page %}
+                <span class="active a" style="padding: 8px 12px; background: #324bab; color: white; border-radius: 4px;">{{ p }}</span>
+            {% else %}
+                <a href="{{ url_for('accountsHistory', page=p) }}">{{ p }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if current_page < total_pages %}
+            <a href="{{ url_for('accountsHistory', page=current_page+1) }}">Siguiente</a>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
