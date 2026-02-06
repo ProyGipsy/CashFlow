@@ -41,29 +41,36 @@
 
         <div class="grid {{ grid_class }}">
             {% if 1 in session['modules'] %}
-            <a href="{{ url_for('homeCashier') }}" class="card">
-                <img src="{{ url_for('static', filename='IMG/cash-flow.png') }}" alt="Flujo de Caja" class="card-img">
-                <h3>Flujo de Caja</h3>
-            </a>
+                {% set is_maint = MAINTENANCE.CASHFLOW == 'ON' %}
+                <a href="{{ url_for('homeCashier') }}" class="card {{ 'disabled' if is_maint else '' }}">
+                    <img src="{{ url_for('static', filename='IMG/cash-flow.png') }}" alt="Flujo de Caja" class="card-img">
+                    <h3>Flujo de Caja</h3>
+                    {% if is_maint %}<span class="disabledText">Módulo en mantenimiento.<br> Por favor, vuelva más tarde.</span>{% endif %}
+                </a>
             {% endif %}
             {% if 0 in session['modules'] %}
-            <a onclick="handleReceiptRole()" class="card">
-                <img src="{{ url_for('static', filename='IMG/receipt.png') }}" alt="Registro de Cobranza al Mayor" class="card-img">
-                <h3>Registro de Cobranza al Mayor</h3>
-                <!--<span>Sistema en mantenimiento. <br> Por favor, vuelva más tarde.</span>-->
-            </a>
+                {% set is_maint = MAINTENANCE.PAYMENTRECEIPT == 'ON' %}
+                <a onclick="handleReceiptRole()" class="card {{ 'disabled' if is_maint else '' }}">
+                    <img src="{{ url_for('static', filename='IMG/receipt.png') }}" alt="Registro de Cobranza al Mayor" class="card-img">
+                    <h3>Registro de Cobranza al Mayor</h3>
+                    {% if is_maint %}<span class="disabledText">Módulo en mantenimiento.<br> Por favor, vuelva más tarde.</span>{% endif %}
+                </a>
             {% endif %}
             {% if 2 in session['modules'] %}
-            <a href="{{ url_for('reports.homeReports') }}" class="card">
-                <img src="{{ url_for('static', filename='IMG/dashboard.png') }}" alt="Reportes" class="card-img">
-                <h3>Visualización de Reportes</h3>
-            </a>
+                {% set is_maint = MAINTENANCE.REPORTS == 'ON' %}
+                <a href="{{ url_for('reports.homeReports') }}" class="card {{ 'disabled' if is_maint else '' }}">
+                    <img src="{{ url_for('static', filename='IMG/dashboard.png') }}" alt="Reportes" class="card-img">
+                    <h3>Visualización de Reportes</h3>
+                    {% if is_maint %}<span class="disabledText">Módulo en mantenimiento.<br> Por favor, vuelva más tarde.</span>{% endif %}
+                </a>
             {% endif %}
             {% if 3 in session['modules'] %}
-            <a href="{{ react_app_url }}" class="card">
-                <img src="{{ url_for('static', filename='IMG/document.png') }}" alt="Documentos" class="card-img">
-                <h3>Gestión de Documentos</h3>
-            </a>
+                {% set is_maint = MAINTENANCE.DOCUMENTS == 'ON' %}
+                <a href="{{ react_app_url }}" class="card {{ 'disabled' if is_maint else '' }}">
+                    <img src="{{ url_for('static', filename='IMG/document.png') }}" alt="Documentos" class="card-img">
+                    <h3>Gestión de Documentos</h3>
+                    {% if is_maint %}<span class="disabledText">Módulo en mantenimiento.<br> Por favor, vuelva más tarde.</span>{% endif %}
+                </a>
             {% endif %}
             <!--
             <a href="{{ url_for('welcome') }}" class="card disabled">

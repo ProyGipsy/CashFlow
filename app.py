@@ -170,6 +170,19 @@ app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
 
 serializer = URLSafeTimedSerializer(app.secret_key)
 
+# Variables de Mantenimiento para toda la app, inyectadas en el contexto de Jinja para su uso en templates
+@app.context_processor
+def inject_maintenance_vars():
+    return {
+        'MAINTENANCE': {
+            'APP': os.environ.get('MAINTENANCE_MODE_APP', 'OFF'),
+            'CASHFLOW': os.environ.get('MAINTENANCE_MODE_CASHFLOW', 'OFF'),
+            'PAYMENTRECEIPT': os.environ.get('MAINTENANCE_MODE_PAYMENTRECEIPT', 'OFF'),
+            'REPORTS': os.environ.get('MAINTENANCE_MODE_REPORTS', 'OFF'),
+            'DOCUMENTS': os.environ.get('MAINTENANCE_MODE_DOCUMENTS', 'OFF')
+        }
+    }
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     return render_template('newIndex.html')

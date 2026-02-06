@@ -114,6 +114,11 @@ body::after {
     opacity: 0.6;
 }
 
+.disabledText{
+    margin-top: -12px;
+    font-size: 15px;
+}
+
 /*Modal*/
 
 .modal {
