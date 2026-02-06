@@ -59,7 +59,7 @@ def get_receiptStores_DebtAccount(salesRep_id):
                     AND (
                         (D.Amount - Calc.SelectedPaidAmount > 0) 
                         OR 
-                        (D.DocumentType = 'N/C' AND D.Amount <> -Calc.EffectivePaidAmount)
+                        (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
                     )
                     ORDER BY S.Name;
                    ''', (salesRep_id))
@@ -87,7 +87,7 @@ def get_receiptStores_DebtAccount_admin():
                     AND (
                         (D.Amount - Calc.SelectedPaidAmount > 0) 
                         OR 
-                        (D.DocumentType = 'N/C' AND D.Amount <> -Calc.EffectivePaidAmount)
+                        (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
                     )
                     ORDER BY S.Name;
                    ''',)
@@ -180,7 +180,7 @@ def get_customers(store_id, salesRep_id):
                     AND D.GalacCxcStatus IN ('ABO', 'P/C')
                     AND (
                             (D.Amount > Calc.EffectivePaidAmount)
-                        OR (D.DocumentType = 'N/C' AND D.Amount <> -Calc.EffectivePaidAmount)
+                        OR (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
                     )
                     GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
                     ''', (store_id, salesRep_id))
@@ -209,7 +209,7 @@ def get_customers_admin(store_id):
                     AND D.GalacCxcStatus IN ('ABO', 'P/C')
                     AND (
                             (D.Amount > Calc.EffectivePaidAmount)
-                        OR (D.DocumentType = 'N/C' AND D.Amount <> -Calc.EffectivePaidAmount)
+                        OR (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
                     )
                     GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
                     ''', (store_id))
@@ -241,7 +241,7 @@ def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
                         AND D.GalacCxcStatus IN ('ABO', 'P/C')
                         AND (
                                 (D.Amount > Calc.EffectivePaidAmount) 
-                            OR (D.DocumentType = 'N/C' AND D.Amount <> -Calc.EffectivePaidAmount)
+                            OR (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
                         )
                         GROUP BY D.CurrencyID
                     ) AS T
@@ -276,7 +276,7 @@ def get_count_customers_with_accountsReceivable_admin(store_id):
                         AND D.GalacCxcStatus IN ('ABO', 'P/C')
                         AND (
                                 (D.Amount > Calc.EffectivePaidAmount) 
-                            OR (D.DocumentType = 'N/C' AND D.Amount <> -Calc.EffectivePaidAmount)
+                            OR (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
                         )
                         GROUP BY D.CurrencyID
                     ) AS T
@@ -406,7 +406,7 @@ def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_i
                     AND (
                             (D.Amount - Calc.EffectivePaidAmount > 0) 
                         OR 
-                            (D.DocumentType IN ('N/C') AND D.Amount <> -Calc.EffectivePaidAmount)
+                            (D.DocumentType IN ('N/C') AND D.Amount + Calc.EffectivePaidAmount < 0)
                     )
                     ORDER BY D.N_CTA;''',
                    (customer_id, customer_isRembd, store_id, salesRep_id))
@@ -437,7 +437,7 @@ def get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id):
                     AND (
                             (D.Amount - Calc.EffectivePaidAmount > 0) 
                         OR 
-                            (D.DocumentType IN ('N/C') AND D.Amount <> -Calc.EffectivePaidAmount)
+                            (D.DocumentType IN ('N/C') AND D.Amount + Calc.EffectivePaidAmount < 0)
                     )
                     ORDER BY D.N_CTA;''',
                    (customer_id, customer_isRembd, store_id))
