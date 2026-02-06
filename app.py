@@ -683,16 +683,19 @@ def accountsReceivable():
     print(session['roles']);
     # if (session['salesRep_id'] == '99' or session['user_id'] == 20):
     if (0 in session['roles'] and 1 in session['roles']):
+        isAdmin = True
         stores = get_receiptStores_DebtAccount_admin()
         customers_by_store = {store[0]: get_customers_admin(store[0]) for store in stores}
         count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable_admin(store[0]) for store in stores}
     else:
+        isAdmin = False
         stores = get_receiptStores_DebtAccount(session['salesRep_id'])
         customers_by_store = {store[0]: get_customers(store[0], session['salesRep_id']) for store in stores}
         count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable(store[0], session['salesRep_id']) for store in stores}
     return render_template('receipt.accountsReceivable.html',
                            page='accountsReceivable',
                            active_page='accountsReceivable',
+                           isAdmin=isAdmin,
                            stores=stores,
                            customers_by_store=customers_by_store,
                            count_customers_by_store=count_customers_by_store)
@@ -714,7 +717,8 @@ def get_invoices(customer_id, customer_isRembd, store_id):
             'IVA': 0,
             'Remaining': float(invoice[2] - invoice[3]),
             'Currency': invoice[4],
-            'DocumentType': invoice[5]
+            'DocumentType': invoice[5],
+            'SyncStatus': invoice[6]
         } for invoice in invoices
     ]
     return jsonify({'invoices': formatted_invoices})

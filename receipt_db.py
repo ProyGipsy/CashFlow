@@ -44,22 +44,12 @@ def get_receiptStores_DebtAccount(salesRep_id):
     cursor.execute('''SELECT DISTINCT S.ID, S.Name
                     FROM Main.Store S
                     JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON S.ID = D.StoreID
-                    CROSS APPLY (
-                        -- Definimos dinámicamente qué monto comparar según el status
-                        SELECT CASE 
-                            WHEN SyncStatusID IN (1, 2) THEN D.AppPaidAmount
-                            WHEN D.SyncStatusID = 3 AND D.DocumentType NOT IN ('N/C') THEN D.GalacPaidAmount
-							WHEN D.SyncStatusID = 3 AND D.DocumentType IN ('N/C') THEN D.GalacPaidAmount * -1
-                            ELSE D.AppPaidAmount
-                        END AS SelectedPaidAmount
-                    ) AS Calc
                     WHERE S.ID != 0 AND D.GalacCxcStatus IN ('ABO', 'P/C')
                     AND D.SalesRepID = %s
-                    AND Calc.SelectedPaidAmount IS NOT NULL
                     AND (
-                        (D.Amount - Calc.SelectedPaidAmount > 0) 
+                        (D.Amount - D.AppPaidAmount > 0) 
                         OR 
-                        (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
+                        (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
                     )
                     ORDER BY S.Name;
                    ''', (salesRep_id))
@@ -73,21 +63,11 @@ def get_receiptStores_DebtAccount_admin():
     cursor.execute('''SELECT DISTINCT S.ID, S.Name
                     FROM Main.Store S
                     JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON S.ID = D.StoreID
-                    CROSS APPLY (
-                        -- Definimos dinámicamente qué monto comparar según el status
-                        SELECT CASE 
-                            WHEN SyncStatusID IN (1, 2) THEN D.AppPaidAmount
-                            WHEN D.SyncStatusID = 3 AND D.DocumentType NOT IN ('N/C') THEN D.GalacPaidAmount
-							WHEN D.SyncStatusID = 3 AND D.DocumentType IN ('N/C') THEN D.GalacPaidAmount * -1
-                            ELSE NULL 
-                        END AS SelectedPaidAmount
-                    ) AS Calc
                     WHERE S.ID != 0 AND D.GalacCxcStatus IN ('ABO', 'P/C')
-                    AND Calc.SelectedPaidAmount IS NOT NULL
                     AND (
-                        (D.Amount - Calc.SelectedPaidAmount > 0) 
+                        (D.Amount - D.AppPaidAmount > 0) 
                         OR 
-                        (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
+                        (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
                     )
                     ORDER BY S.Name;
                    ''',)
@@ -166,21 +146,13 @@ def get_customers(store_id, salesRep_id):
                     FROM Commission_Receipt.Customer C
                     JOIN Commission_Receipt.DebtAccount_Copia27012026 D 
                         ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
-                    CROSS APPLY (
-                        SELECT CASE 
-                            WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
-                            WHEN D.SyncStatusID = 3 AND D.DocumentType NOT IN ('N/C') THEN D.GalacPaidAmount
-							WHEN D.SyncStatusID = 3 AND D.DocumentType IN ('N/C') THEN D.GalacPaidAmount * -1
-                            ELSE D.AppPaidAmount -- Valor por defecto en caso de otros estados
-                        END AS EffectivePaidAmount
-                    ) AS Calc
                     WHERE C.isRetail = 0
                     AND D.StoreID = %s 
                     AND D.SalesRepID = %s 
                     AND D.GalacCxcStatus IN ('ABO', 'P/C')
                     AND (
-                            (D.Amount > Calc.EffectivePaidAmount)
-                        OR (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
+                            (D.Amount > D.AppPaidAmount)
+                        OR (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
                     )
                     GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
                     ''', (store_id, salesRep_id))
@@ -196,20 +168,12 @@ def get_customers_admin(store_id):
                     FROM Commission_Receipt.Customer C
                     JOIN Commission_Receipt.DebtAccount_Copia27012026 D 
                         ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
-                    CROSS APPLY (
-                        SELECT CASE 
-                            WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
-                            WHEN D.SyncStatusID = 3 AND D.DocumentType NOT IN ('N/C') THEN D.GalacPaidAmount
-							WHEN D.SyncStatusID = 3 AND D.DocumentType IN ('N/C') THEN D.GalacPaidAmount * -1
-                            ELSE D.AppPaidAmount -- Valor por defecto en caso de otros estados
-                        END AS EffectivePaidAmount
-                    ) AS Calc
                     WHERE C.isRetail = 0
                     AND D.StoreID = %s 
                     AND D.GalacCxcStatus IN ('ABO', 'P/C')
                     AND (
-                            (D.Amount > Calc.EffectivePaidAmount)
-                        OR (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
+                            (D.Amount > D.AppPaidAmount)
+                        OR (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
                     )
                     GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
                     ''', (store_id))
@@ -226,22 +190,14 @@ def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
                         SELECT 
                             D.CurrencyID,
                             COUNT(DISTINCT D.CustomerID) AS CountCustomers,
-                            SUM(D.Amount - Calc.EffectivePaidAmount) AS Balance
+                            SUM(D.Amount - D.AppPaidAmountsyn) AS Balance
                         FROM Commission_Receipt.DebtAccount_Copia27012026 D
-                        CROSS APPLY (
-                            SELECT CASE 
-                                WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
-                                WHEN D.SyncStatusID = 3 AND D.DocumentType NOT IN ('N/C') THEN D.GalacPaidAmount
-							    WHEN D.SyncStatusID = 3 AND D.DocumentType IN ('N/C') THEN D.GalacPaidAmount * -1
-                                ELSE D.AppPaidAmount 
-                            END AS EffectivePaidAmount
-                        ) AS Calc
                         WHERE D.StoreID = %s 
                         AND D.SalesRepID = %s 
                         AND D.GalacCxcStatus IN ('ABO', 'P/C')
                         AND (
-                                (D.Amount > Calc.EffectivePaidAmount) 
-                            OR (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
+                                (D.Amount > D.AppPaidAmount) 
+                            OR (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
                         )
                         GROUP BY D.CurrencyID
                     ) AS T
@@ -262,21 +218,13 @@ def get_count_customers_with_accountsReceivable_admin(store_id):
                         SELECT 
                             D.CurrencyID,
                             COUNT(DISTINCT D.CustomerID) AS CountCustomers,
-                            SUM(D.Amount - Calc.EffectivePaidAmount) AS Balance
+                            SUM(D.Amount - D.AppPaidAmount) AS Balance
                         FROM Commission_Receipt.DebtAccount_Copia27012026 D
-                        CROSS APPLY (
-                            SELECT CASE 
-                                WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
-                                WHEN D.SyncStatusID = 3 AND D.DocumentType NOT IN ('N/C') THEN D.GalacPaidAmount
-							    WHEN D.SyncStatusID = 3 AND D.DocumentType IN ('N/C') THEN D.GalacPaidAmount * -1
-                                ELSE D.AppPaidAmount 
-                            END AS EffectivePaidAmount
-                        ) AS Calc
                         WHERE D.StoreID = %s 
                         AND D.GalacCxcStatus IN ('ABO', 'P/C')
                         AND (
-                                (D.Amount > Calc.EffectivePaidAmount) 
-                            OR (D.DocumentType = 'N/C' AND D.Amount + Calc.EffectivePaidAmount < 0)
+                                (D.Amount > D.AppPaidAmount) 
+                            OR (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
                         )
                         GROUP BY D.CurrencyID
                     ) AS T
@@ -386,27 +334,19 @@ def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_i
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT D.AccountID, D.N_CTA, D.Amount, 
-                        Calc.EffectivePaidAmount AS PaidAmount, -- Se muestra el monto según el SyncStatus
-                        C.Description, D.DocumentType
+                        D.AppPaidAmount AS PaidAmount, -- Se muestra el monto según el SyncStatus
+                        C.Description, D.DocumentType, D.SyncStatusID
                     FROM Commission_Receipt.DebtAccount_Copia27012026 D
                     JOIN Main.Currency C ON D.CurrencyID = C.ID
-                    CROSS APPLY (
-                        SELECT CASE 
-                            WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
-                            WHEN D.SyncStatusID = 3 AND D.DocumentType NOT IN ('N/C') THEN D.GalacPaidAmount
-							WHEN D.SyncStatusID = 3 AND D.DocumentType IN ('N/C') THEN D.GalacPaidAmount * -1
-                            ELSE D.AppPaidAmount 
-                        END AS EffectivePaidAmount
-                    ) AS Calc
                     WHERE D.CustomerID = %s 
                     AND D.isRembd = %s 
                     AND D.StoreID = %s 
                     AND D.SalesRepID = %s
                     AND D.GalacCxcStatus IN ('ABO', 'P/C')
                     AND (
-                            (D.Amount - Calc.EffectivePaidAmount > 0) 
+                            (D.Amount - D.AppPaidAmount > 0) 
                         OR 
-                            (D.DocumentType IN ('N/C') AND D.Amount + Calc.EffectivePaidAmount < 0)
+                            (D.DocumentType IN ('N/C') AND D.Amount + D.AppPaidAmount < 0)
                     )
                     ORDER BY D.N_CTA;''',
                    (customer_id, customer_isRembd, store_id, salesRep_id))
@@ -418,26 +358,18 @@ def get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT D.AccountID, D.N_CTA, D.Amount, 
-                        Calc.EffectivePaidAmount AS PaidAmount, -- Se muestra el monto según el SyncStatus
-                        C.Description, D.DocumentType
+                        D.AppPaidAmount AS PaidAmount, -- Se muestra el monto según el SyncStatus
+                        C.Description, D.DocumentType, D.SyncStatusID
                     FROM Commission_Receipt.DebtAccount_Copia27012026 D
                     JOIN Main.Currency C ON D.CurrencyID = C.ID
-                    CROSS APPLY (
-                        SELECT CASE 
-                            WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
-                            WHEN D.SyncStatusID = 3 AND D.DocumentType NOT IN ('N/C') THEN D.GalacPaidAmount
-							WHEN D.SyncStatusID = 3 AND D.DocumentType IN ('N/C') THEN D.GalacPaidAmount * -1
-                            ELSE D.AppPaidAmount 
-                        END AS EffectivePaidAmount
-                    ) AS Calc
                     WHERE D.CustomerID = %s 
                     AND D.isRembd = %s 
                     AND D.StoreID = %s 
                     AND D.GalacCxcStatus IN ('ABO', 'P/C')
                     AND (
-                            (D.Amount - Calc.EffectivePaidAmount > 0) 
+                            (D.Amount - D.AppPaidAmount > 0) 
                         OR 
-                            (D.DocumentType IN ('N/C') AND D.Amount + Calc.EffectivePaidAmount < 0)
+                            (D.DocumentType IN ('N/C') AND D.Amount + D.AppPaidAmount < 0)
                     )
                     ORDER BY D.N_CTA;''',
                    (customer_id, customer_isRembd, store_id))
