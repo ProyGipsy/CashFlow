@@ -231,6 +231,64 @@ def get_accountsHistory(salesRep_id):
     conn.close()
     return accounts_history
 
+def get_accountsHistory_admin():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Versión con DebtAccount anterior (sin SyncStatus)
+    cursor.execute('''
+                    SET LANGUAGE Spanish
+                    SELECT 
+                        D.AccountID, 
+                        D.N_CTA, 
+                        D.DocumentType,
+                        S.Name AS StoreName,
+                        C.FirstName + ' ' + C.LastName AS CustomerName,
+                        M.Code, 
+                        D.Amount, 
+                        D.PaidAmount,
+                        DPR.PaymentReceiptIDs,
+                        CASE 
+                            WHEN D.DocumentType = 'N/C' THEN
+                                CASE 
+                                    WHEN D.PaidAmount = 0 THEN 'Disponible'
+                                    WHEN D.PaidAmount >= D.Amount THEN 'Usada'
+                                    ELSE 'Parcialmente Usada'
+                                END
+                            ELSE
+                                CASE 
+                                    WHEN D.PaidAmount >= D.Amount THEN 'Pagada'
+                                    WHEN D.PaidAmount > 0 AND D.PaidAmount < D.Amount THEN 'Abonada'
+                                    ELSE 'Pendiente'
+                                END
+                        END AS PaymentStatus,
+                        DS.DebtSettlementDate,
+                        DS.CommissionPaymentDate
+                    FROM Commission_Receipt.DebtAccount D
+                    JOIN Main.Store S ON D.StoreID = S.ID 
+                    JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd
+                    JOIN Main.Currency M ON D.CurrencyID = M.ID AND D.isRetail = M.isRetail
+                    LEFT JOIN (
+                        SELECT 
+                            DebtAccountID,
+                            STRING_AGG(PaymentReceiptID, ', ') AS PaymentReceiptIDs
+                        FROM Commission_Receipt.DebtPaymentRelation
+                        GROUP BY DebtAccountID
+                    ) DPR ON D.AccountID = DPR.DebtAccountID
+                    LEFT JOIN (
+                        SELECT 
+                            AccountID,
+                            FORMAT(MAX(CompletionDate), 'yyyy-MM-dd') AS DebtSettlementDate,
+                            DATENAME(month, MAX(CompletionDate)) AS CommissionPaymentDate
+                        FROM Commission_Receipt.DebtSettlement
+                        GROUP BY AccountID
+                    ) DS ON D.AccountID = DS.AccountID
+                    ORDER BY DS.DebtSettlementDate DESC, D.N_CTA;
+                   ''')
+    accounts_history = cursor.fetchall()
+    conn.close()
+    return accounts_history
+
 def get_customer_by_id(customer_id, customer_isRembd):
     conn = get_db_connection()
     cursor = conn.cursor()

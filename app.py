@@ -104,7 +104,8 @@ from receipt_db import (
     check_duplicate_receipt,
     set_DebtSettlement,
     get_all_related_receipts,
-    get_accountsHistory
+    get_accountsHistory,
+    get_accountsHistory_admin
     )
     
 from accessControl import (
@@ -670,7 +671,10 @@ def accountsHistory():
     page_num = request.args.get('page', 1, type=int)
     per_page = 50
     
-    all_accounts = get_accountsHistory(session['salesRep_id'])
+    if (0 in session['roles'] and 1 in session['roles']):
+        all_accounts = get_accountsHistory_admin()
+    else:
+        all_accounts = get_accountsHistory(session['salesRep_id'])
     
     total = len(all_accounts)
     start = (page_num - 1) * per_page

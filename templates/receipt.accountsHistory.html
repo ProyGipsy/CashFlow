@@ -110,13 +110,23 @@
             <a href="{{ url_for('accountsHistory', page=current_page-1) }}">Anterior</a>
         {% endif %}
 
-        {% for p in range(1, total_pages + 1) %}
-            {% if p == current_page %}
-                <span class="active a" style="padding: 8px 12px; background: #324bab; color: white; border-radius: 4px;">{{ p }}</span>
-            {% else %}
-                <a href="{{ url_for('accountsHistory', page=p) }}">{{ p }}</a>
-            {% endif %}
-        {% endfor %}
+        {% if total_pages <= 10 %}
+            {# Si hay 10 o menos, las mostramos todas #}
+            {% for p in range(1, total_pages + 1) %}
+                <a href="{{ url_for('accountsHistory', page=p) }}" class="{% if p == current_page %}active{% endif %}">{{ p }}</a>
+            {% endfor %}
+        {% else %}
+            {# Lógica de puntos suspensivos: 5 primeras y 5 últimas #}
+            {% for p in range(1, 6) %}
+                <a href="{{ url_for('accountsHistory', page=p) }}" class="{% if p == current_page %}active{% endif %}">{{ p }}</a>
+            {% endfor %}
+
+            <span class="dots">...</span>
+
+            {% for p in range(total_pages - 4, total_pages + 1) %}
+                <a href="{{ url_for('accountsHistory', page=p) }}" class="{% if p == current_page %}active{% endif %}">{{ p }}</a>
+            {% endfor %}
+        {% endif %}
 
         {% if current_page < total_pages %}
             <a href="{{ url_for('accountsHistory', page=current_page+1) }}">Siguiente</a>
