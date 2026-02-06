@@ -20,64 +20,39 @@
             <div class="filter-group">
                 <label for="year">Año:</label>
                 <select id="year" name="year">
-                    <option value="ALL">Todos</option>
-                    <option value="2024">2024</option>
-                    <option value="2023">2023</option>
                 </select>
             </div>
             <div class="filter-group">
                 <label for="month">Mes:</label>
                 <select id="month" name="month">
-                    <option value="ALL">Todos</option>
-                    <option value="01">Enero</option>
-                    <option value="02">Febrero</option>
-                    <option value="03">Marzo</option>
                     </select>
             </div>
             <div class="filter-group">
                 <label for="store">Tienda:</label>
                 <select id="store" name="store">
-                    <option value="ALL">Todas</option>
-                    <option value="S01">Sucursal Principal</option>
-                    <option value="S02">Sucursal Norte</option>
                 </select>
             </div>
             <div class="filter-group">
                 <label for="customer">Cliente:</label>
                 <select id="customer" name="customer">
-                    <option value="ALL">Todos</option>
-                    <option value="C01">Distribuidora Global C.A.</option>
-                    <option value="C02">Inversiones Maracay</option>
                 </select>
             </div>
             <div class="filter-group">
                 <label for="currency">Moneda:</label>
                 <select id="currency" name="currency">
-                    <option value="ALL">Todas</option>
-                    <option value="USD">Bs</option>
-                    <option value="VEF">USD</option>
                 </select>
             </div>
             <div class="filter-group">
                 <label for="docType">Tipo Doc:</label>
                 <select id="docType" name="docType">
-                    <option value="ALL">Todos</option>
-                    <option value="FAC">FAC</option>
-                    <option value="NC">N/C</option>
-                    <option value="ND">N/D</option>
-                    <option value="NE">N/E</option>
                 </select>
             </div>
             <div class="filter-group">
                 <label for="status">Estatus:</label>
                 <select id="status" name="status">
-                    <option value="ALL">Todos</option>
-                    <option value="PAID">Pagado</option>
-                    <option value="PARTIAL">Abonado</option>
-                    <option value="PENDING">Pendiente</option>
                 </select>
             </div>
-            <button type="submit" class="btn-filter">Filtrar</button>
+            <button type="button" id="reset-filters" class="btn-filter">Reiniciar</button>
         </form>
     </div>
 
@@ -128,6 +103,8 @@
         </table>
     </div>
 
+    <div id="no-results" style="display:none; padding:16px; color:#444;">No hay cuentas que cumplan con esos filtros.</div>
+
     <div class="pagination">
         {% if current_page > 1 %}
             <a href="{{ url_for('accountsHistory', page=current_page-1) }}">Anterior</a>
@@ -146,4 +123,339 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+    const selectors = {
+        year: document.getElementById('year'),
+        month: document.getElementById('month'),
+        store: document.getElementById('store'),
+        customer: document.getElementById('customer'),
+        currency: document.getElementById('currency'),
+        docType: document.getElementById('docType'),
+        status: document.getElementById('status')
+    };
+
+    const monthNames = {
+        '01': 'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio',
+        '07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'
+    };
+
+    const table = document.querySelector('.table-container table');
+    const tbody = table && table.tBodies[0];
+    if(!tbody) return;
+
+    // Full dataset provided by server (unpaginated)
+    const fullData = {{ full_accounts|tojson | safe }} || [];
+    const PER_PAGE = {{ per_page }} || 50;
+
+    // Rows for the initially rendered server page (kept for initial view)
+    const serverRows = Array.from(tbody.rows);
+
+    function getCellText(row, index){
+        const cell = row.cells[index];
+        return cell ? cell.textContent.trim() : '';
+    }
+
+    function parseDateParts(text){
+        if(!text) return {year:'', month:''};
+        // Try ISO YYYY-MM-DD
+        let m = text.match(/(\d{4})[-\/](\d{2})[-\/](\d{2})/);
+        if(m) return {year: m[1], month: m[2]};
+        // Try DD/MM/YYYY or D/M/YYYY
+        m = text.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+        if(m){
+            const mm = m[2].padStart(2,'0');
+            return {year: m[3], month: mm};
+        }
+        // Fallback: try to parse year anywhere
+        m = text.match(/(20\d{2})/);
+        if(m) return {year: m[1], month: ''};
+        return {year:'', month:''};
+    }
+
+    function extractCurrencyFromAmount(text){
+        if(!text) return '';
+        // Assume currency is last token (e.g., "1234.00 USD" or "Bs")
+        const parts = text.split(/\s+/).filter(Boolean);
+        if(parts.length===0) return '';
+        const last = parts[parts.length-1];
+        // Normalize some common representations
+        if(['Bs','VEF','VES','USD','EUR'].includes(last)) return last;
+        // If last is symbol like "$" or "Bs.", return trimmed
+        return last.replace(/[^A-Za-z0-9]/g,'') || last;
+    }
+
+    function collectOptionsFromRows(visibleRows){
+        const years = new Set();
+        const months = new Set();
+        const stores = new Set();
+        const customers = new Set();
+        const currencies = new Set();
+        const docTypes = new Set();
+        const statuses = new Set();
+
+        visibleRows.forEach(row => {
+            // When passed DOM rows, use cell text
+            if(row && row.cells){
+                const tipo = getCellText(row,1);
+                const tienda = getCellText(row,2);
+                const cliente = getCellText(row,3);
+                const montoTotal = getCellText(row,4);
+                const status = getCellText(row,7);
+                const fecha = getCellText(row,8);
+                const {year, month} = parseDateParts(fecha);
+                if(year) years.add(year);
+                if(month) months.add(month);
+                if(tienda) stores.add(tienda);
+                if(cliente) customers.add(cliente);
+                const cur = extractCurrencyFromAmount(montoTotal);
+                if(cur) currencies.add(cur);
+                if(tipo) docTypes.add(tipo);
+                if(status) statuses.add(status);
+            } else if(Array.isArray(row)){
+                // When passed data array from fullData
+                const tipo = row[2] || '';
+                const tienda = row[3] || '';
+                const cliente = row[4] || '';
+                const moneda = row[5] || '';
+                const montoTotal = (row[6] !== undefined) ? String(row[6]) : '';
+                const status = row[9] || '';
+                const fecha = row[10] || '';
+                const {year, month} = parseDateParts(fecha);
+                if(year) years.add(year);
+                if(month) months.add(month);
+                if(tienda) stores.add(tienda);
+                if(cliente) customers.add(cliente);
+                if(moneda) currencies.add(moneda);
+                if(tipo) docTypes.add(tipo);
+                if(status) statuses.add(status);
+            }
+        });
+
+        return {years, months, stores, customers, currencies, docTypes, statuses};
+    }
+
+    function clearSelect(sel){
+        while(sel.options.length) sel.remove(0);
+    }
+
+    function populateSelect(sel, values, formatMonth=false){
+        clearSelect(sel);
+        const allOpt = new Option(sel === selectors.store || sel===selectors.customer ? (sel===selectors.store? 'Todas':'Todos') : 'Todos', 'ALL');
+        sel.add(allOpt);
+        const sorted = Array.from(values).sort();
+        sorted.forEach(v => {
+            const text = (formatMonth && monthNames[v]) ? monthNames[v] + ' ('+v+')' : v;
+            sel.add(new Option(text, v));
+        });
+    }
+
+    function initialPopulate(){
+        const opts = collectOptionsFromRows(fullData);
+        populateSelect(selectors.year, opts.years);
+        populateSelect(selectors.month, opts.months, true);
+        populateSelect(selectors.store, opts.stores);
+        populateSelect(selectors.customer, opts.customers);
+        const currencySet = new Set();
+        opts.currencies.forEach(c => {
+            const normalized = String(c).toUpperCase();
+            if(normalized.includes('USD')) currencySet.add('USD');
+            else if(normalized.includes('BS') || normalized.includes('VEF') || normalized.includes('VES')) currencySet.add('Bs');
+        });
+        populateSelect(selectors.currency, currencySet);
+        populateSelect(selectors.docType, opts.docTypes);
+        populateSelect(selectors.status, opts.statuses);
+    }
+
+    let clientState = {currentPage:1, filteredData: []};
+    const pagContainer = document.querySelector('.pagination');
+    const originalPaginationHTML = pagContainer ? pagContainer.innerHTML : '';
+    const originalPaginationDisplay = pagContainer ? (pagContainer.style.display || '') : '';
+
+    function renderTableFromData(data, page){
+        tbody.innerHTML = '';
+        page = page || 1;
+        const start = (page-1) * PER_PAGE;
+        const end = start + PER_PAGE;
+        const slice = data.slice(start, end);
+        slice.forEach(account => {
+            const tr = document.createElement('tr');
+            function td(text){ const c = document.createElement('td'); c.textContent = text !== undefined && text !== null ? text : ''; return c; }
+            tr.appendChild(td(account[1])); // N_CTA
+            tr.appendChild(td(account[2])); // Tipo
+            tr.appendChild(td(account[3])); // Tienda
+            tr.appendChild(td(account[4])); // Cliente
+            tr.appendChild(td((account[5] || '') + ' ' + (account[6] !== undefined ? account[6] : '')));
+            tr.appendChild(td((account[5] || '') + ' ' + (account[7] !== undefined ? account[7] : '')));
+            tr.appendChild(td(account[8]));
+            const statusTd = document.createElement('td');
+            const span = document.createElement('span');
+            let status_class = '';
+            const statusText = account[9] || '';
+            if (['Pagada','Usada'].includes(statusText)) status_class = 'paid';
+            else if (['Abonada','Parcialmente Usada'].includes(statusText)) status_class = 'partial';
+            else if (['Pendiente','Disponible'].includes(statusText)) status_class = 'pending';
+            span.className = 'status-badge ' + status_class;
+            span.textContent = statusText;
+            statusTd.appendChild(span);
+            tr.appendChild(statusTd);
+            tr.appendChild(td(account[10] || ' -- '));
+            tr.appendChild(td(account[11] || ' -- '));
+            tbody.appendChild(tr);
+        });
+        renderClientPagination(data.length);
+    }
+
+    function renderClientPagination(count){
+        if(!pagContainer) return;
+        const anyFilter = Object.values(selectors).some(s => s.value && s.value !== 'ALL');
+        if(!anyFilter){
+            pagContainer.innerHTML = originalPaginationHTML;
+            pagContainer.style.display = originalPaginationDisplay || '';
+            return;
+        }
+        if(count <= PER_PAGE){
+            pagContainer.style.display = 'none';
+            return;
+        }
+        pagContainer.style.display = '';
+        const totalPages = Math.ceil(count / PER_PAGE);
+        pagContainer.innerHTML = '';
+
+        const prev = document.createElement('a');
+        prev.href = '#';
+        prev.textContent = 'Anterior';
+        prev.style.marginRight = '8px';
+        prev.addEventListener('click', (ev)=>{ ev.preventDefault(); if(clientState.currentPage>1){ clientState.currentPage--; renderTableFromData(clientState.filteredData, clientState.currentPage); } });
+        pagContainer.appendChild(prev);
+
+        const maxButtons = 10;
+        let startPage = Math.max(1, clientState.currentPage - Math.floor(maxButtons/2));
+        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+        if(endPage - startPage + 1 < maxButtons){ startPage = Math.max(1, endPage - maxButtons + 1); }
+
+        for(let p=startPage;p<=endPage;p++){
+            if(p === clientState.currentPage){
+                const span = document.createElement('span');
+                span.className = 'active a';
+                span.style.padding = '8px 12px';
+                span.style.background = '#324bab';
+                span.style.color = 'white';
+                span.style.borderRadius = '4px';
+                span.style.marginRight = '6px';
+                span.textContent = p;
+                pagContainer.appendChild(span);
+            } else {
+                const a = document.createElement('a');
+                a.href = '#';
+                a.style.marginRight = '6px';
+                a.textContent = p;
+                a.addEventListener('click', (ev)=>{ ev.preventDefault(); clientState.currentPage = p; renderTableFromData(clientState.filteredData, p); });
+                pagContainer.appendChild(a);
+            }
+        }
+
+        const next = document.createElement('a');
+        next.href = '#';
+        next.textContent = 'Siguiente';
+        next.style.marginLeft = '8px';
+        next.addEventListener('click', (ev)=>{ ev.preventDefault(); if(clientState.currentPage<totalPages){ clientState.currentPage++; renderTableFromData(clientState.filteredData, clientState.currentPage); } });
+        pagContainer.appendChild(next);
+    }
+
+    function applyFilters(){
+        const selValues = {
+            year: selectors.year.value,
+            month: selectors.month.value,
+            store: selectors.store.value,
+            customer: selectors.customer.value,
+            currency: selectors.currency.value,
+            docType: selectors.docType.value,
+            status: selectors.status.value
+        };
+        const filtered = fullData.filter(acc => {
+            const tipo = acc[2] || '';
+            const tienda = acc[3] || '';
+            const cliente = acc[4] || '';
+            const moneda = (acc[5] || '').toString();
+            const monto = acc[6] !== undefined ? String(acc[6]) : '';
+            const status = acc[9] || '';
+            const fecha = acc[10] || '';
+            const {year, month} = parseDateParts(fecha);
+
+            if(selValues.year !== 'ALL' && selValues.year !== year) return false;
+            if(selValues.month !== 'ALL' && selValues.month !== month) return false;
+            if(selValues.store !== 'ALL' && selValues.store !== tienda) return false;
+            if(selValues.customer !== 'ALL' && selValues.customer !== cliente) return false;
+            if(selValues.currency !== 'ALL'){
+                const norm = moneda.toUpperCase();
+                const want = selValues.currency;
+                if(want === 'USD' && !norm.includes('USD')) return false;
+                if(want === 'Bs' && !(norm.includes('BS') || norm.includes('VEF') || norm.includes('VES'))) return false;
+            }
+            if(selValues.docType !== 'ALL' && selValues.docType !== tipo) return false;
+            if(selValues.status !== 'ALL' && selValues.status !== status) return false;
+            return true;
+        });
+
+        clientState.filteredData = filtered;
+        clientState.currentPage = 1;
+        const anyFilter = Object.values(selectors).some(s => s.value && s.value !== 'ALL');
+        if(!anyFilter){
+            tbody.innerHTML = '';
+            serverRows.forEach(r => tbody.appendChild(r.cloneNode(true)));
+            if(pagContainer){ pagContainer.innerHTML = originalPaginationHTML; pagContainer.style.display = originalPaginationDisplay || ''; }
+            return;
+        }
+
+        const noResultsDiv = document.getElementById('no-results');
+        if(filtered.length === 0){
+            if(noResultsDiv) noResultsDiv.style.display = '';
+            // hide table
+            document.querySelector('.table-container').style.display = 'none';
+            if(pagContainer) pagContainer.style.display = 'none';
+            return;
+        } else {
+            if(noResultsDiv) noResultsDiv.style.display = 'none';
+            document.querySelector('.table-container').style.display = '';
+        }
+
+        renderTableFromData(filtered, 1);
+    }
+
+    const form = document.querySelector('.history-filters');
+    if(form){
+        const resetBtn = document.getElementById('reset-filters');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function() {
+                // 1. Resetear todos los selectores al valor por defecto
+                Object.values(selectors).forEach(s => s.value = 'ALL');
+
+                // 2. Limpiar visualmente el estado de "No hay resultados"
+                const noResultsDiv = document.getElementById('no-results');
+                if (noResultsDiv) noResultsDiv.style.display = 'none';
+
+                // 3. Volver a mostrar los contenedores principales
+                document.querySelector('.table-container').style.display = '';
+                const pagContainer = document.querySelector('.pagination');
+                if (pagContainer) {
+                    pagContainer.style.display = '';
+                }
+
+                // 4. Ejecutar la función de filtrado (que ahora detectará que todo es 'ALL')
+                applyFilters();
+            });
+        }
+    }
+
+    Object.values(selectors).forEach(sel => {
+        sel.addEventListener('change', () => applyFilters());
+    });
+
+    initialPopulate();
+})();
+</script>
 {% endblock %}

@@ -683,8 +683,10 @@ def accountsHistory():
                            page='accountsHistory',
                            active_page='accountsHistory',
                            accounts_history=paginated_accounts,
+                           full_accounts=all_accounts,
                            current_page=page_num,
-                           total_pages=total_pages)
+                           total_pages=total_pages,
+                           per_page=per_page)
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
