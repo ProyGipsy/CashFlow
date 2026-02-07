@@ -45,12 +45,29 @@
     margin-bottom: 20px;
 }
 
-.history-filters {
+/* .history-filters {
     display: flex;
     flex-wrap: wrap;
     gap: 15px;
     align-items: flex-end;
     justify-content: center;
+    width: 100%;
+} */
+
+.history-filters {
+    display: flex;
+    flex-direction: column; /* Apila las líneas de filtros */
+    gap: 20px; /* Espacio entre la fila 1 y la fila 2 */
+    width: 100%;
+}
+
+/* Nueva clase para cada fila de filtros */
+.filter-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px; /* Espacio horizontal entre filtros */
+    align-items: flex-end;
+    justify-content: center; /* Centra los filtros en la fila */
     width: 100%;
 }
 
@@ -68,8 +85,80 @@
     border: 1px solid #324bab;
     border-radius: 4px;
     color: #324bab;
-    min-width: 120px;
+    min-width: 100px;
     /* text-align: center; */
+}
+
+/* Contenedor principal del combo de cliente */
+.customer-combobox {
+    position: relative;
+    min-width: 250px; /* Ajusta según prefieras */
+}
+
+/* El cuadro que simula el select (cs-display) */
+.cs-display {
+    border: 1px solid #324bab; /* Color azul del tema */
+    padding: 8px 10px;
+    border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #324bab;
+    height: 38px; /* Altura similar a los select estándar */
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+/* El panel desplegable */
+.cs-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: white;
+    border: 1px solid #324bab;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    margin-top: 2px;
+    padding: 10px;
+    display: none;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* El input de búsqueda dentro del panel */
+#customer_search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+    border: 1px solid #d0ebff;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    outline: none;
+}
+
+#customer_search:focus {
+    border-color: #324bab;
+}
+
+/* Lista de resultados */
+#customer_list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+#customer_list li {
+    padding: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+#customer_list li:hover {
+    background-color: #d0ebff; /* Color celeste de tus cabeceras */
 }
 
 .btn-filter {

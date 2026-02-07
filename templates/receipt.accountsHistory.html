@@ -17,42 +17,47 @@
 
     <div class="filter-row-container">
         <form action="#" method="GET" class="history-filters">
-            <div class="filter-group">
-                <label for="year">Año:</label>
-                <select id="year" name="year">
-                </select>
+            <div class="filter-line">
+                <div class="filter-group">
+                    <label for="year">Año:</label>
+                    <select id="year" name="year"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="month">Mes:</label>
+                    <select id="month" name="month"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="store">Tienda:</label>
+                    <select id="store" name="store"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="customer">Cliente:</label>
+                    <div class="customer-combobox">
+                        <div class="cs-display" tabindex="0">Todos</div>
+                        <div class="cs-panel">
+                            <input id="customer_search" placeholder="Buscar cliente..." autocomplete="off" />
+                            <ul id="customer_list"></ul>
+                        </div>
+                        <select id="customer" name="customer" style="display:none;"></select>
+                    </div>
+                </div>
             </div>
-            <div class="filter-group">
-                <label for="month">Mes:</label>
-                <select id="month" name="month">
-                    </select>
+
+            <div class="filter-line">
+                <div class="filter-group">
+                    <label for="currency">Moneda:</label>
+                    <select id="currency" name="currency"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="docType">Tipo Doc:</label>
+                    <select id="docType" name="docType"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="status">Estatus:</label>
+                    <select id="status" name="status"></select>
+                </div>
+                <button type="button" id="reset-filters" class="btn-filter">Reiniciar</button>
             </div>
-            <div class="filter-group">
-                <label for="store">Tienda:</label>
-                <select id="store" name="store">
-                </select>
-            </div>
-            <div class="filter-group">
-                <label for="customer">Cliente:</label>
-                <select id="customer" name="customer">
-                </select>
-            </div>
-            <div class="filter-group">
-                <label for="currency">Moneda:</label>
-                <select id="currency" name="currency">
-                </select>
-            </div>
-            <div class="filter-group">
-                <label for="docType">Tipo Doc:</label>
-                <select id="docType" name="docType">
-                </select>
-            </div>
-            <div class="filter-group">
-                <label for="status">Estatus:</label>
-                <select id="status" name="status">
-                </select>
-            </div>
-            <button type="button" id="reset-filters" class="btn-filter">Reiniciar</button>
         </form>
     </div>
 
@@ -147,6 +152,11 @@
         docType: document.getElementById('docType'),
         status: document.getElementById('status')
     };
+    const customerSearchInput = document.getElementById('customer_search');
+    let fullCustomerList = [];
+    const csDisplay = document.querySelector('.cs-display');
+    const csPanel = document.querySelector('.cs-panel');
+    const customerListEl = document.getElementById('customer_list');
 
     const monthNames = {
         '01': 'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio',
@@ -263,12 +273,68 @@
         });
     }
 
+    function populateCustomerFiltered(query){
+        if(!selectors.customer) return;
+        clearSelect(selectors.customer);
+        const allOpt = new Option('Todos', 'ALL');
+        selectors.customer.add(allOpt);
+        const q = (query || '').toLowerCase().trim();
+        const source = fullCustomerList.slice();
+        const matches = q ? source.filter(c => c.toLowerCase().includes(q)) : source;
+        // populate hidden select
+        matches.forEach(v => selectors.customer.add(new Option(v, v)));
+        // populate visible list
+        if(customerListEl){
+            customerListEl.innerHTML = '';
+            // add Todos
+            const liAll = document.createElement('li');
+            liAll.textContent = 'Todos';
+            liAll.dataset.value = 'ALL';
+            liAll.style.padding = '6px 8px';
+            liAll.style.cursor = 'pointer';
+            customerListEl.appendChild(liAll);
+            liAll.addEventListener('click', function(){
+                const selVal = 'ALL';
+                selectors.customer.value = selVal;
+                if(csDisplay) csDisplay.textContent = 'Todos';
+                if(customerSearchInput) customerSearchInput.value = '';
+                if(csPanel) csPanel.style.display = 'none';
+                // repopulate to full list and restore selection
+                populateCustomerFiltered('');
+                try{ selectors.customer.value = selVal; }catch(e){}
+                applyFilters();
+            });
+
+            matches.forEach(v => {
+                const li = document.createElement('li');
+                li.textContent = v;
+                li.dataset.value = v;
+                li.style.padding = '6px 8px';
+                li.style.cursor = 'pointer';
+                customerListEl.appendChild(li);
+                li.addEventListener('click', function(){
+                    const selVal = this.dataset.value;
+                    // set selection
+                    try{ selectors.customer.value = selVal; }catch(e){}
+                    if(csDisplay) csDisplay.textContent = selVal;
+                    if(customerSearchInput) customerSearchInput.value = '';
+                    if(csPanel) csPanel.style.display = 'none';
+                    // repopulate the visible list to full after selection and restore selection
+                    populateCustomerFiltered('');
+                    try{ selectors.customer.value = selVal; }catch(e){}
+                    applyFilters();
+                });
+            });
+        }
+    }
+
     function initialPopulate(){
         const opts = collectOptionsFromRows(fullData);
         populateSelect(selectors.year, opts.years);
         populateSelect(selectors.month, opts.months, true);
         populateSelect(selectors.store, opts.stores);
         populateSelect(selectors.customer, opts.customers);
+        fullCustomerList = Array.from(opts.customers).sort();
         const currencySet = new Set();
         opts.currencies.forEach(c => {
             const normalized = String(c).toUpperCase();
@@ -321,7 +387,7 @@
 
     function renderClientPagination(count){
         if(!pagContainer) return;
-        const anyFilter = Object.values(selectors).some(s => s.value && s.value !== 'ALL');
+        const anyFilter = Object.values(selectors).some(s => s.value && s.value !== 'ALL') || (customerSearchInput && customerSearchInput.value.trim() !== '');
         if(!anyFilter){
             pagContainer.innerHTML = originalPaginationHTML;
             pagContainer.style.display = originalPaginationDisplay || '';
@@ -386,6 +452,7 @@
             docType: selectors.docType.value,
             status: selectors.status.value
         };
+        const customerSearchVal = customerSearchInput ? customerSearchInput.value.trim() : '';
         const filtered = fullData.filter(acc => {
             const tipo = acc[2] || '';
             const tienda = acc[3] || '';
@@ -399,7 +466,11 @@
             if(selValues.year !== 'ALL' && selValues.year !== year) return false;
             if(selValues.month !== 'ALL' && selValues.month !== month) return false;
             if(selValues.store !== 'ALL' && selValues.store !== tienda) return false;
-            if(selValues.customer !== 'ALL' && selValues.customer !== cliente) return false;
+            if(customerSearchVal){
+                if(!cliente.toLowerCase().includes(customerSearchVal.toLowerCase())) return false;
+            } else {
+                if(selValues.customer !== 'ALL' && selValues.customer !== cliente) return false;
+            }
             if(selValues.currency !== 'ALL'){
                 const norm = moneda.toUpperCase();
                 const want = selValues.currency;
@@ -413,7 +484,7 @@
 
         clientState.filteredData = filtered;
         clientState.currentPage = 1;
-        const anyFilter = Object.values(selectors).some(s => s.value && s.value !== 'ALL');
+        const anyFilter = Object.values(selectors).some(s => s.value && s.value !== 'ALL') || (customerSearchVal && customerSearchVal !== '');
         if(!anyFilter){
             tbody.innerHTML = '';
             serverRows.forEach(r => tbody.appendChild(r.cloneNode(true)));
@@ -443,6 +514,11 @@
             resetBtn.addEventListener('click', function() {
                 // 1. Resetear todos los selectores al valor por defecto
                 Object.values(selectors).forEach(s => s.value = 'ALL');
+                if(customerSearchInput) customerSearchInput.value = '';
+                if(csDisplay) csDisplay.textContent = 'Todos';
+                        if(csPanel) csPanel.style.display = 'none';
+                        // repoblar la lista de clientes a la lista completa
+                        populateCustomerFiltered('');
 
                 // 2. Limpiar visualmente el estado de "No hay resultados"
                 const noResultsDiv = document.getElementById('no-results');
@@ -465,7 +541,46 @@
         sel.addEventListener('change', () => applyFilters());
     });
 
+    if(customerSearchInput){
+        customerSearchInput.addEventListener('input', function(){
+            populateCustomerFiltered(this.value);
+            applyFilters();
+        });
+    }
+
+    // Toggle the custom panel when clicking the display
+    if(csDisplay){
+        csDisplay.addEventListener('click', function(e){
+            if(!csPanel) return;
+            csPanel.style.display = (csPanel.style.display === 'none' || csPanel.style.display === '') ? 'block' : 'none';
+            if(csPanel.style.display === 'block' && customerSearchInput) { customerSearchInput.focus(); }
+        });
+        csDisplay.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); csDisplay.click(); } if(e.key === 'Escape' && csPanel){ csPanel.style.display='none'; } });
+    }
+
+    // Close panel on outside click
+    document.addEventListener('click', function(e){
+        const combobox = document.querySelector('.customer-combobox');
+        if(!combobox) return;
+        if(!combobox.contains(e.target)){
+            if(csPanel) csPanel.style.display = 'none';
+        }
+    });
+
+    // Keep display synced if hidden select changes
+    if(selectors.customer){
+        selectors.customer.addEventListener('change', function(){
+            const v = this.value === 'ALL' ? 'Todos' : this.value;
+            if(csDisplay) csDisplay.textContent = v;
+        });
+    }
+
     initialPopulate();
+    if(customerSearchInput) populateCustomerFiltered('');
+    if(selectors.customer && selectors.customer.value){
+        const v = selectors.customer.value === 'ALL' ? 'Todos' : selectors.customer.value;
+        if(csDisplay) csDisplay.textContent = v;
+    }
 })();
 </script>
 {% endblock %}
