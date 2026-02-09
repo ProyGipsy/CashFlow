@@ -116,66 +116,6 @@ def get_seller_details(seller_id):
 def get_accountsHistory(salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # Versión con SyncStatus según abono en Gálac vs App
-    # cursor.execute('''
-    #                 SET LANGUAGE Spanish
-    #                 SELECT 
-    #                     D.AccountID, 
-    #                     D.N_CTA, 
-    #                     D.DocumentType,
-    #                     S.Name AS StoreName,
-    #                     C.FirstName + ' ' + C.LastName AS CustomerName,
-    #                     M.Code, 
-    #                     D.Amount, 
-    #                     Calc.EffectivePaidAmount AS PaidAmount, -- Monto según SyncStatus
-    #                     DPR.PaymentReceiptIDs,
-    #                     CASE 
-    #                         WHEN D.DocumentType = 'N/C' THEN
-    #                             CASE 
-    #                                 WHEN Calc.EffectivePaidAmount = 0 THEN 'Disponible'
-    #                                 WHEN Calc.EffectivePaidAmount >= D.Amount THEN 'Usada'
-    #                                 ELSE 'Parcialmente Usada'
-    #                             END
-    #                         ELSE
-    #                             CASE 
-    #                                 WHEN Calc.EffectivePaidAmount >= D.Amount THEN 'Pagada'
-    #                                 WHEN Calc.EffectivePaidAmount > 0 AND Calc.EffectivePaidAmount < D.Amount THEN 'Abonada'
-    #                                 ELSE 'Pendiente'
-    #                             END
-    #                     END AS PaymentStatus,
-    #                     DS.DebtSettlementDate,
-    #                     DS.CommissionPaymentDate
-    #                 FROM Commission_Receipt.DebtAccount_Copia27012026 D
-    #                 JOIN Main.Store S ON D.StoreID = S.ID 
-    #                 JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd
-    #                 JOIN Main.Currency M ON D.CurrencyID = M.ID AND D.isRetail = M.isRetail
-    #                 CROSS APPLY (
-    #                     SELECT CASE 
-    #                         WHEN D.SyncStatusID IN (1, 2) THEN D.AppPaidAmount
-    #                         WHEN D.SyncStatusID = 3 THEN D.GalacPaidAmount
-    #                         ELSE D.AppPaidAmount 
-    #                     END AS EffectivePaidAmount
-    #                 ) AS Calc
-    #                 LEFT JOIN (
-    #                     SELECT 
-    #                         DebtAccountID,
-    #                         STRING_AGG(PaymentReceiptID, ', ') AS PaymentReceiptIDs
-    #                     FROM Commission_Receipt.DebtPaymentRelation
-    #                     GROUP BY DebtAccountID
-    #                 ) DPR ON D.AccountID = DPR.DebtAccountID
-    #                 LEFT JOIN (
-    #                     SELECT 
-    #                         AccountID,
-    #                         FORMAT(MAX(CompletionDate), 'yyyy-MM-dd') AS DebtSettlementDate,
-    #                         DATENAME(month, MAX(CompletionDate)) AS CommissionPaymentDate
-    #                     FROM Commission_Receipt.DebtSettlement
-    #                     GROUP BY AccountID
-    #                 ) DS ON D.AccountID = DS.AccountID
-    #                 WHERE D.SalesRepID = %s
-    #                 ORDER BY DS.DebtSettlementDate DESC, D.N_CTA;
-    #                ''', (salesRep_id,))
-
     # Versión con DebtAccount anterior (sin SyncStatus)
     cursor.execute('''
                     SET LANGUAGE Spanish
@@ -205,7 +145,7 @@ def get_accountsHistory(salesRep_id):
                         END AS PaymentStatus,
                         DS.DebtSettlementDate,
                         DS.CommissionPaymentDate
-                    FROM Commission_Receipt.DebtAccount D
+                    FROM Commission_Receipt.DebtAccount_Copia27012026 D
                     JOIN Main.Store S ON D.StoreID = S.ID 
                     JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd
                     JOIN Main.Currency M ON D.CurrencyID = M.ID AND D.isRetail = M.isRetail
@@ -224,7 +164,7 @@ def get_accountsHistory(salesRep_id):
                         FROM Commission_Receipt.DebtSettlement
                         GROUP BY AccountID
                     ) DS ON D.AccountID = DS.AccountID
-                    WHERE D.SalesRepID = %s
+                    WHERE GalacCxcStatus NOT IN ('ANU') AND D.SalesRepID = %s
                     ORDER BY DS.DebtSettlementDate DESC, D.N_CTA;
                    ''', (salesRep_id,))
     accounts_history = cursor.fetchall()
