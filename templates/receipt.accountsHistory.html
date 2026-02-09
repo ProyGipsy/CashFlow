@@ -84,8 +84,8 @@
                     <td>{{ account[2] }}</td>
                     <td>{{ account[3] }}</td>
                     <td>{{ account[4] }}</td>
-                    <td>{{ account[5] }} {{account[6] }}</td>
-                    <td>{{ account[5] }} {{ account[7] }}</td>
+                    <td>{{ account[5] }} {{ "{:,.2f}".format(account[6]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
+                    <td>{{ account[5] }} {{ "{:,.2f}".format(account[7]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
                     <td>{{ account[8] }}</td>
                     <td>
                         {% set status_class = '' %}
@@ -166,6 +166,16 @@
     const table = document.querySelector('.table-container table');
     const tbody = table && table.tBodies[0];
     if(!tbody) return;
+
+    // Función para formatear números a estilo español (1.234,56)
+    function formatMoneySpanish(amount) {
+        if (amount === null || amount === undefined) return "0,00";
+        
+        return new Intl.NumberFormat('es-ES', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(amount);
+    }
 
     // Full dataset provided by server (unpaginated)
     const fullData = {{ full_accounts|tojson | safe }} || [];
@@ -364,8 +374,8 @@
             tr.appendChild(td(account[2])); // Tipo
             tr.appendChild(td(account[3])); // Tienda
             tr.appendChild(td(account[4])); // Cliente
-            tr.appendChild(td((account[5] || '') + ' ' + (account[6] !== undefined ? account[6] : '')));
-            tr.appendChild(td((account[5] || '') + ' ' + (account[7] !== undefined ? account[7] : '')));
+            tr.appendChild(td((account[5] || '') + ' ' + (formatMoneySpanish(account[6]) !== undefined ? formatMoneySpanish(account[6]) : '')));
+            tr.appendChild(td((account[5] || '') + ' ' + (formatMoneySpanish(account[7]) !== undefined ? formatMoneySpanish(account[7]) : '')));
             tr.appendChild(td(account[8]));
             const statusTd = document.createElement('td');
             const span = document.createElement('span');
