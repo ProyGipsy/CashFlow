@@ -1362,7 +1362,7 @@ def send_validationEmail():
         # Actualizar el estado de la sincronización
         diff = app_paid_amount - galac_paid_amount
         print("Diferencia:", diff)
-        if diff == 0: # MATCHED. StatusID 1
+        if abs(diff) <= 0.01: # MATCHED. StatusID 1
             syncStatus = 1
         elif diff > 0.01: # APP_AHEAD. StatusID 2
             syncStatus = 2

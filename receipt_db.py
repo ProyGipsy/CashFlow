@@ -30,7 +30,7 @@ def get_receiptStores_Sellers():
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT T.ID, T.Name
                     FROM Main.Store T
-                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON T.ID = D.StoreID
+                    JOIN Commission_Receipt.DebtAccount D ON T.ID = D.StoreID
                     JOIN Commission_Receipt.SalesRep S ON D.SalesRepID = S.ID
                     WHERE T.ID != 0 AND S.isRetail = 0
                     ORDER BY T.ID;''')
@@ -43,7 +43,7 @@ def get_receiptStores_DebtAccount(salesRep_id):
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT S.ID, S.Name
                     FROM Main.Store S
-                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON S.ID = D.StoreID
+                    JOIN Commission_Receipt.DebtAccount D ON S.ID = D.StoreID
                     WHERE S.ID != 0 AND D.GalacCxcStatus IN ('ABO', 'P/C')
                     AND D.SalesRepID = %s
                     AND (
@@ -62,7 +62,7 @@ def get_receiptStores_DebtAccount_admin():
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT S.ID, S.Name
                     FROM Main.Store S
-                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON S.ID = D.StoreID
+                    JOIN Commission_Receipt.DebtAccount D ON S.ID = D.StoreID
                     WHERE S.ID != 0 AND D.GalacCxcStatus IN ('ABO', 'P/C')
                     AND (
                         (D.Amount - D.AppPaidAmount > 0) 
@@ -80,7 +80,7 @@ def get_receiptStores_Receipts():
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT(S.ID), S.Name
                     FROM Main.Store S
-                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON S.ID = D.StoreID
+                    JOIN Commission_Receipt.DebtAccount D ON S.ID = D.StoreID
                     JOIN Commission_Receipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID
                     JOIN Commission_Receipt.PaymentReceipt P ON R.PaymentReceiptID = P.ReceiptID
                     WHERE P.IsReviewed = 0''')
@@ -101,7 +101,7 @@ def get_sellers(store_id):
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT S.ID, S.Name
                     FROM Commission_Receipt.SalesRep S
-                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON S.ID = D.SalesRepID
+                    JOIN Commission_Receipt.DebtAccount D ON S.ID = D.SalesRepID
                     WHERE S.isRetail = 0 AND D.StoreID = %s
                     ORDER BY S.ID''', (store_id,))
     sellers = cursor.fetchall()
@@ -113,7 +113,7 @@ def get_count_sellers(store_id):
     cursor = conn.cursor()
     cursor.execute('''SELECT COUNT(DISTINCT(S.ID))
                     FROM Commission_Receipt.SalesRep S
-                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON S.ID = D.SalesRepID
+                    JOIN Commission_Receipt.DebtAccount D ON S.ID = D.SalesRepID
                     WHERE S.isRetail = 0 AND D.StoreID = %s''', (store_id,))
     sellers = cursor.fetchone()[0]
     conn.close()
@@ -144,7 +144,7 @@ def get_customers(store_id, salesRep_id):
     cursor.execute('''
                     SELECT C.ID, C.FirstName, C.LastName, C.isRembd
                     FROM Commission_Receipt.Customer C
-                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D 
+                    JOIN Commission_Receipt.DebtAccount D 
                         ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
                     WHERE C.isRetail = 0
                     AND D.StoreID = %s 
@@ -166,7 +166,7 @@ def get_customers_admin(store_id):
     cursor.execute('''
                     SELECT C.ID, C.FirstName, C.LastName, C.isRembd
                     FROM Commission_Receipt.Customer C
-                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D 
+                    JOIN Commission_Receipt.DebtAccount D 
                         ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
                     WHERE C.isRetail = 0
                     AND D.StoreID = %s 
@@ -190,8 +190,8 @@ def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
                         SELECT 
                             D.CurrencyID,
                             COUNT(DISTINCT D.CustomerID) AS CountCustomers,
-                            SUM(D.Amount - D.AppPaidAmountsyn) AS Balance
-                        FROM Commission_Receipt.DebtAccount_Copia27012026 D
+                            SUM(D.Amount - D.AppPaidAmount) AS Balance
+                        FROM Commission_Receipt.DebtAccount D
                         WHERE D.StoreID = %s 
                         AND D.SalesRepID = %s 
                         AND D.GalacCxcStatus IN ('ABO', 'P/C')
@@ -219,7 +219,7 @@ def get_count_customers_with_accountsReceivable_admin(store_id):
                             D.CurrencyID,
                             COUNT(DISTINCT D.CustomerID) AS CountCustomers,
                             SUM(D.Amount - D.AppPaidAmount) AS Balance
-                        FROM Commission_Receipt.DebtAccount_Copia27012026 D
+                        FROM Commission_Receipt.DebtAccount D
                         WHERE D.StoreID = %s 
                         AND D.GalacCxcStatus IN ('ABO', 'P/C')
                         AND (
@@ -242,7 +242,7 @@ def get_customers_with_unvalidated_receipts(store_id):
     cursor.execute('''
             SELECT DISTINCT C.ID, C.FirstName, C.LastName, C.isRembd
             FROM Commission_Receipt.Customer C
-            JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
+            JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
             JOIN Commission_Receipt.DebtPaymentRelation P ON D.AccountID = P.DebtAccountID
             JOIN Commission_Receipt.PaymentReceipt R ON P.PaymentReceiptID = R.ReceiptID
             WHERE  C.isRetail = 0 AND R.IsReviewed = 0 AND D.StoreID = %s
@@ -258,7 +258,7 @@ def get_count_customers_with_unvalidated_receipts(store_id):
     cursor.execute('''
         SELECT COUNT(DISTINCT CONCAT(CAST(C.ID AS NVARCHAR), CAST(C.isRembd AS NVARCHAR))) AS CustomerCount
         FROM Commission_Receipt.Customer C
-        JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
+        JOIN Commission_Receipt.DebtAccount D ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
         JOIN Commission_Receipt.DebtPaymentRelation P ON D.AccountID = P.DebtAccountID
         JOIN Commission_Receipt.PaymentReceipt R ON P.PaymentReceiptID = R.ReceiptID
         WHERE C.isRetail = 0 AND R.IsReviewed = 0 AND D.StoreID = %s
@@ -336,7 +336,7 @@ def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_i
     cursor.execute('''SELECT DISTINCT D.AccountID, D.N_CTA, D.Amount, 
                         D.AppPaidAmount AS PaidAmount, -- Se muestra el monto según el SyncStatus
                         C.Description, D.DocumentType, D.SyncStatusID
-                    FROM Commission_Receipt.DebtAccount_Copia27012026 D
+                    FROM Commission_Receipt.DebtAccount D
                     JOIN Main.Currency C ON D.CurrencyID = C.ID
                     WHERE D.CustomerID = %s 
                     AND D.isRembd = %s 
@@ -360,7 +360,7 @@ def get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id):
     cursor.execute('''SELECT DISTINCT D.AccountID, D.N_CTA, D.Amount, 
                         D.AppPaidAmount AS PaidAmount, -- Se muestra el monto según el SyncStatus
                         C.Description, D.DocumentType, D.SyncStatusID
-                    FROM Commission_Receipt.DebtAccount_Copia27012026 D
+                    FROM Commission_Receipt.DebtAccount D
                     JOIN Main.Currency C ON D.CurrencyID = C.ID
                     WHERE D.CustomerID = %s 
                     AND D.isRembd = %s 
@@ -382,7 +382,7 @@ def get_receiptsStoreCustomer(account_ids):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''SELECT TOP (1) S.ID, S.Name, C.ID, C.FirstName, C.LastName, Y.Description, Y.ID
-                   FROM Commission_Receipt.DebtAccount_Copia27012026 D
+                   FROM Commission_Receipt.DebtAccount D
                    JOIN Main.Store S ON D.StoreID = S.ID
                    JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd
                    JOIN Main.Currency Y ON D.CurrencyID = Y.ID
@@ -397,7 +397,7 @@ def get_receiptsInfo(account_ids):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''SELECT D.N_CTA, D.Amount, D.InvoiceIssueDate, D.DueDate, D.AppPaidAmount, D.AccountID, D.DocumentType
-                   FROM Commission_Receipt.DebtAccount_Copia27012026 D
+                   FROM Commission_Receipt.DebtAccount D
                    WHERE AccountID IN %s
                    ORDER BY D.DueDate''',
                    (account_ids_tuple,))
@@ -419,7 +419,7 @@ def get_unvalidated_receipts_by_customer(customer_id, customer_isRembd):
     cursor.execute('''SELECT DISTINCT(R.ReceiptID), R.Amount, R.CommissionAmount_Bs, R.CommissionAmount_USD, R.IsReviewed
         FROM Commission_Receipt.PaymentReceipt R
         JOIN Commission_Receipt.DebtPaymentRelation P ON R.ReceiptID = P.PaymentReceiptID
-        JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON P.DebtAccountID = D.AccountID
+        JOIN Commission_Receipt.DebtAccount D ON P.DebtAccountID = D.AccountID
         WHERE R.IsReviewed = 0 AND D.CustomerID = %s AND D.isRembd = %s
         ''', (customer_id, customer_isRembd))
     receipts = cursor.fetchall()
@@ -430,7 +430,7 @@ def get_invoices_by_receipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT(D.N_CTA), D.Amount, D.DueDate, D.DueDate, D.AppPaidAmount, D.AccountID, C.Description, D.SalesRepID, D.DocumentType, D.GalacPaidAmount
-                    FROM Commission_Receipt.DebtAccount_Copia27012026 D
+                    FROM Commission_Receipt.DebtAccount D
                     JOIN Commission_Receipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID
                     JOIN Main.Currency C ON D.CurrencyID = C.ID
                     WHERE R.PaymentReceiptID = %s
@@ -458,7 +458,7 @@ def get_salesRep_isRetail(account_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''SELECT SalesRepID, IsRetail 
-                    FROM Commission_Receipt.DebtAccount_Copia27012026
+                    FROM Commission_Receipt.DebtAccount
                     WHERE AccountID = %s
                     ''', (account_id,))
     salesRep_isRetail = cursor.fetchone()
@@ -470,7 +470,7 @@ def get_SalesRepCommission(receipt_id):
     cursor = conn.cursor()
     cursor.execute('''SELECT D.N_CTA, C.AmountOwed, STRING_AGG(CAST(P.DaysElapsed AS NVARCHAR(MAX)), ' / ') AS DaysElapsed, C.CommissionAmount_Bs, C.CommissionAmount_USD, P.DebtAccountID
                     FROM Commission_Receipt.SalesRepCommission C
-                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON C.AccountID = D.AccountID
+                    JOIN Commission_Receipt.DebtAccount D ON C.AccountID = D.AccountID
 					JOIN Commission_Receipt.PaymentEntryCommission P ON C.AccountID = P.DebtAccountID AND C.ReceiptID = P.ReceiptID
                     WHERE C.ReceiptID = %s
 					GROUP BY D.N_CTA, C.AmountOwed, C.CommissionAmount_Bs, C.CommissionAmount_USD, P.DebtAccountID
@@ -484,7 +484,7 @@ def get_SalesRepCommission_OLD(receipt_id):
     cursor = conn.cursor()
     cursor.execute('''SELECT D.N_CTA, C.AmountOwed, C.DaysElapsed, C.CommissionAmount
                     FROM Commission_Receipt.SalesRepCommission C
-                    JOIN Commission_Receipt.DebtAccount_Copia27012026 D ON C.AccountID = D.AccountID
+                    JOIN Commission_Receipt.DebtAccount D ON C.AccountID = D.AccountID
                     WHERE ReceiptID = %s
                     ''', (receipt_id,))
     salesRepComm = cursor.fetchall()
@@ -588,7 +588,7 @@ def get_invoiceCurrentPaidAmount(account_id):
     cursor = conn.cursor()
     cursor.execute('''
         SELECT AppPaidAmount, Amount 
-        FROM Commission_Receipt.DebtAccount_Copia27012026
+        FROM Commission_Receipt.DebtAccount
         WHERE AccountID = %s
     ''', (account_id,))
     paid_amount = cursor.fetchone()
@@ -713,7 +713,7 @@ def set_SyncStatus(account_id, sync_status):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-                   UPDATE Commission_Receipt.DebtAccount_Copia27012026
+                   UPDATE Commission_Receipt.DebtAccount
                    SET SyncStatusID = %s
                    WHERE AccountID = %s
                    ''', (sync_status, account_id))
@@ -723,7 +723,7 @@ def set_SyncStatus(account_id, sync_status):
 def set_invoicePaidAmount(cursor, account_id, amount_to_add):
     print("Estoy en set_invoicePaidAmount")
     cursor.execute('''
-                   UPDATE Commission_Receipt.DebtAccount_Copia27012026
+                   UPDATE Commission_Receipt.DebtAccount
                    SET AppPaidAmount = AppPaidAmount + %s
                    WHERE AccountID = %s
                    ''', (amount_to_add, account_id))
@@ -733,7 +733,7 @@ def revert_invoicePaidAmount(account_id, new_AppPaidAmount):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        UPDATE Commission_Receipt.DebtAccount_Copia27012026
+        UPDATE Commission_Receipt.DebtAccount
         SET AppPaidAmount = %s
         WHERE AccountID = %s
     ''', (new_AppPaidAmount, account_id))
@@ -829,7 +829,7 @@ def check_already_paid_invoices(cursor, account_ids):
     placeholders = ','.join(['%s'] * len(account_ids))
     query = f'''
         SELECT da.AccountID, da.AppPaidAmount, da.Amount, da.DocumentType
-        FROM Commission_Receipt.DebtAccount_Copia27012026 da
+        FROM Commission_Receipt.DebtAccount da
         WHERE da.AccountID IN ({placeholders})
         AND da.AppPaidAmount >= da.Amount
     '''
