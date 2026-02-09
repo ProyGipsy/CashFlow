@@ -43,37 +43,57 @@
 {% block extra_js %}
 <script>
 function filterTable(searchTerm) {
+    const lowerSearch = searchTerm.toLowerCase();
     const companyButtons = document.querySelectorAll('.company-name');
+
     companyButtons.forEach(button => {
         const storeName = button.textContent.toLowerCase();
+        // Extraemos el ID del store del atributo onclick
         const storeId = button.getAttribute('onclick').match(/'([^']+)'/)[1];
         const sellersDiv = document.getElementById('sellers-' + storeId);
-        const sellers = sellersDiv.getElementsByTagName('p');
+        
+        // Seleccionamos los contenedores que tienen al vendedor y su separador (<hr>)
+        const sellerContainers = sellersDiv.querySelectorAll('.customer-container');
 
-        let storeMatches = storeName.includes(searchTerm.toLowerCase());
-        let sellerMatches = false;
+        let storeMatches = storeName.includes(lowerSearch);
+        let anySellerMatches = false;
 
-        // Mostrar u ocultar vendedores según el término de búsqueda
-        for (let seller of sellers) {
-            const sellerName = seller.textContent.toLowerCase();
-            if (sellerName.includes(searchTerm.toLowerCase())) {
-                sellerMatches = true;
-                seller.style.display = '';
+        sellerContainers.forEach(container => {
+            // Buscamos el texto dentro del <p> que está dentro del contenedor
+            const sellerText = container.querySelector('p').textContent.toLowerCase();
+            
+            if (sellerText.includes(lowerSearch)) {
+                anySellerMatches = true;
+                container.style.display = ''; // Muestra contenedor + hr
             } else {
-                seller.style.display = 'none';
+                container.style.display = 'none'; // Oculta contenedor + hr
             }
-        }
+        });
 
-        // Mostrar u ocultar la tienda según si coincide con el término de búsqueda o tiene vendedores que coincidan
-        if (storeMatches || sellerMatches) {
+        // Lógica de visibilidad de la tienda (Botón principal)
+        if (storeMatches || anySellerMatches) {
             button.style.display = '';
-            sellersDiv.style.display = 'block';
+            
+            // Si el usuario escribió algo y hay coincidencia, expandimos el acordeón
+            if (lowerSearch.length > 0) {
+                sellersDiv.style.display = 'block';
+                
+                // Si la tienda coincide por nombre pero no hay vendedores que coincidan individualmente,
+                // mostramos todos los vendedores de esa tienda para que no quede vacía.
+                if (storeMatches && !anySellerMatches) {
+                    sellerContainers.forEach(c => c.style.display = '');
+                }
+            } else {
+                // Si el buscador está vacío, colapsamos las listas (comportamiento original)
+                sellersDiv.style.display = 'none';
+            }
         } else {
+            // Si nada coincide, ocultamos todo el bloque
             button.style.display = 'none';
-            sellersDiv.style.display = 'none'
+            sellersDiv.style.display = 'none';
         }
     });
-}   
+}
 
 function toggleSellers(storeId) {
     const sellersDiv = document.getElementById('sellers-' + storeId);

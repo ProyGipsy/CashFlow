@@ -103,7 +103,8 @@ from receipt_db import (
     check_already_paid_invoices, 
     check_duplicate_receipt,
     set_DebtSettlement,
-    get_all_related_receipts
+    get_all_related_receipts,
+    set_SyncStatus
     )
     
 from accessControl import (
@@ -168,6 +169,19 @@ app.config['MAIL_PORT'] = os.environ.get('MAIL_PORT')
 app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
 
 serializer = URLSafeTimedSerializer(app.secret_key)
+
+# Variables de Mantenimiento para toda la app, inyectadas en el contexto de Jinja para su uso en templates
+@app.context_processor
+def inject_maintenance_vars():
+    return {
+        'MAINTENANCE': {
+            'APP': os.environ.get('MAINTENANCE_MODE_APP', 'OFF'),
+            'CASHFLOW': os.environ.get('MAINTENANCE_MODE_CASHFLOW', 'OFF'),
+            'PAYMENTRECEIPT': os.environ.get('MAINTENANCE_MODE_PAYMENTRECEIPT', 'OFF'),
+            'REPORTS': os.environ.get('MAINTENANCE_MODE_REPORTS', 'OFF'),
+            'DOCUMENTS': os.environ.get('MAINTENANCE_MODE_DOCUMENTS', 'OFF')
+        }
+    }
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -666,24 +680,30 @@ def homeSeller():
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
-    if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    print(session['roles']);
+    # if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    if (0 in session['roles'] and 1 in session['roles']):
+        isAdmin = True
         stores = get_receiptStores_DebtAccount_admin()
         customers_by_store = {store[0]: get_customers_admin(store[0]) for store in stores}
         count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable_admin(store[0]) for store in stores}
     else:
+        isAdmin = False
         stores = get_receiptStores_DebtAccount(session['salesRep_id'])
         customers_by_store = {store[0]: get_customers(store[0], session['salesRep_id']) for store in stores}
         count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable(store[0], session['salesRep_id']) for store in stores}
     return render_template('receipt.accountsReceivable.html',
                            page='accountsReceivable',
                            active_page='accountsReceivable',
+                           isAdmin=isAdmin,
                            stores=stores,
                            customers_by_store=customers_by_store,
                            count_customers_by_store=count_customers_by_store)
 
 @app.route('/get_invoices/<customer_id>/<customer_isRembd>/<store_id>')
 def get_invoices(customer_id, customer_isRembd, store_id):
-    if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    # if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    if (0 in session['roles'] and 1 in session['roles']):
         invoices = get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id)
     else: 
         invoices = get_invoices_by_customer(customer_id, customer_isRembd, store_id, session['salesRep_id'])
@@ -697,7 +717,8 @@ def get_invoices(customer_id, customer_isRembd, store_id):
             'IVA': 0,
             'Remaining': float(invoice[2] - invoice[3]),
             'Currency': invoice[4],
-            'DocumentType': invoice[5]
+            'DocumentType': invoice[5],
+            'SyncStatus': invoice[6]
         } for invoice in invoices
     ]
     return jsonify({'invoices': formatted_invoices})
@@ -1327,12 +1348,31 @@ def send_validationEmail():
     set_isReviewedReceipt(receipt_id)
     set_isApprovedReceipt(receipt_id)
 
-    # Si el recibo validado paga la totalidad de una factura, se registra en DebtSettlement
+    # Para cada factura asociada al recibo:
+    # - Se verifica y actualiza su estado respecto al sistema fuente GáLac
+    # - Si el recibo validado paga la totalidad de una factura, se registra en DebtSettlement
     for invoice in invoices:
         total_debt = invoice[1]
-        paid_amount = invoice[4]
+        app_paid_amount = invoice[4]
+        print("APP Paid Amount:", app_paid_amount)
         account_id = invoice[5]
-        if(total_debt == paid_amount):
+        galac_paid_amount = invoice[9]
+        print("GáLac Paid Amount:", galac_paid_amount)
+
+        # Actualizar el estado de la sincronización
+        diff = app_paid_amount - galac_paid_amount
+        print("Diferencia:", diff)
+        if abs(diff) <= 0.01: # MATCHED. StatusID 1
+            syncStatus = 1
+        elif diff > 0.01: # APP_AHEAD. StatusID 2
+            syncStatus = 2
+        elif diff < -0.01: # GALAC_AHEAD. StatusID 3
+            syncStatus = 3
+        print("Sync Status:", syncStatus)
+        set_SyncStatus(account_id, syncStatus)
+
+        # Facturas pagadas en su totalidad
+        if(total_debt == app_paid_amount):
             related_receipt_ids = get_all_related_receipts(account_id)
             for r_id in related_receipt_ids:
                 set_DebtSettlement(account_id, r_id)
