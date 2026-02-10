@@ -47,6 +47,7 @@
             <td><p>{{ receiptStoreCustomer[5] }} {{ "{:,.2f}".format(receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
             <td class="hidden-column">
                 <input type="hidden" name="account_id[]" value="{{ receipt[5] }}" />
+                <input type="hidden" name="issue_date[]" value="{{ receipt[2].strftime('%Y-%m-%d') }}" />
             </td>
         </tr> 
         {% endfor %}
@@ -393,9 +394,14 @@
         const month = String(today.getMonth() + 1).padStart(2, '0');
         const year = today.getFullYear();
         const maxDate = `${year}-${month}-${day}`;
-        dateInput.setAttribute("max", maxDate);
 
         document.getElementById('payment-table').appendChild(newPagoRow);
+
+        // Obtener la fecha mínima (más antigua de las fechas de emisión)
+        const minDate = getEarliestIssueDate();
+
+        dateInput.setAttribute("max", maxDate);
+        dateInput.setAttribute("min", minDate);
 
         // Carga de tenders default
         const defaultCurrencyId = '1';
@@ -413,6 +419,73 @@
         // Aplicar deshabilitación global en la nueva fila en caso de que aplique
         applyGlobalRetentionDisableToRows();
     });
+
+    // Función para obtener la fecha de emisión más temprana de todas las facturas
+    function getEarliestIssueDate() {
+        const issueDateInputs = document.querySelectorAll('input[name="issue_date[]"]');
+        let earliestDate = null;
+        
+        issueDateInputs.forEach(input => {
+            const dateStr = input.value;
+            if (dateStr) {
+                const date = new Date(dateStr);
+                if (!earliestDate || date < earliestDate) {
+                    earliestDate = date;
+                }
+            }
+        });
+        
+        if (!earliestDate) {
+            // Si no hay fechas, usar fecha actual menos 30 días como fallback
+            earliestDate = new Date();
+            earliestDate.setDate(earliestDate.getDate() - 30);
+        }
+        earliestDate.setDate(earliestDate.getDate() + 1);
+        
+        // Formatear a YYYY-MM-DD
+        const year = earliestDate.getFullYear();
+        const month = String(earliestDate.getMonth() + 1).padStart(2, '0');
+        const day = String(earliestDate.getDate()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}`;
+    }
+
+    // Función para formatear fecha para mostrar
+    function formatDateForDisplay(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
+    }
+
+    // Función para validar una fecha de pago específica
+    function validatePaymentDate(dateStr, row) {
+        if (!dateStr) return { isValid: true, message: '' };
+        
+        const paymentDate = new Date(dateStr);
+        const today = new Date();
+        const earliestIssueDate = new Date(getEarliestIssueDate());
+        
+        // Verificar que no sea mayor a hoy
+        if (paymentDate > today) {
+            return { 
+                isValid: false, 
+                message: 'La fecha de pago no puede ser mayor al día actual' 
+            };
+        }
+        
+        // Verificar que no sea menor a la fecha de emisión más temprana
+        if (paymentDate < earliestIssueDate) {
+            return { 
+                isValid: false, 
+                message: `La fecha de pago no puede ser anterior a ${formatDateForDisplay(earliestIssueDate.toISOString().split('T')[0])} (fecha de emisión más temprana)` 
+            };
+        }
+        
+        return { isValid: true, message: '' };
+    }
 
     function deleteRow(btn) {
         const row = btn.parentNode.parentNode;
@@ -601,9 +674,13 @@
         const year = today.getFullYear();
         const maxDate = `${year}-${month}-${day}`;
 
+        // Obtener fecha mínima basada en fechas de emisión
+        const minDate = getEarliestIssueDate();
+
         const firstDateInput = document.querySelector('input[name="date_operation"]');
         if (firstDateInput) {
             firstDateInput.setAttribute("max", maxDate);
+            firstDateInput.setAttribute("min", minDate);
         }
 
         addInputListeners();
