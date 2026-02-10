@@ -1358,7 +1358,7 @@ def send_validationEmail():
         print("APP Paid Amount:", app_paid_amount)
         account_id = invoice[5]
         galac_paid_amount = invoice[9]
-        print("GáLac Paid Amount:", galac_paid_amount)
+        print("Gálac Paid Amount:", galac_paid_amount)
 
         # Actualizar el estado de la sincronización
         diff = app_paid_amount - galac_paid_amount
