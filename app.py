@@ -104,6 +104,7 @@ from receipt_db import (
     check_duplicate_receipt,
     set_DebtSettlement,
     get_all_related_receipts,
+    set_SyncStatus,
     get_accountsHistory,
     get_accountsHistory_admin
     )
