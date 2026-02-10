@@ -1219,8 +1219,6 @@ def send_rejectionEmail():
     ncta_list = [str(invoice[0]) for invoice in invoices]
     ncta_str = ", ".join(ncta_list)
 
-    set_isReviewedReceipt(receipt_id)
-
     # Revirtiendo monto abonado
     try:
         payment_relations = get_paymentRelations_by_receipt(receipt_id)
@@ -1243,6 +1241,9 @@ def send_rejectionEmail():
     except Exception as e:
         app.logger.error(f"Error al revertir pagos: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
+    
+    # Marcando como revisado (y rechazado)
+    set_isReviewedReceipt(receipt_id)
 
     rejection_reason = request.form.get('rejection_reason', '')
     rejection_reason_html = "<br>".join(line.strip() for line in rejection_reason.split('\n') if line.strip())

@@ -575,7 +575,7 @@ def get_paymentRelations_by_receipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT DebtAccountID, AppPaidAmount 
+        SELECT DebtAccountID, PaidAmount 
         FROM Commission_Receipt.DebtPaymentRelation
         WHERE PaymentReceiptID = %s
     ''', (receipt_id,))
@@ -729,25 +729,25 @@ def set_invoicePaidAmount(cursor, account_id, amount_to_add):
                    ''', (amount_to_add, account_id))
     
 
-def revert_invoicePaidAmount(account_id, new_AppPaidAmount):
+def revert_invoicePaidAmount(account_id, new_PaidAmount):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE Commission_Receipt.DebtAccount
         SET AppPaidAmount = %s
         WHERE AccountID = %s
-    ''', (new_AppPaidAmount, account_id))
+    ''', (new_PaidAmount, account_id))
     conn.commit()
     conn.close()
     
 
-def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_AppPaidAmount):
+def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_PaidAmount):
     print("Estoy en set_DebtPaymentRelation")
     cursor.execute('''
                     INSERT INTO Commission_Receipt.DebtPaymentRelation
-                    (DebtAccountID, PaymentReceiptID, isRetail, AppPaidAmount)
+                    (DebtAccountID, PaymentReceiptID, isRetail, PaidAmount)
                     VALUES (%s, %s, %s, %s)
-                    ''', (account_id, int(receipt_id), 0, invoice_AppPaidAmount))
+                    ''', (account_id, int(receipt_id), 0, invoice_PaidAmount))
 
 
 def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission):
@@ -912,7 +912,7 @@ def check_duplicate_receipt(cursor, account_ids, invoice_paid_amounts, payment_e
         for rid in candidate_receipts:
             # Obtener relaciones y comparar
             rels = []
-            cursor.execute('''SELECT DebtAccountID, AppPaidAmount FROM Commission_Receipt.DebtPaymentRelation WHERE PaymentReceiptID = %s''', (rid,))
+            cursor.execute('''SELECT DebtAccountID, PaidAmount FROM Commission_Receipt.DebtPaymentRelation WHERE PaymentReceiptID = %s''', (rid,))
             rel_rows = cursor.fetchall()
             rel_map = {str(r[0]): round(float(r[1]), 2) for r in rel_rows}
 
