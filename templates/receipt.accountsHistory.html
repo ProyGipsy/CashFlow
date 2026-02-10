@@ -86,7 +86,7 @@
                     <td>{{ account[4] }}</td>
                     <td>{{ account[5] }} {{ "{:,.2f}".format(account[6]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
                     <td>{{ account[5] }} {{ "{:,.2f}".format(account[7]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
-                    <td>{{ account[8] }}</td>
+                    <td>{{ account[8] | default('', true) }}</td>
                     <td>
                         {% set status_class = '' %}
                         {% if account[9] in ['Pagada', 'Usada'] %}
@@ -179,7 +179,7 @@
 
     // Full dataset provided by server (unpaginated)
     const fullData = {{ full_accounts|tojson | safe }} || [];
-    const PER_PAGE = {{ per_page }} || 50;
+    const PER_PAGE = {{ per_page }} || 30;
 
     // Rows for the initially rendered server page (kept for initial view)
     const serverRows = Array.from(tbody.rows);
@@ -395,43 +395,27 @@
         renderClientPagination(data.length);
     }
 
-    function renderClientPagination(count){
-        if(!pagContainer) return;
-        const anyFilter = Object.values(selectors).some(s => s.value && s.value !== 'ALL') || (customerSearchInput && customerSearchInput.value.trim() !== '');
-        if(!anyFilter){
-            pagContainer.innerHTML = originalPaginationHTML;
-            pagContainer.style.display = originalPaginationDisplay || '';
-            return;
-        }
-        if(count <= PER_PAGE){
+    function renderClientPagination(count) {
+        if (!pagContainer) return;
+
+        const totalPages = Math.ceil(count / PER_PAGE);
+
+        // Si no hay nada que mostrar o solo hay una página, ocultamos y salimos
+        if (count <= PER_PAGE) {
             pagContainer.style.display = 'none';
             return;
         }
+
         pagContainer.style.display = '';
-        const totalPages = Math.ceil(count / PER_PAGE);
         pagContainer.innerHTML = '';
+        const current = clientState.currentPage;
 
-        const prev = document.createElement('a');
-        prev.href = '#';
-        prev.textContent = 'Anterior';
-        prev.style.marginRight = '8px';
-        prev.addEventListener('click', (ev)=>{ ev.preventDefault(); if(clientState.currentPage>1){ clientState.currentPage--; renderTableFromData(clientState.filteredData, clientState.currentPage); } });
-        pagContainer.appendChild(prev);
-
-        const maxButtons = 10;
-        let startPage = Math.max(1, clientState.currentPage - Math.floor(maxButtons/2));
-        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-        if(endPage - startPage + 1 < maxButtons){ startPage = Math.max(1, endPage - maxButtons + 1); }
-
-        for(let p=startPage;p<=endPage;p++){
-            if(p === clientState.currentPage){
+        // Helper para crear botones
+        const addPage = (p) => {
+            if (p === current) {
                 const span = document.createElement('span');
                 span.className = 'active a';
-                span.style.padding = '8px 12px';
-                span.style.background = '#324bab';
-                span.style.color = 'white';
-                span.style.borderRadius = '4px';
-                span.style.marginRight = '6px';
+                span.style.cssText = 'padding: 8px 12px; background: #324bab; color: white; border-radius: 4px; margin-right: 6px;';
                 span.textContent = p;
                 pagContainer.appendChild(span);
             } else {
@@ -439,17 +423,76 @@
                 a.href = '#';
                 a.style.marginRight = '6px';
                 a.textContent = p;
-                a.addEventListener('click', (ev)=>{ ev.preventDefault(); clientState.currentPage = p; renderTableFromData(clientState.filteredData, p); });
+                a.onclick = (e) => { 
+                    e.preventDefault(); 
+                    clientState.currentPage = p; 
+                    renderTableFromData(clientState.filteredData, p); 
+                };
                 pagContainer.appendChild(a);
+            }
+        };
+
+        // Helper para puntos suspensivos
+        const addEllipsis = () => {
+            const span = document.createElement('span');
+            span.textContent = '...';
+            span.style.marginRight = '6px';
+            pagContainer.appendChild(span);
+        };
+
+        // 1. Botón Anterior
+        if (current > 1) {
+            const prev = document.createElement('a');
+            prev.href = '#';
+            prev.textContent = 'Anterior';
+            prev.style.marginRight = '8px';
+            prev.onclick = (e) => {
+                e.preventDefault();
+                clientState.currentPage--;
+                renderTableFromData(clientState.filteredData, clientState.currentPage);
+            };
+            pagContainer.appendChild(prev);
+        }
+
+        // 2. Lógica de bloques con puntos suspensivos
+        if (totalPages <= 10) {
+            // Si hay pocas páginas, mostrar todas
+            for (let i = 1; i <= totalPages; i++) addPage(i);
+        } else {
+            // Caso complejo: Mostrar 1, 2, 3, 4, 5 ... y las últimas 5
+            if (current <= 4) {
+                // Estamos al principio
+                for (let i = 1; i <= 5; i++) addPage(i);
+                addEllipsis();
+                for (let i = totalPages - 4; i <= totalPages; i++) addPage(i);
+            } else if (current >= totalPages - 3) {
+                // Estamos al final
+                for (let i = 1; i <= 5; i++) addPage(i);
+                addEllipsis();
+                for (let i = totalPages - 4; i <= totalPages; i++) addPage(i);
+            } else {
+                // Estamos en el medio: Mostrar 1... actual ...última
+                addPage(1);
+                addEllipsis();
+                for (let i = current - 1; i <= current + 1; i++) addPage(i);
+                addEllipsis();
+                addPage(totalPages);
             }
         }
 
-        const next = document.createElement('a');
-        next.href = '#';
-        next.textContent = 'Siguiente';
-        next.style.marginLeft = '8px';
-        next.addEventListener('click', (ev)=>{ ev.preventDefault(); if(clientState.currentPage<totalPages){ clientState.currentPage++; renderTableFromData(clientState.filteredData, clientState.currentPage); } });
-        pagContainer.appendChild(next);
+        // 3. Botón Siguiente
+        if (current < totalPages) {
+            const next = document.createElement('a');
+            next.href = '#';
+            next.textContent = 'Siguiente';
+            next.style.marginLeft = '8px';
+            next.onclick = (e) => {
+                e.preventDefault();
+                clientState.currentPage++;
+                renderTableFromData(clientState.filteredData, clientState.currentPage);
+            };
+            pagContainer.appendChild(next);
+        }
     }
 
     function applyFilters(){

@@ -104,7 +104,9 @@ from receipt_db import (
     check_duplicate_receipt,
     set_DebtSettlement,
     get_all_related_receipts,
-    set_SyncStatus
+    set_SyncStatus,
+    get_accountsHistory,
+    get_accountsHistory_admin
     )
     
 from accessControl import (
@@ -681,7 +683,7 @@ def homeSeller():
 @app.route('/accountsHistory')
 def accountsHistory():
     page_num = request.args.get('page', 1, type=int)
-    per_page = 50
+    per_page = 30
     
     if (0 in session['roles'] and 1 in session['roles']):
         all_accounts = get_accountsHistory_admin()
