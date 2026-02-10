@@ -316,3 +316,90 @@
     outline: none;
     border-color: #007bff;
 }
+
+/* Tooltip de Status */
+
+/* Contenedor principal de la celda de sincronización */
+.sync-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Contenedor del Tooltip */
+.tooltip-container {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+
+/* Estilo del ícono (i) */
+.info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    background-color: #324aabd2; /* Azul de tu proyecto */
+    color: white;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: bold;
+    font-family: serif; /* Para que la 'i' se vea elegante */
+}
+
+/* El globo de texto (oculto por defecto) */
+.tooltip-text {
+    visibility: hidden;
+    width: 220px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 10px;
+    position: absolute;
+    z-index: 10;
+    bottom: 125%; /* Aparece arriba del ícono */
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    box-shadow: 0px 4px 8px rgba(0,0,0,0.2);
+}
+
+/* La flechita del tooltip */
+.tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+
+/* Mostrar al pasar el mouse */
+.tooltip-container:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Ajuste para que no se corte en las últimas filas de la tabla */
+.styled-table td {
+    overflow: visible; 
+}
+
+/* Estilos de Status Badge */
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+.status-badge.matched { background-color: #d4edda; color: #155724; }
+.status-badge.appAhead { background-color: #fff3cd; color: #856404; }
+.status-badge.galacAhead { background-color: #f8d4ba; color: #b64809; }
+.status-badge.needReview { background-color: #f8d7da; color: #721c24; }
