@@ -1373,7 +1373,7 @@ def send_validationEmail():
         set_SyncStatus(account_id, syncStatus)
 
         # Facturas pagadas en su totalidad
-        if(total_debt == app_paid_amount):
+        if(total_debt <= app_paid_amount + 0.99):
             related_receipt_ids = get_all_related_receipts(account_id)
             for r_id in related_receipt_ids:
                 set_DebtSettlement(account_id, r_id)
