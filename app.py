@@ -3,6 +3,7 @@ import json
 import base64
 import requests
 import mimetypes
+from decimal import Decimal
 
 from io import BytesIO
 from reports import reports_bp
@@ -1374,9 +1375,6 @@ def send_validationEmail():
     Al implementar el pdf en producción, realizar la validación luego de este último renderizado.
     NOTA: Actualmente, el PDF se descarga directamente del correo, así que no ha sido solicitado
     """
-    set_isReviewedReceipt(receipt_id)
-    set_isApprovedReceipt(receipt_id)
-
     # Para cada factura asociada al recibo:
     # - Se verifica y actualiza su estado respecto al sistema fuente GáLac
     # - Si el recibo validado paga la totalidad de una factura, se registra en DebtSettlement
@@ -1401,11 +1399,14 @@ def send_validationEmail():
         set_SyncStatus(account_id, syncStatus)
 
         # Facturas pagadas en su totalidad
-        if(total_debt == app_paid_amount):
+        if(total_debt <= app_paid_amount + Decimal('0.99')):
             related_receipt_ids = get_all_related_receipts(account_id)
             for r_id in related_receipt_ids:
                 set_DebtSettlement(account_id, r_id)
     
+    set_isReviewedReceipt(receipt_id)
+    set_isApprovedReceipt(receipt_id)
+
     # Logo Store (dinámico desde store[2])
     logo_store_path = store[2] if store and len(store) > 2 else None
     logo_store_cid = 'logo_store' if logo_store_path else None 

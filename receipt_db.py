@@ -44,13 +44,18 @@ def get_receiptStores_DebtAccount(salesRep_id):
     cursor.execute('''SELECT DISTINCT S.ID, S.Name
                     FROM Main.Store S
                     JOIN Commission_Receipt.DebtAccount D ON S.ID = D.StoreID
-                    WHERE S.ID != 0 AND D.GalacCxcStatus IN ('ABO', 'P/C')
-                    AND D.SalesRepID = %s
+                    WHERE S.ID != 0 AND D.SalesRepID = %s
+                    AND
+                        (
+                            D.GalacCxcStatus IN ('ABO', 'P/C') 
+                            OR 
+                            (D.GalacCxcStatus = 'CAN' AND D.InvoiceIssueDate >= '2026-01-01')
+                        )
                     AND (
-                        (D.Amount - D.AppPaidAmount > 0) 
-                        OR 
-                        (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
-                    )
+							(D.DocumentType <> 'N/C' AND D.Amount > (D.AppPaidAmount + 0.99))
+							OR 
+							(D.DocumentType = 'N/C' AND D.Amount < (-D.AppPaidAmount - 0.99))
+						)
                     ORDER BY S.Name;
                    ''', (salesRep_id))
     stores = cursor.fetchall()
@@ -63,12 +68,18 @@ def get_receiptStores_DebtAccount_admin():
     cursor.execute('''SELECT DISTINCT S.ID, S.Name
                     FROM Main.Store S
                     JOIN Commission_Receipt.DebtAccount D ON S.ID = D.StoreID
-                    WHERE S.ID != 0 AND D.GalacCxcStatus IN ('ABO', 'P/C')
+                    WHERE S.ID != 0
+                    AND
+                        (
+                            D.GalacCxcStatus IN ('ABO', 'P/C') 
+                            OR 
+                            (D.GalacCxcStatus = 'CAN' AND D.InvoiceIssueDate >= '2026-01-01')
+                        )
                     AND (
-                        (D.Amount - D.AppPaidAmount > 0) 
-                        OR 
-                        (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
-                    )
+							(D.DocumentType <> 'N/C' AND D.Amount > (D.AppPaidAmount + 0.99))
+							OR 
+							(D.DocumentType = 'N/C' AND D.Amount < (-D.AppPaidAmount - 0.99))
+						)
                     ORDER BY S.Name;
                    ''',)
     stores = cursor.fetchall()
@@ -313,11 +324,17 @@ def get_customers(store_id, salesRep_id):
                     WHERE C.isRetail = 0
                     AND D.StoreID = %s 
                     AND D.SalesRepID = %s 
-                    AND D.GalacCxcStatus IN ('ABO', 'P/C')
+                    AND
+                        (
+                            D.GalacCxcStatus IN ('ABO', 'P/C') 
+                            OR 
+                            (D.GalacCxcStatus = 'CAN' AND D.InvoiceIssueDate >= '2026-01-01')
+                        )
                     AND (
-                            (D.Amount > D.AppPaidAmount)
-                        OR (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
-                    )
+							(D.DocumentType <> 'N/C' AND D.Amount > (D.AppPaidAmount + 0.99))
+							OR 
+							(D.DocumentType = 'N/C' AND D.Amount < (-D.AppPaidAmount - 0.99))
+						)
                     GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
                     ''', (store_id, salesRep_id))
     sellers = cursor.fetchall()
@@ -334,11 +351,17 @@ def get_customers_admin(store_id):
                         ON C.ID = D.CustomerID AND C.isRembd = D.isRembd
                     WHERE C.isRetail = 0
                     AND D.StoreID = %s 
-                    AND D.GalacCxcStatus IN ('ABO', 'P/C')
+                    AND
+                        (
+                            D.GalacCxcStatus IN ('ABO', 'P/C') 
+                            OR 
+                            (D.GalacCxcStatus = 'CAN' AND D.InvoiceIssueDate >= '2026-01-01')
+                        )
                     AND (
-                            (D.Amount > D.AppPaidAmount)
-                        OR (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
-                    )
+							(D.DocumentType <> 'N/C' AND D.Amount > (D.AppPaidAmount + 0.99))
+							OR 
+							(D.DocumentType = 'N/C' AND D.Amount < (-D.AppPaidAmount - 0.99))
+						)
                     GROUP BY C.ID, C.FirstName, C.LastName, C.isRembd
                     ''', (store_id))
     sellers = cursor.fetchall()
@@ -358,11 +381,17 @@ def get_count_customers_with_accountsReceivable(store_id, salesRep_id):
                         FROM Commission_Receipt.DebtAccount D
                         WHERE D.StoreID = %s 
                         AND D.SalesRepID = %s 
-                        AND D.GalacCxcStatus IN ('ABO', 'P/C')
-                        AND (
-                                (D.Amount > D.AppPaidAmount) 
-                            OR (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
+                        AND
+                        (
+                            D.GalacCxcStatus IN ('ABO', 'P/C') 
+                            OR 
+                            (D.GalacCxcStatus = 'CAN' AND D.InvoiceIssueDate >= '2026-01-01')
                         )
+                        AND (
+							(D.DocumentType <> 'N/C' AND D.Amount > (D.AppPaidAmount + 0.99))
+							OR 
+							(D.DocumentType = 'N/C' AND D.Amount < (-D.AppPaidAmount - 0.99))
+						)
                         GROUP BY D.CurrencyID
                     ) AS T
                     JOIN Main.Currency M ON T.CurrencyID = M.ID;
@@ -385,11 +414,17 @@ def get_count_customers_with_accountsReceivable_admin(store_id):
                             SUM(D.Amount - D.AppPaidAmount) AS Balance
                         FROM Commission_Receipt.DebtAccount D
                         WHERE D.StoreID = %s 
-                        AND D.GalacCxcStatus IN ('ABO', 'P/C')
-                        AND (
-                                (D.Amount > D.AppPaidAmount) 
-                            OR (D.DocumentType = 'N/C' AND D.Amount + D.AppPaidAmount < 0)
+                        AND
+                        (
+                            D.GalacCxcStatus IN ('ABO', 'P/C') 
+                            OR 
+                            (D.GalacCxcStatus = 'CAN' AND D.InvoiceIssueDate >= '2026-01-01')
                         )
+                        AND (
+							(D.DocumentType <> 'N/C' AND D.Amount > (D.AppPaidAmount + 0.99))
+							OR 
+							(D.DocumentType = 'N/C' AND D.Amount < (-D.AppPaidAmount - 0.99))
+						)
                         GROUP BY D.CurrencyID
                     ) AS T
                     JOIN Main.Currency M ON T.CurrencyID = M.ID;
@@ -497,21 +532,31 @@ def get_commissionsRules():
 def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT D.AccountID, D.N_CTA, D.Amount, 
-                        D.AppPaidAmount AS PaidAmount, -- Se muestra el monto según el SyncStatus
-                        C.Description, D.DocumentType, D.SyncStatusID
+    cursor.execute('''SELECT 
+                        D.AccountID, 
+                        D.N_CTA, 
+                        D.Amount, 
+                        D.AppPaidAmount AS PaidAmount,
+                        C.Description, 
+                        D.DocumentType, 
+                        D.SyncStatusID
                     FROM Commission_Receipt.DebtAccount D
-                    JOIN Main.Currency C ON D.CurrencyID = C.ID
+                    JOIN Main.Currency C ON D.CurrencyID = C.ID AND D.isRetail = C.isRetail
                     WHERE D.CustomerID = %s 
-                    AND D.isRembd = %s 
-                    AND D.StoreID = %s 
-                    AND D.SalesRepID = %s
-                    AND D.GalacCxcStatus IN ('ABO', 'P/C')
-                    AND (
-                            (D.Amount - D.AppPaidAmount > 0) 
-                        OR 
-                            (D.DocumentType IN ('N/C') AND D.Amount + D.AppPaidAmount < 0)
-                    )
+                        AND D.isRembd = %s 
+                        AND D.StoreID = %s
+                        AND D.SalesRepID = %s
+                        AND
+                        (
+                            D.GalacCxcStatus IN ('ABO', 'P/C') 
+                            OR 
+                            (D.GalacCxcStatus = 'CAN' AND D.InvoiceIssueDate >= '2026-01-01')
+                        )
+                        AND (
+							(D.DocumentType <> 'N/C' AND D.Amount > (D.AppPaidAmount + 0.99))
+							OR 
+							(D.DocumentType = 'N/C' AND D.Amount < (-D.AppPaidAmount - 0.99))
+						)
                     ORDER BY D.N_CTA;''',
                    (customer_id, customer_isRembd, store_id, salesRep_id))
     invoices = cursor.fetchall()    
@@ -521,20 +566,30 @@ def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_i
 def get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT D.AccountID, D.N_CTA, D.Amount, 
-                        D.AppPaidAmount AS PaidAmount, -- Se muestra el monto según el SyncStatus
-                        C.Description, D.DocumentType, D.SyncStatusID
+    cursor.execute('''SELECT 
+                        D.AccountID, 
+                        D.N_CTA, 
+                        D.Amount, 
+                        D.AppPaidAmount AS PaidAmount,
+                        C.Description, 
+                        D.DocumentType, 
+                        D.SyncStatusID
                     FROM Commission_Receipt.DebtAccount D
-                    JOIN Main.Currency C ON D.CurrencyID = C.ID
+                    JOIN Main.Currency C ON D.CurrencyID = C.ID AND D.isRetail = C.isRetail
                     WHERE D.CustomerID = %s 
-                    AND D.isRembd = %s 
-                    AND D.StoreID = %s 
-                    AND D.GalacCxcStatus IN ('ABO', 'P/C')
-                    AND (
-                            (D.Amount - D.AppPaidAmount > 0) 
-                        OR 
-                            (D.DocumentType IN ('N/C') AND D.Amount + D.AppPaidAmount < 0)
-                    )
+                        AND D.isRembd = %s 
+                        AND D.StoreID = %s
+                        AND
+                        (
+                            D.GalacCxcStatus IN ('ABO', 'P/C') 
+                            OR 
+                            (D.GalacCxcStatus = 'CAN' AND D.InvoiceIssueDate >= '2026-01-01')
+                        )
+                        AND (
+							(D.DocumentType <> 'N/C' AND D.Amount > (D.AppPaidAmount + 0.99))
+							OR 
+							(D.DocumentType = 'N/C' AND D.Amount < (-D.AppPaidAmount - 0.99))
+						)
                     ORDER BY D.N_CTA;''',
                    (customer_id, customer_isRembd, store_id))
     invoices = cursor.fetchall()    
