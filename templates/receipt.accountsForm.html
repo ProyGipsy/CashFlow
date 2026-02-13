@@ -111,7 +111,7 @@
                     </select>
                 </td>
                 <td class="col-date"><input type="date" id="date_operation" name="date_operation" class="input-field"></td>
-                <td class="col-amount"><input type="number" name="payment_amount" step="0.01" class="input-field" value="0.00"></td>
+                <td class="col-amount"><input type="number" name="payment_amount" step="0.01" class="input-field" value="0.01" min="0.01"></td>
                 <td class="col-reference"><input type="text" name="reference" class="input-field"></td>
                 <td class="col-account"><select name="payment_made" class="input-field">
                     <option value="" disabled selected>Cuenta Bancaria</option> 
@@ -611,11 +611,15 @@
         selectedFiles.forEach(f => dataTransfer.items.add(f));
         try { input.files = dataTransfer.files; } catch (e) { /* some browsers prevent setting files; still show previews */ }
 
-        // clear the original input so the user can select more files later
-        try { input.value = ''; } catch(e){}
-
+        syncInputFiles(input); 
         renderSelectedFiles();
-        updateFileName();
+        updateFileName(selectedFiles.length);
+    }
+
+    function syncInputFiles(input) {
+        const dataTransfer = new DataTransfer();
+        selectedFiles.forEach(file => dataTransfer.items.add(file));
+        input.files = dataTransfer.files; 
     }
 
     function renderSelectedFiles(){
@@ -648,9 +652,11 @@
         });
     }
     function updateFileName() {
+        const fileInput = document.getElementById('proof_of_payment');
         const fileMessage = document.getElementById('file-message');
-        if (selectedFiles.length > 0) {
-            fileMessage.textContent = `Archivo(s) seleccionado(s): ${selectedFiles.map(f=>f.name).join(', ')}`;
+
+        if (fileInput.files.length > 0) {
+            fileMessage.textContent = `Archivo seleccionado: ${fileInput.files[0].name}`;
         } else {
             fileMessage.textContent = '';
         }
