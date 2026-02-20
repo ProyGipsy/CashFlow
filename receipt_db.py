@@ -762,6 +762,99 @@ def get_commissionsRules():
     conn.close()
     return rules
 
+def get_paymentOptions():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+                    SELECT AccountID, S.Name, C.Description, T.Description, BankName, Destiny, O.Description, RIF
+                    FROM Commission_Receipt.PaymentOption O
+                    JOIN Main.Store S ON S.ID = O.StoreID
+                    JOIN Main.Currency C ON O.CurrencyID = C.ID AND O.IsRetail = C.isRetail
+                    JOIN Main.Tender T ON O.TenderID = T.ID AND O.IsRetail = T.isRetail
+                    ORDER BY S.Name
+                   ''')
+    options = cursor.fetchall()
+    conn.close()
+    return options
+
+def _get_payment_options_where(filters):
+    """Helper para construir la cláusula WHERE basada en filtros"""
+    clauses = []
+    params = []
+    if filters:
+        if filters.get('store') and filters['store'] != 'ALL':
+            clauses.append("S.Name = %s")
+            params.append(filters['store'])
+        if filters.get('currency') and filters['currency'] != 'ALL':
+            clauses.append("C.Description = %s")
+            params.append(filters['currency'])
+        if filters.get('tender') and filters['tender'] != 'ALL':
+            clauses.append("T.Description = %s")
+            params.append(filters['tender'])
+    
+    where_str = " AND ".join(clauses)
+    return f" WHERE {where_str}" if clauses else "", params
+
+def get_payment_options_page(page=1, per_page=50, filters=None):
+    where_clause, params = _get_payment_options_where(filters)
+    offset = (page - 1) * per_page
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Usamos OFFSET/FETCH para paginación en SQL Server
+    sql = f'''
+        SELECT O.AccountID, S.Name, C.Description, T.Description, BankName, Destiny, O.Description, RIF
+        FROM Commission_Receipt.PaymentOption O
+        JOIN Main.Store S ON S.ID = O.StoreID
+        JOIN Main.Currency C ON O.CurrencyID = C.ID AND O.IsRetail = C.isRetail
+        JOIN Main.Tender T ON O.TenderID = T.ID AND O.IsRetail = T.isRetail
+        {where_clause}
+        ORDER BY S.Name
+        OFFSET {offset} ROWS FETCH NEXT {per_page} ROWS ONLY
+    '''
+    cursor.execute(sql, tuple(params))
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+def get_payment_options_count(filters=None):
+    where_clause, params = _get_payment_options_where(filters)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    sql = f'''
+        SELECT COUNT(*) 
+        FROM Commission_Receipt.PaymentOption O
+        JOIN Main.Store S ON S.ID = O.StoreID
+        JOIN Main.Currency C ON O.CurrencyID = C.ID AND O.IsRetail = C.isRetail
+        JOIN Main.Tender T ON O.TenderID = T.ID AND O.IsRetail = T.isRetail
+        {where_clause}
+    '''
+    cursor.execute(sql, tuple(params))
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
+
+def get_payment_options_filters():
+    """Obtiene los valores únicos para llenar los selects de los filtros"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    filters = {}
+    # Obtener Tiendas únicas
+    cursor.execute("SELECT DISTINCT S.Name FROM Main.Store S WHERE S.isRetail = 0 AND S.ID != 0 ORDER BY 1")
+    filters['stores'] = [r[0] for r in cursor.fetchall()]
+    
+    # Obtener Monedas únicas
+    cursor.execute("SELECT DISTINCT C.Description FROM Commission_Receipt.PaymentOption O JOIN Main.Currency C ON O.CurrencyID = C.ID AND O.IsRetail = C.isRetail ORDER BY 1")
+    filters['currencies'] = [r[0] for r in cursor.fetchall()]
+    
+    # Obtener Tenders únicos
+    cursor.execute("SELECT DISTINCT T.Description FROM Main.Tender T ORDER BY 1")
+    filters['tenders'] = [r[0] for r in cursor.fetchall()]
+    
+    conn.close()
+    return filters
+
 def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_id):
     conn = get_db_connection()
     cursor = conn.cursor()

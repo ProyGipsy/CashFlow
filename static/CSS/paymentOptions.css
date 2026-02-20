@@ -1,0 +1,220 @@
+.main-content {
+    color: #421d83;
+    display: flex;
+    flex-direction: column;
+}
+
+.content {
+    padding: 0% 3% 3% 3%;
+}
+
+.title-container {
+    padding: 2%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.back {
+    margin-right: auto;
+}
+
+.title-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.title-container a.back img {
+    width: 24px;
+    height: auto;
+}
+
+.title-container h2 {
+    margin: 0;
+}
+
+/* Estilos de tabla */
+
+.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.styled-table th, .styled-table td {
+    border: 1px solid #421d83;
+    padding: 10px;
+    text-align: left;
+    font-size: 0.85rem;
+}
+
+.styled-table th {
+    background-color: #d0b8ff;
+    color: #421d83;
+}
+
+.input-field {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #421d83;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+.add-button {
+    border-radius: 8px;
+    background-color: #421d83;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    color: white;
+    font-size: 16px;
+    margin: 10px 5px;
+    margin-right: auto;
+}
+
+.add-button:hover {
+    background-color: #8b56ed;
+}
+
+.undo-button, .save-button {
+    background-color: #421d83;
+    color: #ffffff;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 1em;
+    margin: 0 10px;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.3s ease;
+}
+
+.undo-button:hover, .save-button:hover {
+    background-color: #8b56ed;
+}
+
+.button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.button-container .add-button {
+    justify-content: flex-start; 
+    flex-wrap: wrap;
+}
+
+.edit-icon img, .delete-icon img{
+    width: 18px;
+    height: auto;
+}
+
+/* Estilos para la fila de filtros */
+
+.filter-row-container {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e0d0ff;
+    margin-bottom: 20px;
+}
+
+.history-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 20px; 
+    width: 100%;
+}
+
+.filter-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+    justify-content: center;
+    width: 100%;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    color: #421d83;
+    font-weight: bold;
+    align-items: center;
+}
+
+.filter-group select {
+    padding: 8px;
+    border: 1px solid #421d83;
+    border-radius: 4px;
+    color: #421d83;
+    min-width: 100px;
+    /* text-align: center; */
+}
+
+.btn-filter {
+    background-color: #421d83;
+    color: white;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    height: fit-content;
+}
+
+.btn-filter:hover {
+    background-color: #8b56ed;
+}
+
+/* Modal de carga */
+
+.loading-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 20%;
+    top: 0;
+    width: 80%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+}
+
+.loading-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.error {
+    border: 2px solid #ff0000 !important;
+}
+
+/* Estilos básicos para paginación */
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+    padding-bottom: 30px;
+}
+
+.pagination a {
+    padding: 8px 12px;
+    border: 1px solid #421d83;
+    color: #421d83;
+    text-decoration: none;
+    border-radius: 4px;
+}
+
+.pagination .active {
+    background-color: #421d83;
+    color: white;
+}

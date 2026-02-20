@@ -111,7 +111,12 @@ from receipt_db import (
     get_accounts_history_page,
     get_accounts_history_all,
     get_accounts_history_filters,
-    get_accounts_history_count
+    get_accounts_history_count,
+    get_paymentOptions,
+    _get_payment_options_where,
+    get_payment_options_page,
+    get_payment_options_count,
+    get_payment_options_filters
     )
     
 from accessControl import (
@@ -680,6 +685,46 @@ def businessRules():
         set_commissionsRules(data)
         return jsonify(success=True)
     return render_template('receipt.businessRules.html', page='businessRules', active_page='businessRules', rules=rules)
+
+@app.route('/paymentOptions')
+def paymentOptions():
+    page_num = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    # Carga inicial
+    options = get_payment_options_page(page=page_num, per_page=per_page)
+    total = get_payment_options_count()
+    available_filters = get_payment_options_filters()
+    
+    total_pages = (total + per_page - 1) // per_page
+    
+    return render_template('receipt.paymentOptions.html', 
+                           page='paymentOptions', 
+                           active_page='paymentOptions', 
+                           payment_options=options,
+                           filters=available_filters,
+                           current_page=page_num,
+                           total_pages=total_pages)
+
+@app.route('/api/paymentOptions')
+def api_payment_options():
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    filters = {
+        'store': request.args.get('store'),
+        'currency': request.args.get('currency'),
+        'tender': request.args.get('tender')
+    }
+    
+    rows = get_payment_options_page(page=page, per_page=per_page, filters=filters)
+    total = get_payment_options_count(filters=filters)
+    
+    return jsonify({
+        'options': rows,
+        'total': total,
+        'page': page,
+        'total_pages': (total + per_page - 1) // per_page
+    })
 
 @app.route('/receiptSeller')
 def homeSeller():
