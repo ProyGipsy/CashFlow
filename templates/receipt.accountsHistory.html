@@ -177,8 +177,9 @@
         }).format(amount);
     }
 
-    // Full dataset provided by server (unpaginated)
-    const fullData = {{ full_accounts|tojson | safe }} || [];
+    // Full dataset is requested from API when needed. Server provided filter options:
+    const fullData = [];
+    const serverFilters = {{ filters|tojson | safe }} || {};
     const PER_PAGE = {{ per_page }} || 30;
 
     // Rows for the initially rendered server page (kept for initial view)
@@ -272,13 +273,14 @@
         while(sel.options.length) sel.remove(0);
     }
 
-    function populateSelect(sel, values, formatMonth=false){
+    function populateSelect(sel, values, formatMonth = false) {
         clearSelect(sel);
-        const allOpt = new Option(sel === selectors.store || sel===selectors.customer ? (sel===selectors.store? 'Todas':'Todos') : 'Todos', 'ALL');
+        const allOpt = new Option('Todos', 'ALL');
         sel.add(allOpt);
+        
         const sorted = Array.from(values).sort();
         sorted.forEach(v => {
-            const text = (formatMonth && monthNames[v]) ? monthNames[v] + ' ('+v+')' : v;
+            const text = (formatMonth && monthNames[v]) ? monthNames[v] : v;
             sel.add(new Option(text, v));
         });
     }
@@ -339,14 +341,15 @@
     }
 
     function initialPopulate(){
-        const opts = collectOptionsFromRows(fullData);
+        // Use server-provided distinct options to avoid loading entire dataset
+        const opts = {years: new Set(serverFilters.years || []), months: new Set(serverFilters.months || []), stores: new Set(serverFilters.stores || []), customers: new Set(serverFilters.customers || []), currencies: new Set(serverFilters.currencies || []), docTypes: new Set(serverFilters.docTypes || []), statuses: new Set(serverFilters.statuses || []) };
         populateSelect(selectors.year, opts.years);
         populateSelect(selectors.month, opts.months, true);
         populateSelect(selectors.store, opts.stores);
         populateSelect(selectors.customer, opts.customers);
         fullCustomerList = Array.from(opts.customers).sort();
         const currencySet = new Set();
-        opts.currencies.forEach(c => {
+        (serverFilters.currencies || []).forEach(c => {
             const normalized = String(c).toUpperCase();
             if(normalized.includes('USD')) currencySet.add('USD');
             else if(normalized.includes('BS') || normalized.includes('VEF') || normalized.includes('VES')) currencySet.add('Bs');
@@ -506,58 +509,45 @@
             status: selectors.status.value
         };
         const customerSearchVal = customerSearchInput ? customerSearchInput.value.trim() : '';
-        const filtered = fullData.filter(acc => {
-            const tipo = acc[2] || '';
-            const tienda = acc[3] || '';
-            const cliente = acc[4] || '';
-            const moneda = (acc[5] || '').toString();
-            const monto = acc[6] !== undefined ? String(acc[6]) : '';
-            const status = acc[9] || '';
-            const fecha = acc[10] || '';
-            const {year, month} = parseDateParts(fecha);
 
-            if(selValues.year !== 'ALL' && selValues.year !== year) return false;
-            if(selValues.month !== 'ALL' && selValues.month !== month) return false;
-            if(selValues.store !== 'ALL' && selValues.store !== tienda) return false;
-            if(customerSearchVal){
-                if(!cliente.toLowerCase().includes(customerSearchVal.toLowerCase())) return false;
-            } else {
-                if(selValues.customer !== 'ALL' && selValues.customer !== cliente) return false;
-            }
-            if(selValues.currency !== 'ALL'){
-                const norm = moneda.toUpperCase();
-                const want = selValues.currency;
-                if(want === 'USD' && !norm.includes('USD')) return false;
-                if(want === 'Bs' && !(norm.includes('BS') || norm.includes('VEF') || norm.includes('VES'))) return false;
-            }
-            if(selValues.docType !== 'ALL' && selValues.docType !== tipo) return false;
-            if(selValues.status !== 'ALL' && selValues.status !== status) return false;
-            return true;
-        });
-
-        clientState.filteredData = filtered;
-        clientState.currentPage = 1;
+        // If no filters selected, restore server-rendered page
         const anyFilter = Object.values(selectors).some(s => s.value && s.value !== 'ALL') || (customerSearchVal && customerSearchVal !== '');
         if(!anyFilter){
             tbody.innerHTML = '';
             serverRows.forEach(r => tbody.appendChild(r.cloneNode(true)));
             if(pagContainer){ pagContainer.innerHTML = originalPaginationHTML; pagContainer.style.display = originalPaginationDisplay || ''; }
+            const noResultsDiv = document.getElementById('no-results'); if(noResultsDiv) noResultsDiv.style.display = 'none';
             return;
         }
 
-        const noResultsDiv = document.getElementById('no-results');
-        if(filtered.length === 0){
-            if(noResultsDiv) noResultsDiv.style.display = '';
-            // hide table
-            document.querySelector('.table-container').style.display = 'none';
-            if(pagContainer) pagContainer.style.display = 'none';
-            return;
-        } else {
-            if(noResultsDiv) noResultsDiv.style.display = 'none';
+        // Build query string and request full filtered set from server (so filters apply to all data)
+        const params = new URLSearchParams();
+        params.set('all', 'true');
+        if(selValues.year && selValues.year !== 'ALL') params.set('year', selValues.year);
+        if(selValues.month && selValues.month !== 'ALL') params.set('month', selValues.month);
+        if(selValues.store && selValues.store !== 'ALL') params.set('store', selValues.store);
+        if(selValues.customer && selValues.customer !== 'ALL') params.set('customer', selValues.customer);
+        if(selValues.currency && selValues.currency !== 'ALL') params.set('currency', selValues.currency);
+        if(selValues.docType && selValues.docType !== 'ALL') params.set('docType', selValues.docType);
+        if(selValues.status && selValues.status !== 'ALL') params.set('status', selValues.status);
+        if(customerSearchVal) params.set('customerSearch', customerSearchVal);
+
+        fetch('/api/accountsHistory?' + params.toString()).then(r => r.json()).then(data => {
+            const accounts = data.accounts || [];
+            if(accounts.length === 0){
+                const noResultsDiv = document.getElementById('no-results'); if(noResultsDiv) noResultsDiv.style.display = '';
+                document.querySelector('.table-container').style.display = 'none';
+                if(pagContainer) pagContainer.style.display = 'none';
+                return;
+            }
+            if(document.getElementById('no-results')) document.getElementById('no-results').style.display = 'none';
             document.querySelector('.table-container').style.display = '';
-        }
-
-        renderTableFromData(filtered, 1);
+            clientState.filteredData = accounts;
+            clientState.currentPage = 1;
+            renderTableFromData(clientState.filteredData, 1);
+        }).catch(err => {
+            console.error('Error fetching filtered accounts', err);
+        });
     }
 
     const form = document.querySelector('.history-filters');

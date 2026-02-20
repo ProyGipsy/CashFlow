@@ -302,6 +302,239 @@ def get_accountsHistory_admin():
     conn.close()
     return accounts_history
 
+
+def _base_accounts_history_sql():
+    # Base SELECT portion used by paginated and filtered queries
+    return '''
+                    SET LANGUAGE Spanish
+                    SELECT 
+                        D.AccountID, 
+                        D.N_CTA, 
+                        D.DocumentType,
+                        S.Name AS StoreName,
+                        C.FirstName + ' ' + C.LastName AS CustomerName,
+                        M.Code, 
+                        D.Amount, 
+                        D.AppPaidAmount,
+                        DPR.PaymentReceiptIDs,
+                        StatusCalc.PaymentStatus,
+                        CASE 
+                            WHEN StatusCalc.PaymentStatus IN ('Pagada', 'Usada') 
+                            THEN COALESCE(DS.DebtSettlementDate, SRC.CreatedAt) 
+                            ELSE NULL 
+                        END AS DebtSettlementDate,
+
+                        CASE 
+                            WHEN StatusCalc.PaymentStatus IN ('Pagada', 'Usada') 
+                            THEN COALESCE(DS.CommissionPaymentDate, SRC.CommissionPaymentDate) 
+                            ELSE NULL 
+                        END AS CommissionPaymentDate
+                    FROM Commission_Receipt.DebtAccount D
+                    JOIN Main.Store S ON D.StoreID = S.ID 
+                    JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd
+                    JOIN Main.Currency M ON D.CurrencyID = M.ID AND D.isRetail = M.isRetail
+                    LEFT JOIN (
+                        SELECT 
+                            DR.DebtAccountID,
+                            STRING_AGG(DR.PaymentReceiptID, ', ') AS PaymentReceiptIDs
+                        FROM Commission_Receipt.DebtPaymentRelation DR
+                        JOIN Commission_Receipt.PaymentReceipt PR ON DR.PaymentReceiptID = PR.ReceiptID
+                        WHERE PR.IsApproved = 1
+                        GROUP BY DR.DebtAccountID
+                    ) DPR ON D.AccountID = DPR.DebtAccountID
+                    LEFT JOIN (
+                        SELECT 
+                            AccountID,
+                            FORMAT(MAX(CompletionDate), 'yyyy-MM-dd') AS DebtSettlementDate,
+                            DATENAME(month, MAX(CompletionDate)) + ' ' + CAST(YEAR(MAX(CompletionDate)) AS VARCHAR) AS CommissionPaymentDate
+                        FROM Commission_Receipt.DebtSettlement
+                        GROUP BY AccountID
+                    ) DS ON D.AccountID = DS.AccountID
+                    LEFT JOIN (
+                        SELECT
+                            AccountID,
+                            FORMAT(MAX(SRC.CreatedAt), 'yyyy-MM-dd') AS CreatedAt,
+                            DATENAME(month, MAX(SRC.CreatedAt)) + ' ' + CAST(YEAR(MAX(SRC.CreatedAt)) AS VARCHAR) AS CommissionPaymentDate
+                        FROM Commission_Receipt.SalesRepCommission SRC
+                        JOIN Commission_Receipt.PaymentReceipt PR ON PR.ReceiptID = SRC.ReceiptID
+                        WHERE PR.IsApproved = 1
+                        GROUP BY AccountID
+                    ) SRC ON D.AccountID = SRC.AccountID
+                    CROSS APPLY (
+                        SELECT CASE 
+                            WHEN D.DocumentType = 'N/C' THEN
+                                CASE 
+                                    WHEN D.AppPaidAmount = 0 THEN 'Disponible'
+                                    WHEN D.AppPaidAmount >= D.Amount THEN 'Usada'
+                                    ELSE 'Parcialmente Usada'
+                                END
+                            ELSE
+                                CASE 
+                                    WHEN D.AppPaidAmount >= D.Amount THEN 'Pagada'
+                                    WHEN D.AppPaidAmount > 0 AND D.AppPaidAmount < D.Amount THEN 'Abonada'
+                                    ELSE 'Pendiente'
+                                END
+                        END AS PaymentStatus
+                    ) AS StatusCalc
+                    WHERE GalacCxcStatus NOT IN ('ANU')
+                   '''
+
+
+def _build_filters_where_clause(filters):
+    where_clauses = []
+    params = []
+    # filters keys: store, customer, currency, docType, status, year, month
+    if not filters:
+        return '', params
+    if filters.get('store') and filters['store'] != 'ALL':
+        where_clauses.append('S.Name = %s')
+        params.append(filters['store'])
+    if filters.get('customer') and filters['customer'] != 'ALL':
+        # match full name
+        where_clauses.append("(C.FirstName + ' ' + C.LastName) = %s")
+        params.append(filters['customer'])
+    if filters.get('currency') and filters['currency'] != 'ALL':
+        where_clauses.append('M.Code LIKE %s')
+        if filters['currency'] == 'USD':
+            params.append('%USD%')
+        else:
+            params.append('%BS%')
+    if filters.get('docType') and filters['docType'] != 'ALL':
+        where_clauses.append('D.DocumentType = %s')
+        params.append(filters['docType'])
+    if filters.get('status') and filters['status'] != 'ALL':
+        # reuse same CASE logic used in SELECT to compute PaymentStatus
+        status_case = "(CASE WHEN D.DocumentType = 'N/C' THEN CASE WHEN D.AppPaidAmount = 0 THEN 'Disponible' WHEN D.AppPaidAmount >= D.Amount THEN 'Usada' ELSE 'Parcialmente Usada' END ELSE CASE WHEN D.AppPaidAmount >= D.Amount THEN 'Pagada' WHEN D.AppPaidAmount > 0 AND D.AppPaidAmount < D.Amount THEN 'Abonada' ELSE 'Pendiente' END END) = %s"
+        where_clauses.append(status_case)
+        params.append(filters['status'])
+    if filters.get('year') and filters['year'] != 'ALL':
+        # DebtSettlementDate / CreatedAt formatted as yyyy-MM-dd; match by prefix
+        year_pattern = filters['year'] + '-%'
+        year_case = "(CASE WHEN (CASE WHEN D.DocumentType = 'N/C' THEN CASE WHEN D.AppPaidAmount = 0 THEN 'Disponible' WHEN D.AppPaidAmount >= D.Amount THEN 'Usada' ELSE 'Parcialmente Usada' END ELSE CASE WHEN D.AppPaidAmount >= D.Amount THEN 'Pagada' WHEN D.AppPaidAmount > 0 AND D.AppPaidAmount < D.Amount THEN 'Abonada' ELSE 'Pendiente' END END) IN ('Pagada','Usada') THEN COALESCE((SELECT FORMAT(MAX(CompletionDate),'yyyy-MM-dd') FROM Commission_Receipt.DebtSettlement DS2 WHERE DS2.AccountID = D.AccountID),(SELECT FORMAT(MAX(SRC2.CreatedAt),'yyyy-MM-dd') FROM Commission_Receipt.SalesRepCommission SRC2 JOIN Commission_Receipt.PaymentReceipt PR2 ON PR2.ReceiptID = SRC2.ReceiptID WHERE PR2.IsApproved = 1 AND SRC2.AccountID = D.AccountID)) ELSE NULL END) LIKE %s"
+        where_clauses.append(year_case)
+        params.append(year_pattern)
+    if filters.get('month') and filters['month'] != 'ALL':
+        month_pattern = '%-' + filters['month'] + '-%'
+        month_case = "(CASE WHEN (CASE WHEN D.DocumentType = 'N/C' THEN CASE WHEN D.AppPaidAmount = 0 THEN 'Disponible' WHEN D.AppPaidAmount >= D.Amount THEN 'Usada' ELSE 'Parcialmente Usada' END ELSE CASE WHEN D.AppPaidAmount >= D.Amount THEN 'Pagada' WHEN D.AppPaidAmount > 0 AND D.AppPaidAmount < D.Amount THEN 'Abonada' ELSE 'Pendiente' END END) IN ('Pagada','Usada') THEN COALESCE((SELECT FORMAT(MAX(CompletionDate),'yyyy-MM-dd') FROM Commission_Receipt.DebtSettlement DS2 WHERE DS2.AccountID = D.AccountID),(SELECT FORMAT(MAX(SRC2.CreatedAt),'yyyy-MM-dd') FROM Commission_Receipt.SalesRepCommission SRC2 JOIN Commission_Receipt.PaymentReceipt PR2 ON PR2.ReceiptID = SRC2.ReceiptID WHERE PR2.IsApproved = 1 AND SRC2.AccountID = D.AccountID)) ELSE NULL END) LIKE %s"
+        where_clauses.append(month_case)
+        params.append(month_pattern)
+
+    if not where_clauses:
+        return '', params
+
+    return ' AND ' + ' AND '.join(where_clauses), params
+
+
+def get_accounts_history_page(salesRep_id=None, page=1, per_page=30, filters=None, admin=False):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    base_sql = _base_accounts_history_sql()
+    where_suffix, params = _build_filters_where_clause(filters)
+    if not admin and salesRep_id is not None:
+        base_sql += ' AND D.SalesRepID = %s'
+        params.insert(0, salesRep_id)
+    # append filters
+    full_sql = base_sql + where_suffix + ' ORDER BY DebtSettlementDate DESC, D.N_CTA'
+    # add pagination OFFSET/FETCH
+    offset = (page - 1) * per_page
+    full_sql = full_sql + ' OFFSET %s ROWS FETCH NEXT %s ROWS ONLY;'
+    params.extend([offset, per_page])
+    cursor.execute(full_sql, tuple(params))
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def get_accounts_history_all(salesRep_id=None, filters=None, admin=False):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    base_sql = _base_accounts_history_sql()
+    where_suffix, params = _build_filters_where_clause(filters)
+    if not admin and salesRep_id is not None:
+        base_sql += ' AND D.SalesRepID = %s'
+        params.insert(0, salesRep_id)
+    full_sql = base_sql + where_suffix + ' ORDER BY DebtSettlementDate DESC, D.N_CTA;'
+    cursor.execute(full_sql, tuple(params))
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def get_accounts_history_count(salesRep_id=None, filters=None, admin=False):
+    # Return total count for pagination with same WHERE conditions
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Count based on DebtAccount primary key
+    count_sql = 'SELECT COUNT(1) FROM Commission_Receipt.DebtAccount D JOIN Main.Store S ON D.StoreID = S.ID JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd JOIN Main.Currency M ON D.CurrencyID = M.ID AND D.isRetail = M.isRetail WHERE GalacCxcStatus NOT IN (\'ANU\')'
+    where_suffix, params = _build_filters_where_clause(filters)
+    if not admin and salesRep_id is not None:
+        count_sql += ' AND D.SalesRepID = %s'
+        params.insert(0, salesRep_id)
+    count_sql += where_suffix + ';'
+    cursor.execute(count_sql, tuple(params))
+    total = cursor.fetchone()[0]
+    conn.close()
+    return total
+
+
+def get_accounts_history_filters(salesRep_id=None, admin=False):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    base_where = "WHERE GalacCxcStatus NOT IN ('ANU')"
+    params = []
+    if not admin and salesRep_id is not None:
+        base_where += ' AND D.SalesRepID = %s'
+        params.append(salesRep_id)
+
+    # Years
+    where_clause = "" if admin else f"WHERE D.SalesRepID = {salesRep_id}"
+    years_sql = f'''
+        SELECT DISTINCT YEAR(DS.CompletionDate) 
+        FROM Commission_Receipt.DebtSettlement DS
+        JOIN Commission_Receipt.DebtAccount D ON DS.AccountID = D.AccountID
+        {where_clause}
+        UNION
+        SELECT DISTINCT YEAR(SRC.CreatedAt) 
+        FROM Commission_Receipt.SalesRepCommission SRC
+        JOIN Commission_Receipt.DebtAccount D ON SRC.AccountID = D.AccountID
+        {where_clause}
+        ORDER BY 1 DESC
+    '''
+    cursor.execute(years_sql)
+    years = [str(row[0]) for row in cursor.fetchall() if row[0] is not None]
+
+    # Stores
+    cursor.execute('SELECT DISTINCT S.Name FROM Commission_Receipt.DebtAccount D JOIN Main.Store S ON D.StoreID = S.ID ' + base_where + ' ORDER BY S.Name;', tuple(params))
+    stores = [r[0] for r in cursor.fetchall()]
+
+    # Customers (full name)
+    cursor.execute("SELECT DISTINCT (C.FirstName + ' ' + C.LastName) FROM Commission_Receipt.DebtAccount D JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd " + base_where + ' ORDER BY 1;', tuple(params))
+    customers = [r[0] for r in cursor.fetchall()]
+
+    # Currency codes
+    cursor.execute('SELECT DISTINCT M.Code FROM Commission_Receipt.DebtAccount D JOIN Main.Currency M ON D.CurrencyID = M.ID AND D.isRetail = M.isRetail ' + base_where + ' ORDER BY M.Code;', tuple(params))
+    currencies = [r[0] for r in cursor.fetchall()]
+
+    # Document types
+    cursor.execute('SELECT DISTINCT D.DocumentType FROM Commission_Receipt.DebtAccount D ' + base_where + ' ORDER BY D.DocumentType;', tuple(params))
+    docTypes = [r[0] for r in cursor.fetchall()]
+
+    # Payment statuses (compute via same CASE)
+    status_case = "(CASE WHEN D.DocumentType = 'N/C' THEN CASE WHEN D.AppPaidAmount = 0 THEN 'Disponible' WHEN D.AppPaidAmount >= D.Amount THEN 'Usada' ELSE 'Parcialmente Usada' END ELSE CASE WHEN D.AppPaidAmount >= D.Amount THEN 'Pagada' WHEN D.AppPaidAmount > 0 AND D.AppPaidAmount < D.Amount THEN 'Abonada' ELSE 'Pendiente' END END)"
+    cursor.execute('SELECT DISTINCT ' + status_case + ' FROM Commission_Receipt.DebtAccount D ' + base_where + ' ORDER BY 1;', tuple(params))
+    statuses = [r[0] for r in cursor.fetchall()]
+
+    conn.close()
+    return {
+        'years': years,
+        'months': ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
+        'stores': stores,
+        'customers': customers,
+        'currencies': currencies,
+        'docTypes': docTypes,
+        'statuses': statuses
+    }
+
 def get_customer_by_id(customer_id, customer_isRembd):
     conn = get_db_connection()
     cursor = conn.cursor()

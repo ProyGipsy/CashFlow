@@ -107,7 +107,11 @@ from receipt_db import (
     get_all_related_receipts,
     set_SyncStatus,
     get_accountsHistory,
-    get_accountsHistory_admin
+    get_accountsHistory_admin,
+    get_accounts_history_page,
+    get_accounts_history_all,
+    get_accounts_history_filters,
+    get_accounts_history_count
     )
     
 from accessControl import (
@@ -685,27 +689,65 @@ def homeSeller():
 def accountsHistory():
     page_num = request.args.get('page', 1, type=int)
     per_page = 30
-    
-    if (0 in session['roles'] and 1 in session['roles']):
-        all_accounts = get_accountsHistory_admin()
+
+    is_admin = (0 in session.get('roles', []) and 1 in session.get('roles', []))
+    # Fetch only the page to render initially
+    if is_admin:
+        paginated_accounts = get_accounts_history_page(page=page_num, per_page=per_page, admin=True)
+        total = get_accounts_history_count(admin=True)
+        filters = get_accounts_history_filters(admin=True)
     else:
-        all_accounts = get_accountsHistory(session['salesRep_id'])
-    
-    total = len(all_accounts)
-    start = (page_num - 1) * per_page
-    end = start + per_page
-    paginated_accounts = all_accounts[start:end]
-    
+        paginated_accounts = get_accounts_history_page(salesRep_id=session.get('salesRep_id'), page=page_num, per_page=per_page)
+        total = get_accounts_history_count(salesRep_id=session.get('salesRep_id'))
+        filters = get_accounts_history_filters(salesRep_id=session.get('salesRep_id'))
+
     total_pages = (total + per_page - 1) // per_page
 
     return render_template('receipt.accountsHistory.html',
                            page='accountsHistory',
                            active_page='accountsHistory',
                            accounts_history=paginated_accounts,
-                           full_accounts=all_accounts,
+                           filters=filters,
                            current_page=page_num,
                            total_pages=total_pages,
                            per_page=per_page)
+
+
+
+@app.route('/api/accountsHistory')
+def api_accounts_history():
+    # Returns JSON for filtered/paginated accounts; if 'all' param is set, returns full filtered set
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 1000, type=int)
+    all_flag = request.args.get('all', 'false').lower() == 'true'
+
+    filters = {
+        'year': request.args.get('year'),
+        'month': request.args.get('month'),
+        'store': request.args.get('store'),
+        'customer': request.args.get('customer'),
+        'currency': request.args.get('currency'),
+        'docType': request.args.get('docType'),
+        'status': request.args.get('status')
+    }
+
+    is_admin = (0 in session.get('roles', []) and 1 in session.get('roles', []))
+
+    if all_flag:
+        if is_admin:
+            rows = get_accounts_history_all(filters=filters, admin=True)
+        else:
+            rows = get_accounts_history_all(salesRep_id=session.get('salesRep_id'), filters=filters)
+        return jsonify({'accounts': rows, 'total': len(rows)})
+    else:
+        if is_admin:
+            total = get_accounts_history_count(filters=filters, admin=True)
+            rows = get_accounts_history_page(page=page, per_page=per_page, filters=filters, admin=True)
+        else:
+            total = get_accounts_history_count(salesRep_id=session.get('salesRep_id'), filters=filters)
+            rows = get_accounts_history_page(salesRep_id=session.get('salesRep_id'), page=page, per_page=per_page, filters=filters)
+
+        return jsonify({'accounts': rows, 'total': total, 'page': page, 'per_page': per_page})
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
