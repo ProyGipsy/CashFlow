@@ -111,6 +111,11 @@
     height: auto;
 }
 
+.edit-icon img::hover, .delete-icon img:hover {
+    filter: brightness(0.8);
+    cursor: pointer;
+}
+
 /* Estilos para la fila de filtros */
 
 .filter-row-container {
@@ -217,4 +222,87 @@
 .pagination .active {
     background-color: #421d83;
     color: white;
+}
+
+/* Estilos del Modal */
+
+.modal {
+    display: none; 
+    position: fixed;
+    z-index: 1000;
+    left: 20%;
+    top: 0;
+    width: 80%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 2% auto;
+    padding: 25px;
+    border: 1px solid #421d83;
+    width: 45%;
+    border-radius: 10px;
+}
+
+.close {
+    color: #421d83;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.form-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 20px;
+    text-align: left;
+}
+
+.form-vertical .filter-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* Etiquetas a la izquierda */
+    width: 100%;
+}
+
+.form-vertical label {
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    color: #421d83;
+}
+
+.form-vertical input, 
+.form-vertical select {
+    width: 100%;
+    box-sizing: border-box; /* Asegura que el padding no rompa el ancho */
+}
+
+.rif-container {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.rif-select {
+    width: 70px !important; /* Ancho fijo pequeño para el prefijo */
+    padding: 10px;
+    border: 1px solid #421d83;
+    border-radius: 5px;
+    color: #421d83;
+}
+
+/* El input del RIF tomará el resto del espacio */
+#modal-rif-number {
+    flex-grow: 1;
+}
+
+.required-star {
+    color: red;
+    margin-left: 3px;
+    font-weight: bold;
 }

@@ -28,7 +28,7 @@
                     <select id="currency" name="currency"></select>
                 </div>
                 <div class="filter-group">
-                    <label for="tender">Tender:</label>
+                    <label for="tender">Forma de Pago:</label>
                     <select id="tender" name="tender"></select>
                 </div>
                 <button type="button" id="reset-filters" class="btn-filter">Reiniciar</button>
@@ -45,11 +45,11 @@
             <tr>
                 <th>Tienda</th>
                 <th>Moneda</th>
-                <th>Tender</th>
+                <th>Forma de Pago</th>
                 <th>Cuenta Bancaria</th>
                 <th>Destino</th>
-                <th>Descripción</th>
                 <th>RIF</th>
+                <th>Descripción</th>
             </tr>
         </thead>
         <tbody>
@@ -60,8 +60,8 @@
                 <td>{{payments[3]}}</td>
                 <td>{{payments[4]}}</td>
                 <td>{{payments[5]}}</td>
-                <td>{{payments[6]}}</td>
                 <td>{{payments[7]}}</td>
+                <td>{{payments[6]}}</td>
                 <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
             </tr>
             {% endfor %}
@@ -97,6 +97,65 @@
         {% endif %}
     </div>
 
+
+    <!-- Modal para agregar/editar opción de pago -->
+     <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">Agregar Opción de Pago</h2>
+            <hr>
+            <form id="paymentForm">
+                <input type="hidden" id="edit-id" name="id">
+                
+                <div class="form-vertical">
+                    <div class="filter-group">
+                        <label for="modal-store">Tienda: <span class="required-star">*</span></label>
+                        <select id="modal-store" name="store" required></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="modal-currency">Moneda: <span class="required-star">*</span></label>
+                        <select id="modal-currency" name="currency" required></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="modal-tender">Forma de Pago: <span class="required-star">*</span></label>
+                        <select id="modal-tender" name="tender" required></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="modal-bank">Cuenta Bancaria: <span class="required-star">*</span></label>
+                        <input type="text" id="modal-bank" name="bank_account" class="input-field" placeholder="Ingrese la cuenta bancaria de la opción de pago">
+                    </div>
+                    <div class="filter-group">
+                        <label for="modal-destination">Destino:</label>
+                        <input type="text" id="modal-destination" name="destination" class="input-field" placeholder="Ingrese el destino de la opción de pago">
+                    </div>
+                    <div class="filter-group">
+                        <label>RIF: <span class="required-star">*</span></label>
+                        <div class="rif-container">
+                            <select id="modal-rif-prefix" name="rif_prefix" class="rif-select">
+                                <option value="V">V</option>
+                                <option value="E">E</option>
+                                <option value="P">P</option>
+                                <option value="J">J</option>
+                                <option value="G">G</option>
+                                <option value="R">R</option>
+                            </select>
+                            <input type="text" id="modal-rif-number" name="rif_number" class="input-field" 
+                                placeholder="12345678-9" maxlength="10">
+                        </div>
+                    </div>
+                    <div class="filter-group full-width">
+                        <label for="modal-description">Descripción: <span class="required-star">*</span></label>
+                        <input type="text" id="modal-description" name="description" class="input-field" placeholder="Ingrese la descripción de la opción de pago">
+                    </div>
+                </div>
+
+                <div class="button-container">
+                    <button type="submit" class="save-button">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -108,10 +167,15 @@
         const storeSel = document.getElementById('store');
         const currSel = document.getElementById('currency');
         const tenderSel = document.getElementById('tender');
+        
+        // Selects del Modal
+        const mStore = document.getElementById('modal-store');
+        const mCurr = document.getElementById('modal-currency');
+        const mTender = document.getElementById('modal-tender');
 
-        const fill = (sel, data) => {
+        const fill = (sel, data, includeAll = true) => {
             if (!sel) return;
-            sel.innerHTML = '<option value="ALL">Todas</option>';
+            sel.innerHTML = includeAll ? '<option value="ALL">Todas</option>' : '';
             data.forEach(item => {
                 const opt = document.createElement('option');
                 opt.value = item;
@@ -123,6 +187,11 @@
         fill(storeSel, filtersData.stores);
         fill(currSel, filtersData.currencies);
         fill(tenderSel, filtersData.tenders);
+        
+        // Llenar selects del modal (sin la opción "Todas")
+        fill(mStore, filtersData.stores, false);
+        fill(mCurr, filtersData.currencies, false);
+        fill(mTender, filtersData.tenders, false);
     }
 
     // Función para cambiar de página sin perder filtros
@@ -221,8 +290,8 @@
                 <td>${opt[3]}</td>
                 <td>${opt[4]}</td>
                 <td>${opt[5]}</td>
-                <td>${opt[6]}</td>
                 <td>${opt[7]}</td>
+                <td>${opt[6]}</td>
                 <td><span class="edit-icon" onclick="editRow(this)"><img src="/static/IMG/edit.png"></span></td>
             `;
             tbody.appendChild(tr);
@@ -266,5 +335,113 @@
             });
         });
     });
+
+    // MODAL
+
+    // Función para abrir el modal en modo "Agregar"
+    document.querySelector('.add-button').addEventListener('click', () => {
+        document.getElementById('paymentForm').reset();
+        document.getElementById('edit-id').value = '';
+        document.getElementById('modalTitle').textContent = 'Agregar Opción de Pago';
+        document.getElementById('paymentModal').style.display = 'block';
+    });
+
+    // Función para abrir el modal en modo "Editar"
+    function editRow(element) {
+        const row = element.closest('tr');
+        const id = row.getAttribute('data-id');
+        const cells = row.querySelectorAll('td');
+
+        document.getElementById('modalTitle').textContent = 'Editar Opción de Pago';
+        document.getElementById('edit-id').value = id;
+        
+        // Mapeo de valores de la tabla al modal
+        document.getElementById('modal-store').value = cells[0].textContent;
+        document.getElementById('modal-currency').value = cells[1].textContent;
+        document.getElementById('modal-tender').value = cells[2].textContent;
+        document.getElementById('modal-bank').value = cells[3].textContent;
+        document.getElementById('modal-destination').value = cells[4].textContent;
+        document.getElementById('modal-description').value = cells[6].textContent;
+        
+        // Procesar RIF (Ejemplo: J-50078513-5)
+        const fullRif = cells[5].textContent.trim();
+        if (fullRif.includes('-')) {
+            const parts = fullRif.split('-'); 
+            document.getElementById('modal-rif-prefix').value = parts[0]; // "J"
+            // Unir el resto para el número (50078513 y 5)
+            document.getElementById('modal-rif-number').value = parts[1] + '-' + parts[2];
+        }
+
+        document.getElementById('paymentModal').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('paymentModal').style.display = 'none';
+    }
+
+    document.getElementById('modal-rif-number').addEventListener('input', function (e) {
+        // 1. Eliminar todo lo que no sea número
+        let value = e.target.value.replace(/\D/g, '');
+        
+        // 2. Limitar a 9 dígitos numéricos
+        if (value.length > 9) value = value.slice(0, 9);
+        
+        // 3. Aplicar formato: XXXXXXXX-X
+        if (value.length > 1) {
+            let lastDigit = value.slice(-1);
+            let body = value.slice(0, -1);
+            e.target.value = body + '-' + lastDigit;
+        } else {
+            e.target.value = value;
+        }
+    });
+
+
+    // Manejo del Submit (AJAX sugerido)
+
+    document.getElementById('paymentForm').onsubmit = async function(e) {
+        e.preventDefault();
+        
+        // Obtener valores de los inputs
+        const bank = document.getElementById('modal-bank').value.trim();
+        const prefix = document.getElementById('modal-rif-prefix').value;
+        const rifNum = document.getElementById('modal-rif-number').value.trim();
+        const description = document.getElementById('modal-description').value.trim();
+        
+        // Validación de campos obligatorios
+        if (!bank) {
+            alert("El campo 'Cuenta Bancaria' es obligatorio. Por favor, complételo.");
+            document.getElementById('modal-bank').focus();
+            return;
+        }
+        
+        if (!rifNum || rifNum.length < 3) { // Validación mínima
+            alert("El campo 'RIF' es obligatorio y debe tener un formato válido.");
+            document.getElementById('modal-rif-number').focus();
+            return;
+        }
+        
+        if (!description) {
+            alert("El campo 'Descripción' es obligatorio. Por favor, complételo.");
+            document.getElementById('modal-description').focus();
+            return;
+        }
+
+        // Si pasa las validaciones, procedemos con el envío
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+        data.rif = `${prefix}-${rifNum}`;
+        delete data.rif_prefix;
+        delete data.rif_number;
+        
+        console.log("Datos validados listos para enviar:", data);
+        
+        // Aquí iría tu fetch a la API
+        // await fetch('/api/savePaymentOption', { ... });
+        
+        alert("Opción de pago guardada exitosamente");
+        closeModal();
+    };
+
 </script>
 {% endblock %}
