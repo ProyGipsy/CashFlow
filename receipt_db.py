@@ -393,6 +393,10 @@ def _build_filters_where_clause(filters):
         # match full name
         where_clauses.append("(C.FirstName + ' ' + C.LastName) = %s")
         params.append(filters['customer'])
+    # partial customer search
+    if filters.get('customerSearch') and filters['customerSearch'].strip() != '':
+        where_clauses.append("(C.FirstName + ' ' + C.LastName) LIKE %s")
+        params.append('%' + filters['customerSearch'].strip() + '%')
     if filters.get('currency') and filters['currency'] != 'ALL':
         where_clauses.append('M.Code LIKE %s')
         if filters['currency'] == 'USD':
@@ -402,6 +406,9 @@ def _build_filters_where_clause(filters):
     if filters.get('docType') and filters['docType'] != 'ALL':
         where_clauses.append('D.DocumentType = %s')
         params.append(filters['docType'])
+    if filters.get('ncta') and filters['ncta'].strip() != '':
+        where_clauses.append('D.N_CTA LIKE %s')
+        params.append('%' + filters['ncta'].strip() + '%')
     if filters.get('status') and filters['status'] != 'ALL':
         # reuse same CASE logic used in SELECT to compute PaymentStatus
         status_case = "(CASE WHEN D.DocumentType = 'N/C' THEN CASE WHEN D.AppPaidAmount = 0 THEN 'Disponible' WHEN D.AppPaidAmount >= D.Amount THEN 'Usada' ELSE 'Parcialmente Usada' END ELSE CASE WHEN D.AppPaidAmount >= D.Amount THEN 'Pagada' WHEN D.AppPaidAmount > 0 AND D.AppPaidAmount < D.Amount THEN 'Abonada' ELSE 'Pendiente' END END) = %s"

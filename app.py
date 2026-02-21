@@ -773,7 +773,9 @@ def api_accounts_history():
         'customer': request.args.get('customer'),
         'currency': request.args.get('currency'),
         'docType': request.args.get('docType'),
-        'status': request.args.get('status')
+        'status': request.args.get('status'),
+        'ncta': request.args.get('ncta'),
+        'customerSearch': request.args.get('customerSearch')
     }
 
     is_admin = (0 in session.get('roles', []) and 1 in session.get('roles', []))
@@ -783,7 +785,18 @@ def api_accounts_history():
             rows = get_accounts_history_all(filters=filters, admin=True)
         else:
             rows = get_accounts_history_all(salesRep_id=session.get('salesRep_id'), filters=filters)
-        return jsonify({'accounts': rows, 'total': len(rows)})
+        def _serialize_row(r):
+            out = []
+            for v in r:
+                if isinstance(v, Decimal):
+                    out.append(float(v))
+                elif isinstance(v, (datetime,)):
+                    out.append(v.strftime('%Y-%m-%d'))
+                else:
+                    out.append(v)
+            return out
+        rows_s = [_serialize_row(r) for r in rows]
+        return jsonify({'accounts': rows_s, 'total': len(rows_s)})
     else:
         if is_admin:
             total = get_accounts_history_count(filters=filters, admin=True)
@@ -791,8 +804,18 @@ def api_accounts_history():
         else:
             total = get_accounts_history_count(salesRep_id=session.get('salesRep_id'), filters=filters)
             rows = get_accounts_history_page(salesRep_id=session.get('salesRep_id'), page=page, per_page=per_page, filters=filters)
-
-        return jsonify({'accounts': rows, 'total': total, 'page': page, 'per_page': per_page})
+        def _serialize_row(r):
+            out = []
+            for v in r:
+                if isinstance(v, Decimal):
+                    out.append(float(v))
+                elif isinstance(v, (datetime,)):
+                    out.append(v.strftime('%Y-%m-%d'))
+                else:
+                    out.append(v)
+            return out
+        rows_s = [_serialize_row(r) for r in rows]
+        return jsonify({'accounts': rows_s, 'total': total, 'page': page, 'per_page': per_page})
 
 @app.route('/accountsReceivable')
 def accountsReceivable():

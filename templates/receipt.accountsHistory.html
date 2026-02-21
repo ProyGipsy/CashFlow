@@ -56,6 +56,10 @@
                     <label for="status">Estatus:</label>
                     <select id="status" name="status"></select>
                 </div>
+                <div class="filter-group">
+                    <label for="status">N_CTA:</label>
+                    <input id="ncta_search" placeholder="Buscar por N_CTA..." autocomplete="off" />
+                </div>
                 <button type="button" id="reset-filters" class="btn-filter">Reiniciar</button>
             </div>
         </form>
@@ -150,7 +154,8 @@
         customer: document.getElementById('customer'),
         currency: document.getElementById('currency'),
         docType: document.getElementById('docType'),
-        status: document.getElementById('status')
+        status: document.getElementById('status'),
+        ncta: document.getElementById('ncta_search')
     };
     const customerSearchInput = document.getElementById('customer_search');
     let fullCustomerList = [];
@@ -506,12 +511,12 @@
             customer: selectors.customer.value,
             currency: selectors.currency.value,
             docType: selectors.docType.value,
-            status: selectors.status.value
+            status: selectors.status.value,
+            ncta: (selectors.ncta && selectors.ncta.value) ? selectors.ncta.value.trim() : ''
         };
         const customerSearchVal = customerSearchInput ? customerSearchInput.value.trim() : '';
-
         // If no filters selected, restore server-rendered page
-        const anyFilter = Object.values(selectors).some(s => s.value && s.value !== 'ALL') || (customerSearchVal && customerSearchVal !== '');
+        const anyFilter = (Object.values(selectors).some(s => s && s.value && s.value !== 'ALL' && s.id !== 'ncta_search') || (customerSearchVal && customerSearchVal !== '') || (selValues.ncta && selValues.ncta !== ''));
         if(!anyFilter){
             tbody.innerHTML = '';
             serverRows.forEach(r => tbody.appendChild(r.cloneNode(true)));
@@ -530,6 +535,7 @@
         if(selValues.currency && selValues.currency !== 'ALL') params.set('currency', selValues.currency);
         if(selValues.docType && selValues.docType !== 'ALL') params.set('docType', selValues.docType);
         if(selValues.status && selValues.status !== 'ALL') params.set('status', selValues.status);
+        if(selValues.ncta && selValues.ncta !== '') params.set('ncta', selValues.ncta);
         if(customerSearchVal) params.set('customerSearch', customerSearchVal);
 
         fetch('/api/accountsHistory?' + params.toString()).then(r => r.json()).then(data => {
@@ -556,7 +562,7 @@
         if (resetBtn) {
             resetBtn.addEventListener('click', function() {
                 // 1. Resetear todos los selectores al valor por defecto
-                Object.values(selectors).forEach(s => s.value = 'ALL');
+                Object.values(selectors).forEach(s => { try { if(s.id === 'ncta_search') s.value = ''; else s.value = 'ALL' } catch(e){} });
                 if(customerSearchInput) customerSearchInput.value = '';
                 if(csDisplay) csDisplay.textContent = 'Todos';
                         if(csPanel) csPanel.style.display = 'none';
@@ -589,6 +595,22 @@
             populateCustomerFiltered(this.value);
             applyFilters();
         });
+    }
+
+    // Debounce helper for N_CTA search
+    function debounce(fn, wait) {
+        let t = null;
+        return function(...args){
+            clearTimeout(t);
+            t = setTimeout(() => fn.apply(this, args), wait);
+        };
+    }
+
+    // N_CTA live search: debounce and call applyFilters (server-side filtered)
+    if(selectors.ncta){
+        selectors.ncta.addEventListener('input', debounce(function(){
+            applyFilters();
+        }, 300));
     }
 
     // Toggle the custom panel when clicking the display

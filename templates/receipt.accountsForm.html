@@ -26,10 +26,11 @@
         <tr> 
             <th>N_CTA</th>
             <th>Tipo de Documento</th>
-            <th>Total Deuda (T/D)</th>
+            <th>Monto Documento</th>
             <th>Fecha Emisión</th>
             <th>Fecha Vencimiento</th>
             <th>Monto Abonado</th>
+            <th>Monto Pendiente</th>
         </tr> 
         {% for receipt in receiptDetails %}
         <tr> 
@@ -45,6 +46,7 @@
             <td><p>{{ receipt[2].strftime('%d-%m-%Y') }}</p></td>
             <td><p>{{ receipt[3].strftime('%d-%m-%Y') }}</p></td>
             <td><p>{{ receiptStoreCustomer[5] }} {{ "{:,.2f}".format(receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
+            <td><p>{{ receiptStoreCustomer[5] }} {{ "{:,.2f}".format(receipt[1]-receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
             <td class="hidden-column">
                 <input type="hidden" name="account_id[]" value="{{ receipt[5] }}" />
                 <input type="hidden" name="issue_date[]" value="{{ receipt[2].strftime('%Y-%m-%d') }}" />
