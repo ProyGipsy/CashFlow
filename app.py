@@ -116,7 +116,8 @@ from receipt_db import (
     _get_payment_options_where,
     get_payment_options_page,
     get_payment_options_count,
-    get_payment_options_filters
+    get_payment_options_filters,
+    set_payment_option
     )
     
 from accessControl import (
@@ -725,6 +726,49 @@ def api_payment_options():
         'page': page,
         'total_pages': (total + per_page - 1) // per_page
     })
+
+@app.route('/api/savePaymentOption', methods=['POST'])
+def save_payment_option():
+    data = request.get_json()
+    
+    try:
+        # Convertimos a int los IDs que vienen como string del JSON
+        # El ID de la opción puede ser None o vacío si es un INSERT
+        raw_id = data.get('id')
+        option_id = int(raw_id) if raw_id and str(raw_id).strip() != "" else None
+        
+        store_id = int(data.get('store'))
+        currency_id = int(data.get('currency'))
+        tender_id = int(data.get('tender'))
+        raw_is_retail = data.get('storeIsRetail')
+        
+        if isinstance(raw_is_retail, str):
+            # Si es un string "false" o "true", lo convertimos a su equivalente lógico
+            if raw_is_retail.lower() == 'true':
+                is_retail = 1
+            elif raw_is_retail.lower() == 'false':
+                is_retail = 0
+            else:
+                # Si es un string numérico "0" o "1"
+                is_retail = int(raw_is_retail)
+        else:
+            # Si ya viene como booleano real o int desde el JSON
+            is_retail = 1 if raw_is_retail else 0
+            
+        bank_name = data.get('bank_account')
+        destiny = data.get('destination')
+        description = data.get('description')
+        rif = data.get('rif')
+
+        saved_id = set_payment_option(option_id, store_id, currency_id, tender_id, 
+                   bank_name, destiny, description, rif, is_retail)
+        print(f"[APP] save_payment_option saved_id={saved_id}")
+        return jsonify({'status': 'success', 'message': 'Guardado correctamente', 'id': saved_id})
+
+    except Exception as e:
+        print(f"Error detallado: {e}") # Esto saldrá en tu terminal de Python
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    
 
 @app.route('/receiptSeller')
 def homeSeller():

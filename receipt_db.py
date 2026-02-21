@@ -848,19 +848,66 @@ def get_payment_options_filters():
     
     filters = {}
     # Obtener Tiendas únicas
-    cursor.execute("SELECT DISTINCT S.Name FROM Main.Store S WHERE S.isRetail = 0 AND S.ID != 0 ORDER BY 1")
-    filters['stores'] = [r[0] for r in cursor.fetchall()]
+    cursor.execute("SELECT DISTINCT S.Name, S.ID, S.isRetail FROM Main.Store S WHERE S.isRetail = 0 AND S.ID != 0 ORDER BY 1")
+    filters['stores'] = [{'name': r[0], 'id': r[1], 'isRetail': r[2]} for r in cursor.fetchall()]
     
     # Obtener Monedas únicas
-    cursor.execute("SELECT DISTINCT C.Description FROM Commission_Receipt.PaymentOption O JOIN Main.Currency C ON O.CurrencyID = C.ID AND O.IsRetail = C.isRetail ORDER BY 1")
-    filters['currencies'] = [r[0] for r in cursor.fetchall()]
+    cursor.execute("SELECT DISTINCT C.Description, C.ID, C.isRetail FROM Commission_Receipt.PaymentOption O JOIN Main.Currency C ON O.CurrencyID = C.ID AND O.IsRetail = C.isRetail ORDER BY 1")
+    filters['currencies'] = [{'name': r[0], 'id': r[1], 'isRetail': r[2]} for r in cursor.fetchall()]
     
     # Obtener Tenders únicos
-    cursor.execute("SELECT DISTINCT T.Description FROM Main.Tender T ORDER BY 1")
-    filters['tenders'] = [r[0] for r in cursor.fetchall()]
+    cursor.execute("SELECT DISTINCT T.Description, T.ID, T.isRetail FROM Main.Tender T WHERE T.isRetail = 0 ORDER BY 1")
+    filters['tenders'] = [{'name': r[0], 'id': r[1], 'isRetail': r[2]} for r in cursor.fetchall()]
     
     conn.close()
     return filters
+
+def set_payment_option(option_id, store_id, currency_id, tender_id, bank_name, destiny, description, rif, is_retail):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        print(f"[DB] set_payment_option called with option_id={option_id}, store_id={store_id}, currency_id={currency_id}, tender_id={tender_id}, is_retail={is_retail}")
+
+        if option_id:
+            # MODO EDICIÓN: UPDATE
+            query = """
+                UPDATE Commission_Receipt.PaymentOption 
+                SET BankName = %s, Destiny = %s, StoreID = %s, CurrencyID = %s, 
+                    IsRetail = %s, TenderID = %s, Description = %s, RIF = %s
+                WHERE AccountID = %s
+            """
+            params = (bank_name, destiny, store_id, currency_id, is_retail, tender_id, description, rif, option_id)
+            cursor.execute(query, params)
+            saved_id = option_id
+        else:
+            # MODO NUEVO: INSERT
+            query = """
+                INSERT INTO Commission_Receipt.PaymentOption
+                (BankName, Destiny, StoreID, CurrencyID, IsRetail, TenderID, Description, RIF)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            params = (bank_name, destiny, store_id, currency_id, is_retail, tender_id, description, rif)
+            cursor.execute(query, params)
+            # Obtener el ID insertado en SQL Server
+            cursor.execute('SELECT SCOPE_IDENTITY()')
+            row = cursor.fetchone()
+            saved_id = int(row[0]) if row and row[0] is not None else None
+
+        conn.commit()
+        print(f"[DB] set_payment_option committed, saved_id={saved_id}")
+        return saved_id
+
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        print(f"[DB][ERROR] set_payment_option failed: {e}")
+        raise
+
+    finally:
+        conn.close()
 
 def get_invoices_by_customer(customer_id, customer_isRembd, store_id, salesRep_id):
     conn = get_db_connection()

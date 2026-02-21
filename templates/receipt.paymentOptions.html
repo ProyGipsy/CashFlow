@@ -173,25 +173,27 @@
         const mCurr = document.getElementById('modal-currency');
         const mTender = document.getElementById('modal-tender');
 
-        const fill = (sel, data, includeAll = true) => {
+        const fill = (sel, data, includeAll = true, valueKey = 'name') => {
             if (!sel) return;
             sel.innerHTML = includeAll ? '<option value="ALL">Todas</option>' : '';
             data.forEach(item => {
                 const opt = document.createElement('option');
-                opt.value = item;
-                opt.textContent = item;
+                opt.value = item[valueKey];
+                opt.textContent = item.name;
+                opt.setAttribute('data-isretail', item.isRetail);
                 sel.appendChild(opt);
             });
         };
 
-        fill(storeSel, filtersData.stores);
-        fill(currSel, filtersData.currencies);
-        fill(tenderSel, filtersData.tenders);
+        // Filtros
+        fill(storeSel, filtersData.stores, 'name');
+        fill(currSel, filtersData.currencies, 'name');
+        fill(tenderSel, filtersData.tenders, 'name');
         
-        // Llenar selects del modal (sin la opción "Todas")
-        fill(mStore, filtersData.stores, false);
-        fill(mCurr, filtersData.currencies, false);
-        fill(mTender, filtersData.tenders, false);
+        // Selects del Modal
+        fill(mStore, filtersData.stores, false, 'id');
+        fill(mCurr, filtersData.currencies, false, 'id');
+        fill(mTender, filtersData.tenders, false, 'id');
     }
 
     // Función para cambiar de página sin perder filtros
@@ -352,26 +354,52 @@
         const id = row.getAttribute('data-id');
         const cells = row.querySelectorAll('td');
 
+        // Cambiar el título y asignar el ID oculto
         document.getElementById('modalTitle').textContent = 'Editar Opción de Pago';
         document.getElementById('edit-id').value = id;
-        
-        // Mapeo de valores de la tabla al modal
-        document.getElementById('modal-store').value = cells[0].textContent;
-        document.getElementById('modal-currency').value = cells[1].textContent;
-        document.getElementById('modal-tender').value = cells[2].textContent;
-        document.getElementById('modal-bank').value = cells[3].textContent;
-        document.getElementById('modal-destination').value = cells[4].textContent;
-        document.getElementById('modal-description').value = cells[6].textContent;
-        
-        // Procesar RIF (Ejemplo: J-50078513-5)
+
+        /**
+         * Función auxiliar para seleccionar una opción en un <select> 
+         * basándose en el texto visible, ya que el .value ahora espera un ID.
+         */
+        const selectByText = (selectId, text) => {
+            const sel = document.getElementById(selectId);
+            const options = Array.from(sel.options);
+            // Buscamos la opción cuyo texto coincida con lo que dice la celda de la tabla
+            const targetOption = options.find(opt => opt.text.trim() === text.trim());
+            if (targetOption) {
+                sel.value = targetOption.value;
+            }
+        };
+
+        // 1. Mapeo de Selects (usando la función auxiliar por nombre/texto)
+        selectByText('modal-store', cells[0].textContent);
+        selectByText('modal-currency', cells[1].textContent);
+        selectByText('modal-tender', cells[2].textContent);
+
+        // 2. Mapeo de Inputs de texto simples
+        document.getElementById('modal-bank').value = cells[3].textContent.trim();
+        document.getElementById('modal-destination').value = cells[4].textContent.trim();
+        document.getElementById('modal-description').value = cells[6].textContent.trim();
+
+        // 3. Procesar RIF (Celda 5)
+        // Se espera formato "Letra-Numeros-Digito" (ej: J-50078513-5)
         const fullRif = cells[5].textContent.trim();
         if (fullRif.includes('-')) {
             const parts = fullRif.split('-'); 
-            document.getElementById('modal-rif-prefix').value = parts[0]; // "J"
-            // Unir el resto para el número (50078513 y 5)
-            document.getElementById('modal-rif-number').value = parts[1] + '-' + parts[2];
+            // El primer segmento es el prefijo (V, E, J, etc.)
+            document.getElementById('modal-rif-prefix').value = parts[0]; 
+            
+            // Reconstruimos el número con el guion final (ej: 50078513-5)
+            // Usamos slice(1) por si el RIF tuviera más guiones inesperados
+            document.getElementById('modal-rif-number').value = parts.slice(1).join('-');
+        } else {
+            // Limpiar campos si el RIF en la tabla no tiene el formato esperado
+            document.getElementById('modal-rif-prefix').value = 'V';
+            document.getElementById('modal-rif-number').value = '';
         }
 
+        // Mostrar el modal
         document.getElementById('paymentModal').style.display = 'block';
     }
 
@@ -401,26 +429,29 @@
 
     document.getElementById('paymentForm').onsubmit = async function(e) {
         e.preventDefault();
-        
+
+        const submitBtn = document.querySelector('#paymentForm .save-button');
+        if (submitBtn && submitBtn.disabled) return; // evitar envíos duplicados
+
         // Obtener valores de los inputs
         const bank = document.getElementById('modal-bank').value.trim();
         const prefix = document.getElementById('modal-rif-prefix').value;
         const rifNum = document.getElementById('modal-rif-number').value.trim();
         const description = document.getElementById('modal-description').value.trim();
-        
+
         // Validación de campos obligatorios
         if (!bank) {
             alert("El campo 'Cuenta Bancaria' es obligatorio. Por favor, complételo.");
             document.getElementById('modal-bank').focus();
             return;
         }
-        
+
         if (!rifNum || rifNum.length < 3) { // Validación mínima
             alert("El campo 'RIF' es obligatorio y debe tener un formato válido.");
             document.getElementById('modal-rif-number').focus();
             return;
         }
-        
+
         if (!description) {
             alert("El campo 'Descripción' es obligatorio. Por favor, complételo.");
             document.getElementById('modal-description').focus();
@@ -430,17 +461,59 @@
         // Si pasa las validaciones, procedemos con el envío
         const formData = new FormData(this);
         const data = Object.fromEntries(formData.entries());
+
+        // Obtener los elementos select del modal para extraer el isRetail
+        const storeSelect = document.getElementById('modal-store');
+        const currSelect = document.getElementById('modal-currency');
+        const tenderSelect = document.getElementById('modal-tender');
+
+        data.storeIsRetail = storeSelect.options[storeSelect.selectedIndex].getAttribute('data-isretail');
+        data.currencyIsRetail = currSelect.options[currSelect.selectedIndex].getAttribute('data-isretail');
+        data.tenderIsRetail = tenderSelect.options[tenderSelect.selectedIndex].getAttribute('data-isretail');
+
         data.rif = `${prefix}-${rifNum}`;
         delete data.rif_prefix;
         delete data.rif_number;
-        
+
         console.log("Datos validados listos para enviar:", data);
-        
-        // Aquí iría tu fetch a la API
-        // await fetch('/api/savePaymentOption', { ... });
-        
-        alert("Opción de pago guardada exitosamente");
-        closeModal();
+
+        // Deshabilitar botón para evitar múltiples envíos
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.dataset.origText = submitBtn.textContent;
+            submitBtn.textContent = 'Guardando...';
+        }
+
+        try {
+            const response = await fetch('/api/savePaymentOption', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                alert("Opción de pago guardada exitosamente");
+                closeModal();
+                // Refrescar la tabla para ver los cambios inmediatamente
+                updateTable(); 
+            } else {
+                alert("Error del servidor: " + result.message);
+                // Rehabilitar el botón si hubo error
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = submitBtn.dataset.origText || 'Guardar Cambios';
+                }
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("No se pudo conectar con el servidor.");
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = submitBtn.dataset.origText || 'Guardar Cambios';
+            }
+        }
     };
 
 </script>
