@@ -152,10 +152,14 @@
     </div>
     
     <br>
+    <div class="inline-label">
+        <label for="commission-calculation">Asignación de Pagos y Cálculo de Comisión:</label>
+    </div>
     <table class="styled-table heading-table"> 
         <tr>
             <th>Tipo</th> 
             <th>N_CTA</th>
+            <th>Importe Pagado</th>
             <th>Importe Adeudado</th>
             <th class="col-daysElapsed">Días Transcurridos</th>
             <th class="col-commission">Comisión</th>
@@ -165,6 +169,15 @@
         <tr class="{% if receipt[6] == 'N/C' %}hidden-nc{% endif %}">
             <td><p>{{ receipt[6] }}</p></td> 
             <td><p>{{ receipt[0] }}</p></td>
+            <!-- <td><p class="applied-amount">0,00</p></td> -->
+            <td>
+                <input type="number" 
+                    class="input-field small-input applied-amount-input" 
+                    step="0.01" 
+                    min="0" 
+                    value="0.00" 
+                    onchange="handleManualAssignment(this)">
+            </td>
             <td><p id="balance_calculation" data-original-value="{{ "%.2f"|format(receipt[1] - receipt[4]) }}" data-due-date="{{ receipt[3] }}">{{ "{:,.2f}".format(receipt[1] - receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
             <td><p id="days_passed"></p></td>
             <td><p id="commission_received"></p></td>
@@ -172,7 +185,6 @@
         {% endfor %}
     </table>
 
-    <br><br>
     <div class="inline-label">
         <label for="commission_note">Comisión Total:</label>
         <span id="commission_note" class="small-input">0,00</span> 
@@ -648,6 +660,38 @@
             dateInput.addEventListener('change', dateInput._onChange);
             dateInput.addEventListener('input', dateInput._onInput);
         });
+
+        // Listeners for los inputs 'Importe Pagado' (asigned amounts) para control manual
+        const appliedAmountInputs = document.querySelectorAll('.applied-amount-input');
+        appliedAmountInputs.forEach((input, idx) => {
+            if (input._onInputManual) input.removeEventListener('input', input._onInputManual);
+            input._onInputManual = function() {
+                input.dataset.manual = "true";
+                // Normalizar valor y no permitir negativos
+                let val = parseFloat(input.value) || 0;
+                if (val < 0) { val = 0; input.value = val.toFixed(2); }
+
+                // Limitar por el importe adeudado descontado
+                const balanceEls = document.querySelectorAll('#balance_calculation');
+                const balanceEl = balanceEls[idx];
+                const original = balanceEl ? parseFloat(balanceEl.dataset.originalValue) || 0 : 0;
+                const generalDiscount = parseFloat(document.getElementById('general_discount').value) || 0;
+                const discounted = original * (1 - generalDiscount / 100);
+                if (val > discounted) { val = discounted; input.value = val.toFixed(2); }
+
+                // No exceder el total ingresado en el recibo
+                const totalPaid = parseFloat(cleanNumberForServer(document.getElementById('balance_note').textContent)) || 0;
+                let sumOthers = 0;
+                appliedAmountInputs.forEach((el, i) => {
+                    if (i !== idx && el.dataset.manual === "true") sumOthers += parseFloat(el.value) || 0;
+                });
+                const availableForThis = Math.max(0, totalPaid - sumOthers);
+                if (val > availableForThis) { val = availableForThis; input.value = val.toFixed(2); }
+
+                distributeBalanceAcrossReceipts(totalPaid);
+            };
+            input.addEventListener('input', input._onInputManual);
+        });
     }
 
     // Cálculo del Saldo de la Nota
@@ -678,7 +722,7 @@
     // Cálculo de Días Transcurridos y Comisión
     function updateDaysAndCommission() {
         updateBalanceNote();
-        const balanceNoteValue = parseFloat(document.getElementById('balance_note').textContent) || 0;
+        const balanceNoteValue = document.getElementById('balance_note').textContent || 0;
         distributeBalanceAcrossReceipts(balanceNoteValue);
     }
 
@@ -728,6 +772,15 @@
         });
     }
 
+    // Asignación Manual de Montos a Facturas (con validación)
+    function handleManualAssignment(input) {
+        // Marcar como manual y delegar validación a la rutina central
+        input.dataset.manual = "true";
+        // Recalcular usando el balance actual (updateBalanceNote ya actualiza #balance_note)
+        const balanceNoteValue = parseFloat(cleanNumberForServer(document.getElementById('balance_note').textContent)) || 0;
+        distributeBalanceAcrossReceipts(balanceNoteValue);
+    }
+
     // Cálculo de Impuesto Adeudado. Días Transcurridos y Comisión para las demás filas
     function distributeBalanceAcrossReceipts(balanceNote) {
         const balanceCalculationFields = document.querySelectorAll('#balance_calculation');
@@ -736,6 +789,17 @@
         const generalDiscount = parseFloat(document.getElementById('general_discount').value) || 0;
         const paymentRows = document.querySelectorAll('.payment-row');
         const receiptCurrency = "{{ receiptStoreCustomer[6] }}";
+
+        // Asegurar un valor numérico de balanceNote (se acepta undefined cuando se llama sin parámetro)
+        if (typeof balanceNote !== 'number') {
+            balanceNote = parseFloat(cleanNumberForServer(document.getElementById('balance_note').textContent)) || 0;
+        }
+
+        // Lista de inputs que representan el "Importe Pagado" por factura
+        const amountInputs = document.querySelectorAll('.applied-amount-input');
+        // Saldo disponible para distribución (en moneda del recibo)
+        let availableBalance = parseFloat(balanceNote) || 0;
+
         // Cargar lista de monedas desde template
         const currenciesList = JSON.parse('{{ currencies | tojson | safe }}');
         const exchangeRate = parseFloat("{{ currencies[0][2] }}");
@@ -744,18 +808,21 @@
             const found = currenciesList.find(c => String(c[0]) == String(id));
             return found ? (found[1] || found[0]) : id;
         }
+
         // Preparar datos de pagos
         // Agregar paymentRowIdx para rastrear el índice de la forma de pago
         const paymentData = Array.from(paymentRows).map((row, idx) => {
             const currencySelect = row.querySelector('select[name="currency"]');
-            let entryAmount = row.querySelector('input[name="payment_amount"]').value;
+            let entryAmount = row.querySelector('input[name="payment_amount"]') .value;
             let convertedAmount = entryAmount;
             const paymentMethodSelect = row.querySelector('select[name="payment_method"]');
             const paymentMethodText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex]?.text || '';
+
             if (currencySelect.value != receiptCurrency) {
                 const rate = row.dataset.exchangeRate ? parseFloat(row.dataset.exchangeRate) : null;
                 convertedAmount = convertAmountWithRate(receiptCurrency, currencySelect.value, entryAmount, rate);
             }
+            
             return {
                 // amount: usado para asignación en moneda del recibo (convertido si aplica)
                 amount: parseFloat(convertedAmount) || 0,
@@ -763,12 +830,13 @@
                 originalAmount: parseFloat(entryAmount) || 0,
                 currencyId: currencySelect.value,
                 date: row.querySelector('input[name="date_operation"]').value,
-                dateObj: row.querySelector('input[name="date_operation"]').value ? new Date(row.querySelector('input[name="date_operation"]').value) : null,
+                dateObj: row.querySelector('input[name="date_operation"]') .value ? new Date(row.querySelector('input[name="date_operation"]').value) : null,
                 isRetention: paymentMethodText.toUpperCase().includes('RETENCIONES'),
                 row: row,
                 paymentRowIdx: idx // Índice de la forma de pago
             };
         });
+
         // Preparar datos de facturas
         const receiptData = Array.from(balanceCalculationFields).map((field, index) => {
             const originalValue = parseFloat(field.getAttribute('data-original-value')) || 0;
@@ -790,16 +858,84 @@
             };
         });
 
+        // 1. Primero: Respetar asignaciones manuales y N/C
+        receiptData.forEach((invoice, idx) => {
+            const input = amountInputs[idx];
+            if (input && input.dataset.manual === "true") {
+                let manualVal = parseFloat(input.value) || 0;
+
+                // No permitir que el usuario exceda el importe adeudado de la factura
+                if (manualVal > invoice.discountedValue) {
+                    manualVal = invoice.discountedValue;
+                    input.value = manualVal.toFixed(2);
+                }
+
+                // Validar que no exceda el saldo total ingresado en formas de pago
+                if (manualVal > availableBalance) {
+                    manualVal = availableBalance;
+                    input.value = manualVal.toFixed(2);
+                }
+
+                invoice.amountPaid = manualVal;
+                availableBalance = parseFloat((availableBalance - manualVal).toFixed(2));
+                invoice.remaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+                // Registrar un pago sintético para que el cálculo de comisiones lo incluya
+                try {
+                    const paymentDate = new Date();
+                    let realDays = 0;
+                    if (!isNaN(invoice.dueDate.getTime())){
+                        const diff = paymentDate - invoice.dueDate;
+                        realDays = Math.floor(diff / (1000 * 60 * 60 * 24));
+                    }
+                    const effectiveDays = isNaN(realDays) ? 0 : realDays;
+                    invoice.payments.push({
+                        amount: manualVal,
+                        paymentDate: paymentDate,
+                        daysElapsed: effectiveDays,
+                        realDays: realDays,
+                        paymentRowIdx: -1,
+                        calculateCommission: true
+                    });
+                } catch (e) {
+                    console.error('Error registrando pago sintético por asignación manual:', e);
+                }
+            }
+        });
+
         // Distribución de N/C como si fueran pagos del vendedor
         applyCreditNotesAsPayments(receiptData)
 
-        // Distribuir pagos y retenciones a facturas en orden
+        // Ajustar paymentData para reservar las porciones ya consumidas por asignaciones manuales.
+        // Esto evita que la distribución automática vuelva a usar esos montos.
+        try {
+            const totalPaymentSum = paymentData.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+            const consumedByManual = parseFloat((totalPaymentSum - availableBalance).toFixed(2));
+            if (consumedByManual > 0) {
+                let remainingToDeduct = consumedByManual;
+                for (let i = 0; i < paymentData.length && remainingToDeduct > 0; i++) {
+                    const take = Math.min(paymentData[i].amount, remainingToDeduct);
+                    paymentData[i].amount = parseFloat((paymentData[i].amount - take).toFixed(2));
+                    remainingToDeduct = parseFloat((remainingToDeduct - take).toFixed(2));
+                }
+            }
+        } catch (e) {
+            console.error('Error ajustando paymentData por asignaciones manuales:', e);
+        }
+
+        // 3. Distribuir el availableBalance restante en las facturas NO manuales
         let paymentIndex = 0;
         let invoiceIndex = 0;
+
         while (paymentIndex < paymentData.length && invoiceIndex < receiptData.length) {
             let payment = paymentData[paymentIndex];
             let invoice = receiptData[invoiceIndex];
+            const input = amountInputs[invoiceIndex];
             let invoiceRemaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+            // Saltamos si ya fue asignada manualmente
+            if (input && input.dataset.manual === "true") {
+                invoiceIndex++;
+                continue;
+            }
             if (invoiceRemaining <= 0) {
                 invoiceIndex++;
                 continue;
@@ -880,6 +1016,12 @@
         let totalCommissionPerCurrency = {}; // Ejemplo: { 'Bs': 150.00, 'USD': 50.00 }
         const businessRules = JSON.parse('{{ commissions | tojson | safe }}');
         receiptData.forEach((invoice, idx) => {
+            // Referencia a la celda de "Importe Pagado"
+            const input = amountInputs[idx];
+            if (input && input.dataset.manual !== "true") {
+                input.value = invoice.amountPaid.toFixed(2);
+            }
+
             // Mostrar saldo pendiente
             balanceCalculationFields[idx].textContent = formatSpanishNumber(invoice.remaining);
             invoice.element.dataset.invoicePaidAmount = invoice.amountPaid.toFixed(2);
