@@ -890,25 +890,41 @@
                 invoice.amountPaid = manualVal;
                 availableBalance = parseFloat((availableBalance - manualVal).toFixed(2));
                 invoice.remaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
-                // Registrar un pago sintético para que el cálculo de comisiones lo incluya
-                try {
-                    const paymentDate = new Date();
+                
+                let remainingToCover = manualVal;
+
+                // Buscamos en las formas de pago (paymentData) para ver qué fecha usar
+                for (let p of paymentData) {
+                    if (remainingToCover <= 0) break;
+                    if (p.amount <= 0) continue;
+
+                    let take = Math.min(p.amount, remainingToCover);
+                    
+                    // Calculamos días usando la fecha de ESTA forma de pago
                     let realDays = 0;
-                    if (!isNaN(invoice.dueDate.getTime())){
-                        const diff = paymentDate - invoice.dueDate;
-                        realDays = Math.floor(diff / (1000 * 60 * 60 * 24));
+                    if (p.dateObj && !isNaN(invoice.dueDate.getTime())) {
+                        const diff = p.dateObj - invoice.dueDate;
+                        realDays = Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
                     }
-                    const effectiveDays = isNaN(realDays) ? 0 : realDays;
+
+                    const effectiveDays = p.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays);
+
                     invoice.payments.push({
-                        amount: manualVal,
-                        paymentDate: paymentDate,
+                        amount: take,
+                        paymentDate: p.dateObj,
                         daysElapsed: effectiveDays,
-                        realDays: realDays,
-                        paymentRowIdx: -1,
+                        realDays: isNaN(realDays) ? 0 : realDays,
+                        paymentRowIdx: p.paymentRowIdx,
                         calculateCommission: true
                     });
-                } catch (e) {
-                    console.error('Error registrando pago sintético por asignación manual:', e);
+
+                    // Restamos del saldo de la forma de pago para que la distribución auto no lo use
+                    p.amount = parseFloat((p.amount - take).toFixed(2));
+                    remainingToCover = parseFloat((remainingToCover - take).toFixed(2));
+                    
+                    if (p.isRetention) {
+                        invoice.retentionApplied = parseFloat((invoice.retentionApplied + take).toFixed(2));
+                    }
                 }
             }
         });
