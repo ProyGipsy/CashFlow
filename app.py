@@ -914,9 +914,9 @@ def submit_receipt():
         store_name = request.form.get('store_name', '')
         customer_name = request.form.get('customer_name', '')
         currency = request.form.get('currency', '')
-        send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
-        send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
-        send_receipt_PaymentProofNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
+        #send_receipt_adminNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
+        #send_receipt_salesRepNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
+        #send_receipt_PaymentProofNotification(receipt_id, store_id, store_name, customer_name, balance_note, comision_bs, comision_usd, currency, ncta_str)
         
         return redirect(url_for('accountsReceivable'))
     

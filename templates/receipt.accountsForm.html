@@ -1296,6 +1296,9 @@
         return typeof numberStr !== 'string' ? numberStr : numberStr.replace(/\./g, '').replace(',', '.');
     }
 
+    // ¡¡OJO!!
+    // SendReceipt repite parte del código de BalanceDistribution
+    // El primero es lo que se muestra en la interfaz y el segundo es lo que se envía al servidor, por lo que en ocasiones se necesitan ambos para manejar diferencias entre lo mostrado y lo enviado
     function sendReceipt() {
         closeConfirmationModal();
         document.getElementById('loadingModal').style.display = 'flex';
@@ -1430,16 +1433,70 @@
         applyCreditNotesAsPayments(receiptData)
 
         // Reconstruir los pagos aplicados a cada factura usando la misma lógica
+        const amountInputs = document.querySelectorAll('.applied-amount-input');
+        let availableBalance = paymentData.reduce((sum, p) => sum + p.amount, 0);
+
+        // A. Primero: Procesar los inputs manuales
+        receiptData.forEach((invoice, idx) => {
+            const input = amountInputs[idx];
+            if (input && input.dataset.manual === "true") {
+                let manualVal = parseFloat(cleanNumberForServer(input.value)) || 0;
+                manualVal = Math.min(manualVal, invoice.discountedValue, availableBalance);
+
+                let remainingToCover = manualVal;
+                // Consumir de paymentData
+                for (let p of paymentData) {
+                    if (remainingToCover <= 0.001) break;
+                    if (p.amount <= 0.001) continue;
+
+                    let take = Math.min(p.amount, remainingToCover);
+                    let realDays = 0;
+                    if (p.dateObj && !isNaN(invoice.dueDate.getTime())) {
+                        const diff = p.dateObj - invoice.dueDate;
+                        realDays = Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
+                    }
+
+                    invoice.payments.push({
+                        amount: take,
+                        paymentDate: p.dateObj,
+                        daysElapsed: p.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays),
+                        realDays: isNaN(realDays) ? 0 : realDays,
+                        paymentRowIdx: p.paymentRowIdx
+                    });
+
+                    p.amount = parseFloat((p.amount - take).toFixed(2));
+                    remainingToCover = parseFloat((remainingToCover - take).toFixed(2));
+                    invoice.amountPaid = parseFloat((invoice.amountPaid + take).toFixed(2));
+                    availableBalance = parseFloat((availableBalance - take).toFixed(2));
+                }
+                invoice.remaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+            }
+        });
+
+        // B. Segundo: Distribución automática para el resto (Bucle While Original)
         let paymentIndex = 0;
         let invoiceIndex = 0;
         while (paymentIndex < paymentData.length && invoiceIndex < receiptData.length) {
             let payment = paymentData[paymentIndex];
             let invoice = receiptData[invoiceIndex];
-            let invoiceRemaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
-            if (invoiceRemaining <= 0) {
+            
+            // Si es manual, ya se procesó, saltar
+            if (amountInputs[invoiceIndex]?.dataset.manual === "true") {
                 invoiceIndex++;
                 continue;
             }
+
+            let invoiceRemaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+            if (invoiceRemaining <= 0.001) {
+                invoiceIndex++;
+                continue;
+            }
+
+            if (payment.amount <= 0.001) {
+                paymentIndex++;
+                continue;
+            }
+
             let amountToApply = Math.min(payment.amount, invoiceRemaining);
             if (amountToApply > 0) {
                 let realDays = 0;
@@ -1447,27 +1504,22 @@
                     const difference = payment.dateObj - invoice.dueDate;
                     realDays = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
                 }
-                const effectiveDays = payment.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays);
+                
                 invoice.payments.push({
                     amount: amountToApply,
                     paymentDate: payment.dateObj,
-                    daysElapsed: effectiveDays,
+                    daysElapsed: payment.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays),
                     realDays: isNaN(realDays) ? 0 : realDays,
                     paymentRowIdx: payment.paymentRowIdx
                 });
+
                 invoice.amountPaid = parseFloat((invoice.amountPaid + amountToApply).toFixed(2));
                 invoice.remaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
-                if (payment.isRetention) {
-                    invoice.retentionApplied = parseFloat((invoice.retentionApplied + amountToApply).toFixed(2));
-                }
                 payment.amount = parseFloat((payment.amount - amountToApply).toFixed(2));
             }
-            if (payment.amount <= 0.001) {
-                paymentIndex++;
-            }
-            if (invoice.remaining <= 0.001) {
-                invoiceIndex++;
-            }
+
+            if (payment.amount <= 0.001) paymentIndex++;
+            if (invoice.remaining <= 0.001) invoiceIndex++;
         }
         // Obtener businessRules
         const businessRules = JSON.parse('{{ commissions | tojson | safe }}');
