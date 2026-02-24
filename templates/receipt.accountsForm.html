@@ -159,7 +159,18 @@
         <tr>
             <th>Tipo</th> 
             <th>N_CTA</th>
-            <th>Importe Pagado</th>
+            <!-- <th>Importe Pagado</th> -->
+             <th>
+                <div style="display: flex; gap: 5px;">
+                    Importe Pagado
+                    <div class="tooltip-container">
+                        <span class="info-icon">i</span>
+                        <span class="tooltip-text">
+                            Este monto representa la distribución del monto total del recibo entre los documentos involucrados. Puede ajustar manualmente cada importe abonado, el sistema ajustará automáticamente el resto de abonos para no exceder el total ingresado.
+                        </span>
+                    </div>
+                </div>
+            </th>
             <th>Importe Adeudado</th>
             <th class="col-daysElapsed">Días Transcurridos</th>
             <th class="col-commission">Comisión</th>
