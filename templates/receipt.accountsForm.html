@@ -26,10 +26,11 @@
         <tr> 
             <th>N_CTA</th>
             <th>Tipo de Documento</th>
-            <th>Total Deuda (T/D)</th>
+            <th>Monto Documento</th>
             <th>Fecha Emisión</th>
             <th>Fecha Vencimiento</th>
             <th>Monto Abonado</th>
+            <th>Monto Pendiente</th>
         </tr> 
         {% for receipt in receiptDetails %}
         <tr> 
@@ -45,8 +46,10 @@
             <td><p>{{ receipt[2].strftime('%d-%m-%Y') }}</p></td>
             <td><p>{{ receipt[3].strftime('%d-%m-%Y') }}</p></td>
             <td><p>{{ receiptStoreCustomer[5] }} {{ "{:,.2f}".format(receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
+            <td><p>{{ receiptStoreCustomer[5] }} {{ "{:,.2f}".format(receipt[1]-receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
             <td class="hidden-column">
                 <input type="hidden" name="account_id[]" value="{{ receipt[5] }}" />
+                <input type="hidden" name="issue_date[]" value="{{ receipt[2].strftime('%Y-%m-%d') }}" />
             </td>
         </tr> 
         {% endfor %}
@@ -110,7 +113,7 @@
                     </select>
                 </td>
                 <td class="col-date"><input type="date" id="date_operation" name="date_operation" class="input-field"></td>
-                <td class="col-amount"><input type="number" name="payment_amount" step="0.01" class="input-field" value="0.00"></td>
+                <td class="col-amount"><input type="number" name="payment_amount" step="0.01" class="input-field" value="0.01" min="0.01"></td>
                 <td class="col-reference"><input type="text" name="reference" class="input-field"></td>
                 <td class="col-account"><select name="payment_made" class="input-field">
                     <option value="" disabled selected>Cuenta Bancaria</option> 
@@ -139,6 +142,7 @@
     <div class="file-upload-container">
         <div class="upload-header">
             <label for="proof_of_payment">Cargar Comprobante(s):</label>
+            <p>Debe cargar tantos comprobantes como formas de pago haya agregado.</p>
         </div>
         <div class="upload-area">
             <div class="file-input-wrapper">
@@ -392,9 +396,14 @@
         const month = String(today.getMonth() + 1).padStart(2, '0');
         const year = today.getFullYear();
         const maxDate = `${year}-${month}-${day}`;
-        dateInput.setAttribute("max", maxDate);
 
         document.getElementById('payment-table').appendChild(newPagoRow);
+
+        // Obtener la fecha mínima (más antigua de las fechas de emisión)
+        const minDate = getEarliestIssueDate();
+
+        dateInput.setAttribute("max", maxDate);
+        dateInput.setAttribute("min", minDate);
 
         // Carga de tenders default
         const defaultCurrencyId = '1';
@@ -412,6 +421,73 @@
         // Aplicar deshabilitación global en la nueva fila en caso de que aplique
         applyGlobalRetentionDisableToRows();
     });
+
+    // Función para obtener la fecha de emisión más temprana de todas las facturas
+    function getEarliestIssueDate() {
+        const issueDateInputs = document.querySelectorAll('input[name="issue_date[]"]');
+        let earliestDate = null;
+        
+        issueDateInputs.forEach(input => {
+            const dateStr = input.value;
+            if (dateStr) {
+                const date = new Date(dateStr);
+                if (!earliestDate || date < earliestDate) {
+                    earliestDate = date;
+                }
+            }
+        });
+        
+        if (!earliestDate) {
+            // Si no hay fechas, usar fecha actual menos 30 días como fallback
+            earliestDate = new Date();
+            earliestDate.setDate(earliestDate.getDate() - 30);
+        }
+        earliestDate.setDate(earliestDate.getDate() + 1);
+        
+        // Formatear a YYYY-MM-DD
+        const year = earliestDate.getFullYear();
+        const month = String(earliestDate.getMonth() + 1).padStart(2, '0');
+        const day = String(earliestDate.getDate()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}`;
+    }
+
+    // Función para formatear fecha para mostrar
+    function formatDateForDisplay(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
+    }
+
+    // Función para validar una fecha de pago específica
+    function validatePaymentDate(dateStr, row) {
+        if (!dateStr) return { isValid: true, message: '' };
+        
+        const paymentDate = new Date(dateStr);
+        const today = new Date();
+        const earliestIssueDate = new Date(getEarliestIssueDate());
+        
+        // Verificar que no sea mayor a hoy
+        if (paymentDate > today) {
+            return { 
+                isValid: false, 
+                message: 'La fecha de pago no puede ser mayor al día actual' 
+            };
+        }
+        
+        // Verificar que no sea menor a la fecha de emisión más temprana
+        if (paymentDate < earliestIssueDate) {
+            return { 
+                isValid: false, 
+                message: `La fecha de pago no puede ser anterior a ${formatDateForDisplay(earliestIssueDate.toISOString().split('T')[0])} (fecha de emisión más temprana)` 
+            };
+        }
+        
+        return { isValid: true, message: '' };
+    }
 
     function deleteRow(btn) {
         const row = btn.parentNode.parentNode;
@@ -501,51 +577,81 @@
     }
 
     // Selección de Comprobantes de Pago
+    // Keep selected files across multiple selections
+    let selectedFiles = [];
+
     function handleFileSelection(input) {
         const container = document.getElementById('selected-files-container');
-        container.innerHTML = '';
-        
         const paymentRows = document.querySelectorAll('.payment-row').length;
-        const filesToProcess = Array.from(input.files).slice(0, paymentRows); // Limitar a N archivos
-        
-        if (filesToProcess.length > 0) {
+        const newFiles = Array.from(input.files || []);
 
-            if (input.files.length > paymentRows) {
-                alert(`Solo puede cargar un máximo de ${paymentRows} comprobante(s) para ${paymentRows} forma(s) de pago`);
-                
-                const dataTransfer = new DataTransfer();
-                filesToProcess.forEach(file => dataTransfer.items.add(file));
-                input.files = dataTransfer.files;
-            }
-            
-            filesToProcess.forEach((file, i) => {
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    const previewDiv = document.createElement('div');
-                    previewDiv.className = 'file-preview';
-                    previewDiv.dataset.index = i;
-                    
-                    if (file.type.startsWith('image/')) {
-                        previewDiv.innerHTML = `
-                            <img src="${e.target.result}" alt="${file.name}">
-                            <button class="remove-file" onclick="removeFile(${i})">×</button>
-                            <div class="file-name">${file.name}</div>
-                        `;
-                    } else {
-                        previewDiv.innerHTML = `
-                            <div style="padding: 10px; text-align: center;">
-                                <p>PDF</p>
-                                <p>${file.name}</p>
-                            </div>
-                            <button class="remove-file" onclick="removeFile(${i})">×</button>
-                        `;
-                    }
-                    container.appendChild(previewDiv);
-                };
-                reader.readAsDataURL(file);
-            });
+        const remainingSlots = paymentRows - selectedFiles.length;
+        if (remainingSlots <= 0 && newFiles.length > 0) {
+            alert(`Solo puede cargar un máximo de ${paymentRows} comprobante(s) para ${paymentRows} forma(s) de pago`);
+            try { input.value = ''; } catch(e){}
+            return;
         }
+
+        let addedCount = 0;
+        for (const file of newFiles) {
+            if (addedCount >= remainingSlots) break;
+            // avoid duplicates by name+size
+            const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size && f.type === file.type);
+            if (!exists) {
+                selectedFiles.push(file);
+                addedCount++;
+            }
+        }
+
+        if (newFiles.length > addedCount) {
+            // some files were not added due to limit
+            alert(`Solo puede cargar un máximo de ${paymentRows} comprobante(s) para ${paymentRows} forma(s) de pago`);
+        }
+
+        // Reflect selectedFiles into the input element so form submit works
+        const dataTransfer = new DataTransfer();
+        selectedFiles.forEach(f => dataTransfer.items.add(f));
+        try { input.files = dataTransfer.files; } catch (e) { /* some browsers prevent setting files; still show previews */ }
+
+        syncInputFiles(input); 
+        renderSelectedFiles();
+        updateFileName(selectedFiles.length);
+    }
+
+    function syncInputFiles(input) {
+        const dataTransfer = new DataTransfer();
+        selectedFiles.forEach(file => dataTransfer.items.add(file));
+        input.files = dataTransfer.files; 
+    }
+
+    function renderSelectedFiles(){
+        const container = document.getElementById('selected-files-container');
+        container.innerHTML = '';
+        selectedFiles.forEach((file, i) => {
+            const reader = new FileReader();
+            reader.onload = function(e){
+                const previewDiv = document.createElement('div');
+                previewDiv.className = 'file-preview';
+                previewDiv.dataset.index = i;
+                if (file.type.startsWith('image/')) {
+                    previewDiv.innerHTML = `
+                        <img src="${e.target.result}" alt="${file.name}">
+                        <button class="remove-file" onclick="removeFile(${i})">×</button>
+                        <div class="file-name">${file.name}</div>
+                    `;
+                } else {
+                    previewDiv.innerHTML = `
+                        <div style="padding: 10px; text-align: center;">
+                            <p>PDF</p>
+                            <p>${file.name}</p>
+                        </div>
+                        <button class="remove-file" onclick="removeFile(${i})">×</button>
+                    `;
+                }
+                container.appendChild(previewDiv);
+            };
+            reader.readAsDataURL(file);
+        });
     }
     function updateFileName() {
         const fileInput = document.getElementById('proof_of_payment');
@@ -558,15 +664,14 @@
         }
     }
     function removeFile(index) {
+        selectedFiles.splice(index, 1);
+        // update the real input.files as well
         const input = document.getElementById('proof_of_payment');
-        const files = Array.from(input.files);
-        files.splice(index, 1);
-
         const dataTransfer = new DataTransfer();
-        files.forEach(file => dataTransfer.items.add(file));
-        input.files = dataTransfer.files;
-
-        handleFileSelection(input);
+        selectedFiles.forEach(file => dataTransfer.items.add(file));
+        try { input.files = dataTransfer.files; } catch(e){}
+        renderSelectedFiles();
+        updateFileName();
     }
 
     // Listener
@@ -577,9 +682,13 @@
         const year = today.getFullYear();
         const maxDate = `${year}-${month}-${day}`;
 
+        // Obtener fecha mínima basada en fechas de emisión
+        const minDate = getEarliestIssueDate();
+
         const firstDateInput = document.querySelector('input[name="date_operation"]');
         if (firstDateInput) {
             firstDateInput.setAttribute("max", maxDate);
+            firstDateInput.setAttribute("min", minDate);
         }
 
         addInputListeners();

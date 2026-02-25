@@ -105,7 +105,19 @@ from receipt_db import (
     check_duplicate_receipt,
     set_DebtSettlement,
     get_all_related_receipts,
-    set_SyncStatus
+    set_SyncStatus,
+    get_accountsHistory,
+    get_accountsHistory_admin,
+    get_accounts_history_page,
+    get_accounts_history_all,
+    get_accounts_history_filters,
+    get_accounts_history_count,
+    get_paymentOptions,
+    _get_payment_options_where,
+    get_payment_options_page,
+    get_payment_options_count,
+    get_payment_options_filters,
+    set_payment_option
     )
     
 from accessControl import (
@@ -675,9 +687,179 @@ def businessRules():
         return jsonify(success=True)
     return render_template('receipt.businessRules.html', page='businessRules', active_page='businessRules', rules=rules)
 
+@app.route('/paymentOptions')
+def paymentOptions():
+    page_num = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    # Carga inicial
+    options = get_payment_options_page(page=page_num, per_page=per_page)
+    total = get_payment_options_count()
+    available_filters = get_payment_options_filters()
+    
+    total_pages = (total + per_page - 1) // per_page
+    
+    return render_template('receipt.paymentOptions.html', 
+                           page='paymentOptions', 
+                           active_page='paymentOptions', 
+                           payment_options=options,
+                           filters=available_filters,
+                           current_page=page_num,
+                           total_pages=total_pages)
+
+@app.route('/api/paymentOptions')
+def api_payment_options():
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    filters = {
+        'store': request.args.get('store'),
+        'currency': request.args.get('currency'),
+        'tender': request.args.get('tender')
+    }
+    
+    rows = get_payment_options_page(page=page, per_page=per_page, filters=filters)
+    total = get_payment_options_count(filters=filters)
+    
+    return jsonify({
+        'options': rows,
+        'total': total,
+        'page': page,
+        'total_pages': (total + per_page - 1) // per_page
+    })
+
+@app.route('/api/savePaymentOption', methods=['POST'])
+def save_payment_option():
+    data = request.get_json()
+    
+    try:
+        # Convertimos a int los IDs que vienen como string del JSON
+        # El ID de la opción puede ser None o vacío si es un INSERT
+        raw_id = data.get('id')
+        option_id = int(raw_id) if raw_id and str(raw_id).strip() != "" else None
+        
+        store_id = int(data.get('store'))
+        currency_id = int(data.get('currency'))
+        tender_id = int(data.get('tender'))
+        raw_is_retail = data.get('storeIsRetail')
+        
+        if isinstance(raw_is_retail, str):
+            # Si es un string "false" o "true", lo convertimos a su equivalente lógico
+            if raw_is_retail.lower() == 'true':
+                is_retail = 1
+            elif raw_is_retail.lower() == 'false':
+                is_retail = 0
+            else:
+                # Si es un string numérico "0" o "1"
+                is_retail = int(raw_is_retail)
+        else:
+            # Si ya viene como booleano real o int desde el JSON
+            is_retail = 1 if raw_is_retail else 0
+            
+        bank_name = data.get('bank_account')
+        destiny = data.get('destination')
+        description = data.get('description')
+        rif = data.get('rif')
+
+        saved_id = set_payment_option(option_id, store_id, currency_id, tender_id, 
+                   bank_name, destiny, description, rif, is_retail)
+        print(f"[APP] save_payment_option saved_id={saved_id}")
+        return jsonify({'status': 'success', 'message': 'Guardado correctamente', 'id': saved_id})
+
+    except Exception as e:
+        print(f"Error detallado: {e}") # Esto saldrá en tu terminal de Python
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    
+
 @app.route('/receiptSeller')
 def homeSeller():
     return render_template('receipt.homeSeller.html', page='homeSeller', active_page='homeSeller')
+
+@app.route('/accountsHistory')
+def accountsHistory():
+    page_num = request.args.get('page', 1, type=int)
+    per_page = 30
+
+    is_admin = (0 in session.get('roles', []) and 1 in session.get('roles', []))
+    # Fetch only the page to render initially
+    if is_admin:
+        paginated_accounts = get_accounts_history_page(page=page_num, per_page=per_page, admin=True)
+        total = get_accounts_history_count(admin=True)
+        filters = get_accounts_history_filters(admin=True)
+    else:
+        paginated_accounts = get_accounts_history_page(salesRep_id=session.get('salesRep_id'), page=page_num, per_page=per_page)
+        total = get_accounts_history_count(salesRep_id=session.get('salesRep_id'))
+        filters = get_accounts_history_filters(salesRep_id=session.get('salesRep_id'))
+
+    total_pages = (total + per_page - 1) // per_page
+
+    return render_template('receipt.accountsHistory.html',
+                           page='accountsHistory',
+                           active_page='accountsHistory',
+                           accounts_history=paginated_accounts,
+                           filters=filters,
+                           current_page=page_num,
+                           total_pages=total_pages,
+                           per_page=per_page)
+
+
+
+@app.route('/api/accountsHistory')
+def api_accounts_history():
+    # Returns JSON for filtered/paginated accounts; if 'all' param is set, returns full filtered set
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 1000, type=int)
+    all_flag = request.args.get('all', 'false').lower() == 'true'
+
+    filters = {
+        'year': request.args.get('year'),
+        'month': request.args.get('month'),
+        'store': request.args.get('store'),
+        'customer': request.args.get('customer'),
+        'currency': request.args.get('currency'),
+        'docType': request.args.get('docType'),
+        'status': request.args.get('status'),
+        'ncta': request.args.get('ncta'),
+        'customerSearch': request.args.get('customerSearch')
+    }
+
+    is_admin = (0 in session.get('roles', []) and 1 in session.get('roles', []))
+
+    if all_flag:
+        if is_admin:
+            rows = get_accounts_history_all(filters=filters, admin=True)
+        else:
+            rows = get_accounts_history_all(salesRep_id=session.get('salesRep_id'), filters=filters)
+        def _serialize_row(r):
+            out = []
+            for v in r:
+                if isinstance(v, Decimal):
+                    out.append(float(v))
+                elif isinstance(v, (datetime,)):
+                    out.append(v.strftime('%Y-%m-%d'))
+                else:
+                    out.append(v)
+            return out
+        rows_s = [_serialize_row(r) for r in rows]
+        return jsonify({'accounts': rows_s, 'total': len(rows_s)})
+    else:
+        if is_admin:
+            total = get_accounts_history_count(filters=filters, admin=True)
+            rows = get_accounts_history_page(page=page, per_page=per_page, filters=filters, admin=True)
+        else:
+            total = get_accounts_history_count(salesRep_id=session.get('salesRep_id'), filters=filters)
+            rows = get_accounts_history_page(salesRep_id=session.get('salesRep_id'), page=page, per_page=per_page, filters=filters)
+        def _serialize_row(r):
+            out = []
+            for v in r:
+                if isinstance(v, Decimal):
+                    out.append(float(v))
+                elif isinstance(v, (datetime,)):
+                    out.append(v.strftime('%Y-%m-%d'))
+                else:
+                    out.append(v)
+            return out
+        rows_s = [_serialize_row(r) for r in rows]
+        return jsonify({'accounts': rows_s, 'total': total, 'page': page, 'per_page': per_page})
 
 @app.route('/accountsReceivable')
 def accountsReceivable():
