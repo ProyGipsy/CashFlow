@@ -213,6 +213,21 @@ input[type="submit"] {
     margin-bottom: 5px;
 }
 
+/* Título principal (Label) */
+.upload-header label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 2px; /* Espacio mínimo con el párrafo de abajo */
+}
+
+/* Mensaje de aclaración */
+.upload-header p {
+    margin: 0; /* Elimina el espacio extra arriba y abajo */
+    font-weight: normal; /* Quita las negritas */
+    font-size: 0.85rem; /* Tamaño un poco más pequeño */
+    color: #666; /* Un tono gris para diferenciarlo del título */
+}
+
 .upload-area {
     display: flex;
     flex-direction: column;

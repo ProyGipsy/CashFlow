@@ -1,0 +1,231 @@
+.main-content {
+    color: #324bab;
+    display: flex;
+    flex-direction: column;
+}
+
+.content{
+    padding: 0% 3% 3% 3%;
+}
+
+.title-container {
+    padding: 2%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.back {
+    margin-right: auto;
+}
+
+.title-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.title-container a.back img, .company-sellers p a img {
+    width: 24px;
+    height: auto;
+}
+
+.title-container h2 {
+    margin: 0;
+}
+
+
+/* Estilos para la fila de filtros */
+.filter-row-container {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #d0ebff;
+    margin-bottom: 20px;
+}
+
+/* .history-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+    justify-content: center;
+    width: 100%;
+} */
+
+.history-filters {
+    display: flex;
+    flex-direction: column; /* Apila las líneas de filtros */
+    gap: 20px; /* Espacio entre la fila 1 y la fila 2 */
+    width: 100%;
+}
+
+/* Nueva clase para cada fila de filtros */
+.filter-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px; /* Espacio horizontal entre filtros */
+    align-items: flex-end;
+    justify-content: center; /* Centra los filtros en la fila */
+    width: 100%;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    color: #324bab;
+    font-weight: bold;
+    align-items: center;
+}
+
+.filter-group select, .filter-group input {
+    padding: 8px;
+    border: 1px solid #324bab;
+    border-radius: 4px;
+    color: #324bab;
+    min-width: 100px;
+    /* text-align: center; */
+}
+
+/* Contenedor principal del combo de cliente */
+.customer-combobox {
+    position: relative;
+    min-width: 250px; /* Ajusta según prefieras */
+}
+
+/* El cuadro que simula el select (cs-display) */
+.cs-display {
+    border: 1px solid #324bab; /* Color azul del tema */
+    padding: 8px 10px;
+    border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #324bab;
+    height: 38px; /* Altura similar a los select estándar */
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+/* El panel desplegable */
+.cs-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: white;
+    border: 1px solid #324bab;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    margin-top: 2px;
+    padding: 10px;
+    display: none;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* El input de búsqueda dentro del panel */
+#customer_search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+    border: 1px solid #d0ebff;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    outline: none;
+}
+
+#customer_search:focus {
+    border-color: #324bab;
+}
+
+/* Lista de resultados */
+#customer_list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+#customer_list li {
+    padding: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+#customer_list li:hover {
+    background-color: #d0ebff; /* Color celeste de tus cabeceras */
+}
+
+.btn-filter {
+    background-color: #324bab;
+    color: white;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    height: fit-content;
+}
+
+.btn-filter:hover {
+    background-color: #4068f8;
+}
+
+/* Estilos de tabla */
+
+.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 0.85rem;
+}
+
+.styled-table th, .styled-table td {
+    border: 1px solid #324bab;
+    padding: 10px;
+    text-align: left;
+    font-size: 0.9rem;
+    /* white-space: nowrap; */
+}
+
+.styled-table th {
+    background-color: #d0ebff;
+    color: #324bab;
+}
+
+/* Estilos de Status Badge */
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+.status-badge.paid { background-color: #d4edda; color: #155724; }
+.status-badge.partial { background-color: #fff3cd; color: #856404; }
+.status-badge.pending { background-color: #f8d7da; color: #721c24; }
+
+/* Estilos básicos para paginación */
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+    padding-bottom: 30px;
+}
+
+.pagination a {
+    padding: 8px 12px;
+    border: 1px solid #324bab;
+    color: #324bab;
+    text-decoration: none;
+    border-radius: 4px;
+}
+
+.pagination .active {
+    background-color: #324bab;
+    color: white;
+}

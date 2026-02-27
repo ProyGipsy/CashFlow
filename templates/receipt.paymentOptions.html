@@ -1,0 +1,520 @@
+{% extends "receipt.adminBase.html" %}
+
+{% block title %}Gipsy - Opciones de Pago{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/paymentOptions.css') }}"/>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="title-container">
+        <a class="back" href="{{ url_for('homeAdmin') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <div class="title-center">
+            <h2>Opciones de Pago</h2>
+        </div>
+    </div>
+
+    <div class="filter-row-container">
+        <form action="#" method="GET" class="history-filters">
+            <div class="filter-line">
+                
+                <div class="filter-group">
+                    <label for="store">Tienda:</label>
+                    <select id="store" name="store"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="currency">Moneda:</label>
+                    <select id="currency" name="currency"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="tender">Forma de Pago:</label>
+                    <select id="tender" name="tender"></select>
+                </div>
+                <button type="button" id="reset-filters" class="btn-filter">Reiniciar</button>
+            </div>
+        </form>
+    </div>
+
+    <button class="add-button">Agregar Opción de Pago</button>
+
+    <div id="no-results" style="display:none; padding:16px; color:#444;">No hay opciones de pago que cumplan con esos filtros.</div>
+
+    <table class="styled-table" id="paymentOptions-table">
+        <thead>
+            <tr>
+                <th>Tienda</th>
+                <th>Moneda</th>
+                <th>Forma de Pago</th>
+                <th>Cuenta Bancaria</th>
+                <th>Destino</th>
+                <th>RIF</th>
+                <th>Descripción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for payments in payment_options %}
+            <tr data-id="{{payments[0]}}">
+                <td>{{payments[1]}}</td>
+                <td>{{payments[2]}}</td>
+                <td>{{payments[3]}}</td>
+                <td>{{payments[4]}}</td>
+                <td>{{payments[5]}}</td>
+                <td>{{payments[7]}}</td>
+                <td>{{payments[6]}}</td>
+                <td><span class="edit-icon" onclick="editRow(this)"><img src="{{ url_for('static', filename='IMG/edit.png') }}" alt="Editar"></span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination">
+        {% if current_page > 1 %}
+            <a href="{{ url_for('paymentOptions', page=current_page-1) }}">Anterior</a>
+        {% endif %}
+
+        {% if total_pages <= 10 %}
+            {# Si hay 10 o menos, las mostramos todas #}
+            {% for p in range(1, total_pages + 1) %}
+                <a href="{{ url_for('paymentOptions', page=p) }}" class="{% if p == current_page %}active{% endif %}">{{ p }}</a>
+            {% endfor %}
+        {% else %}
+            {# Lógica de puntos suspensivos: 5 primeras y 5 últimas #}
+            {% for p in range(1, 6) %}
+                <a href="{{ url_for('paymentOptions', page=p) }}" class="{% if p == current_page %}active{% endif %}">{{ p }}</a>
+            {% endfor %}
+
+            <span class="dots">...</span>
+
+            {% for p in range(total_pages - 4, total_pages + 1) %}
+                <a href="{{ url_for('paymentOptions', page=p) }}" class="{% if p == current_page %}active{% endif %}">{{ p }}</a>
+            {% endfor %}
+        {% endif %}
+
+        {% if current_page < total_pages %}
+            <a href="{{ url_for('paymentOptions', page=current_page+1) }}">Siguiente</a>
+        {% endif %}
+    </div>
+
+
+    <!-- Modal para agregar/editar opción de pago -->
+     <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">Agregar Opción de Pago</h2>
+            <hr>
+            <form id="paymentForm">
+                <input type="hidden" id="edit-id" name="id">
+                
+                <div class="form-vertical">
+                    <div class="filter-group">
+                        <label for="modal-store">Tienda: <span class="required-star">*</span></label>
+                        <select id="modal-store" name="store" required></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="modal-currency">Moneda: <span class="required-star">*</span></label>
+                        <select id="modal-currency" name="currency" required></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="modal-tender">Forma de Pago: <span class="required-star">*</span></label>
+                        <select id="modal-tender" name="tender" required></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="modal-bank">Cuenta Bancaria: <span class="required-star">*</span></label>
+                        <input type="text" id="modal-bank" name="bank_account" class="input-field" placeholder="Ingrese la cuenta bancaria de la opción de pago">
+                    </div>
+                    <div class="filter-group">
+                        <label for="modal-destination">Destino:</label>
+                        <input type="text" id="modal-destination" name="destination" class="input-field" placeholder="Ingrese el destino de la opción de pago">
+                    </div>
+                    <div class="filter-group">
+                        <label>RIF: <span class="required-star">*</span></label>
+                        <div class="rif-container">
+                            <select id="modal-rif-prefix" name="rif_prefix" class="rif-select">
+                                <option value="V">V</option>
+                                <option value="E">E</option>
+                                <option value="P">P</option>
+                                <option value="J">J</option>
+                                <option value="G">G</option>
+                                <option value="R">R</option>
+                            </select>
+                            <input type="text" id="modal-rif-number" name="rif_number" class="input-field" 
+                                placeholder="12345678-9" maxlength="10">
+                        </div>
+                    </div>
+                    <div class="filter-group full-width">
+                        <label for="modal-description">Descripción: <span class="required-star">*</span></label>
+                        <input type="text" id="modal-description" name="description" class="input-field" placeholder="Ingrese la descripción de la opción de pago">
+                    </div>
+                </div>
+
+                <div class="button-container">
+                    <button type="submit" class="save-button">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const filtersData = {{ filters|tojson|safe }};
+    let currentPage = {{ current_page }};
+
+    function initialPopulate() {
+        const storeSel = document.getElementById('store');
+        const currSel = document.getElementById('currency');
+        const tenderSel = document.getElementById('tender');
+        
+        // Selects del Modal
+        const mStore = document.getElementById('modal-store');
+        const mCurr = document.getElementById('modal-currency');
+        const mTender = document.getElementById('modal-tender');
+
+        const fill = (sel, data, includeAll = true, valueKey = 'name') => {
+            if (!sel) return;
+            sel.innerHTML = includeAll ? '<option value="ALL">Todas</option>' : '';
+            data.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item[valueKey];
+                opt.textContent = item.name;
+                opt.setAttribute('data-isretail', item.isRetail);
+                sel.appendChild(opt);
+            });
+        };
+
+        // Filtros
+        fill(storeSel, filtersData.stores, 'name');
+        fill(currSel, filtersData.currencies, 'name');
+        fill(tenderSel, filtersData.tenders, 'name');
+        
+        // Selects del Modal
+        fill(mStore, filtersData.stores, false, 'id');
+        fill(mCurr, filtersData.currencies, false, 'id');
+        fill(mTender, filtersData.tenders, false, 'id');
+    }
+
+    // Función para cambiar de página sin perder filtros
+    async function goToPage(page) {
+        currentPage = page;
+        await updateTable();
+    }
+
+    async function updateTable() {
+        const params = new URLSearchParams({
+            page: currentPage,
+            store: document.getElementById('store').value,
+            currency: document.getElementById('currency').value,
+            tender: document.getElementById('tender').value
+        });
+
+        try {
+            const response = await fetch(`/api/paymentOptions?${params.toString()}`);
+            const data = await response.json();
+            
+            renderRows(data.options);
+            // Pasamos current_page y total_pages que vienen del JSON
+            renderPaginationUI(data.page, data.total_pages); 
+        } catch (error) {
+            console.error("Error al actualizar la tabla:", error);
+        }
+    }
+
+    function renderPaginationUI(current, total, totalRecords) {
+        const container = document.querySelector('.pagination'); // Usamos la clase que ya tienes
+        if (!container) return;
+        
+        container.innerHTML = '';
+
+        // Condición 1: Si hay menos de 50 resultados (o solo 1 página), no mostrar paginado
+        // Nota: total es total_pages. Si es 1 o menos, no hace falta paginar.
+        if (total <= 1) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'flex'; // O 'block', según tu CSS
+
+        // --- Botón Anterior ---
+        if (current > 1) {
+            container.innerHTML += `<a href="javascript:void(0)" onclick="goToPage(${current - 1})">Anterior</a>`;
+        }
+
+        // --- Lógica de números ---
+        if (total <= 10) {
+            for (let i = 1; i <= total; i++) {
+                container.innerHTML += `<a href="javascript:void(0)" onclick="goToPage(${i})" class="${i === current ? 'active' : ''}">${i}</a>`;
+            }
+        } else {
+            // Primeras 5
+            for (let i = 1; i <= 5; i++) {
+                container.innerHTML += `<a href="javascript:void(0)" onclick="goToPage(${i})" class="${i === current ? 'active' : ''}">${i}</a>`;
+            }
+            container.innerHTML += `<span class="dots">...</span>`;
+            // Últimas 5
+            for (let i = total - 4; i <= total; i++) {
+                container.innerHTML += `<a href="javascript:void(0)" onclick="goToPage(${i})" class="${i === current ? 'active' : ''}">${i}</a>`;
+            }
+        }
+
+        // --- Botón Siguiente ---
+        if (current < total) {
+            container.innerHTML += `<a href="javascript:void(0)" onclick="goToPage(${current + 1})">Siguiente</a>`;
+        }
+    }
+
+    function renderRows(options) {
+        const tbody = document.querySelector('#paymentOptions-table tbody');
+        const table = document.getElementById('paymentOptions-table');
+        const noResults = document.getElementById('no-results');
+        
+        tbody.innerHTML = '';
+
+        // Condición 2: Si no hay resultados, mostrar mensaje y ocultar tabla
+        if (options.length === 0) {
+            table.style.display = 'none';
+            noResults.style.display = 'block';
+            return;
+        }
+
+        // Si hay resultados, asegurar que la tabla sea visible
+        table.style.display = 'table';
+        noResults.style.display = 'none';
+
+        options.forEach(opt => {
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-id', opt[0]);
+            tr.innerHTML = `
+                <td>${opt[1]}</td>
+                <td>${opt[2]}</td>
+                <td>${opt[3]}</td>
+                <td>${opt[4]}</td>
+                <td>${opt[5]}</td>
+                <td>${opt[7]}</td>
+                <td>${opt[6]}</td>
+                <td><span class="edit-icon" onclick="editRow(this)"><img src="/static/IMG/edit.png"></span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function resetFilters() {
+        // 1. Buscamos los selects por su ID
+        const storeSel = document.getElementById('store');
+        const currSel = document.getElementById('currency');
+        const tenderSel = document.getElementById('tender');
+
+        // 2. Los devolvemos al valor inicial
+        if (storeSel) storeSel.value = 'ALL';
+        if (currSel) currSel.value = 'ALL';
+        if (tenderSel) tenderSel.value = 'ALL';
+
+        // 3. Reiniciamos la página a la primera
+        currentPage = 1;
+
+        // 4. Refrescamos la tabla con los datos originales
+        updateTable();
+    }
+
+    // Inicialización al cargar la página
+    document.addEventListener('DOMContentLoaded', () => {
+        initialPopulate();
+        renderPaginationUI(currentPage, {{ total_pages }}); // Carga inicial de la paginación
+        
+        // Evento para el botón de Reiniciar
+        const resetBtn = document.getElementById('reset-filters');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', resetFilters);
+        }
+
+        // Eventos de filtros
+        document.querySelectorAll('.history-filters select').forEach(select => {
+            select.addEventListener('change', () => {
+                currentPage = 1;
+                updateTable();
+            });
+        });
+    });
+
+    // MODAL
+
+    // Función para abrir el modal en modo "Agregar"
+    document.querySelector('.add-button').addEventListener('click', () => {
+        document.getElementById('paymentForm').reset();
+        document.getElementById('edit-id').value = '';
+        document.getElementById('modalTitle').textContent = 'Agregar Opción de Pago';
+        document.getElementById('paymentModal').style.display = 'block';
+    });
+
+    // Función para abrir el modal en modo "Editar"
+    function editRow(element) {
+        const row = element.closest('tr');
+        const id = row.getAttribute('data-id');
+        const cells = row.querySelectorAll('td');
+
+        // Cambiar el título y asignar el ID oculto
+        document.getElementById('modalTitle').textContent = 'Editar Opción de Pago';
+        document.getElementById('edit-id').value = id;
+
+        /**
+         * Función auxiliar para seleccionar una opción en un <select> 
+         * basándose en el texto visible, ya que el .value ahora espera un ID.
+         */
+        const selectByText = (selectId, text) => {
+            const sel = document.getElementById(selectId);
+            const options = Array.from(sel.options);
+            // Buscamos la opción cuyo texto coincida con lo que dice la celda de la tabla
+            const targetOption = options.find(opt => opt.text.trim() === text.trim());
+            if (targetOption) {
+                sel.value = targetOption.value;
+            }
+        };
+
+        // 1. Mapeo de Selects (usando la función auxiliar por nombre/texto)
+        selectByText('modal-store', cells[0].textContent);
+        selectByText('modal-currency', cells[1].textContent);
+        selectByText('modal-tender', cells[2].textContent);
+
+        // 2. Mapeo de Inputs de texto simples
+        document.getElementById('modal-bank').value = cells[3].textContent.trim();
+        document.getElementById('modal-destination').value = cells[4].textContent.trim();
+        document.getElementById('modal-description').value = cells[6].textContent.trim();
+
+        // 3. Procesar RIF (Celda 5)
+        // Se espera formato "Letra-Numeros-Digito" (ej: J-50078513-5)
+        const fullRif = cells[5].textContent.trim();
+        if (fullRif.includes('-')) {
+            const parts = fullRif.split('-'); 
+            // El primer segmento es el prefijo (V, E, J, etc.)
+            document.getElementById('modal-rif-prefix').value = parts[0]; 
+            
+            // Reconstruimos el número con el guion final (ej: 50078513-5)
+            // Usamos slice(1) por si el RIF tuviera más guiones inesperados
+            document.getElementById('modal-rif-number').value = parts.slice(1).join('-');
+        } else {
+            // Limpiar campos si el RIF en la tabla no tiene el formato esperado
+            document.getElementById('modal-rif-prefix').value = 'V';
+            document.getElementById('modal-rif-number').value = '';
+        }
+
+        // Mostrar el modal
+        document.getElementById('paymentModal').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('paymentModal').style.display = 'none';
+    }
+
+    document.getElementById('modal-rif-number').addEventListener('input', function (e) {
+        // 1. Eliminar todo lo que no sea número
+        let value = e.target.value.replace(/\D/g, '');
+        
+        // 2. Limitar a 9 dígitos numéricos
+        if (value.length > 9) value = value.slice(0, 9);
+        
+        // 3. Aplicar formato: XXXXXXXX-X
+        if (value.length > 1) {
+            let lastDigit = value.slice(-1);
+            let body = value.slice(0, -1);
+            e.target.value = body + '-' + lastDigit;
+        } else {
+            e.target.value = value;
+        }
+    });
+
+
+    // Manejo del Submit (AJAX sugerido)
+
+    document.getElementById('paymentForm').onsubmit = async function(e) {
+        e.preventDefault();
+
+        const submitBtn = document.querySelector('#paymentForm .save-button');
+        if (submitBtn && submitBtn.disabled) return; // evitar envíos duplicados
+
+        // Obtener valores de los inputs
+        const bank = document.getElementById('modal-bank').value.trim();
+        const prefix = document.getElementById('modal-rif-prefix').value;
+        const rifNum = document.getElementById('modal-rif-number').value.trim();
+        const description = document.getElementById('modal-description').value.trim();
+
+        // Validación de campos obligatorios
+        if (!bank) {
+            alert("El campo 'Cuenta Bancaria' es obligatorio. Por favor, complételo.");
+            document.getElementById('modal-bank').focus();
+            return;
+        }
+
+        if (!rifNum || rifNum.length < 3) { // Validación mínima
+            alert("El campo 'RIF' es obligatorio y debe tener un formato válido.");
+            document.getElementById('modal-rif-number').focus();
+            return;
+        }
+
+        if (!description) {
+            alert("El campo 'Descripción' es obligatorio. Por favor, complételo.");
+            document.getElementById('modal-description').focus();
+            return;
+        }
+
+        // Si pasa las validaciones, procedemos con el envío
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+
+        // Obtener los elementos select del modal para extraer el isRetail
+        const storeSelect = document.getElementById('modal-store');
+        const currSelect = document.getElementById('modal-currency');
+        const tenderSelect = document.getElementById('modal-tender');
+
+        data.storeIsRetail = storeSelect.options[storeSelect.selectedIndex].getAttribute('data-isretail');
+        data.currencyIsRetail = currSelect.options[currSelect.selectedIndex].getAttribute('data-isretail');
+        data.tenderIsRetail = tenderSelect.options[tenderSelect.selectedIndex].getAttribute('data-isretail');
+
+        data.rif = `${prefix}-${rifNum}`;
+        delete data.rif_prefix;
+        delete data.rif_number;
+
+        console.log("Datos validados listos para enviar:", data);
+
+        // Deshabilitar botón para evitar múltiples envíos
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.dataset.origText = submitBtn.textContent;
+            submitBtn.textContent = 'Guardando...';
+        }
+
+        try {
+            const response = await fetch('/api/savePaymentOption', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                alert("Opción de pago guardada exitosamente");
+                closeModal();
+                // Refrescar la tabla para ver los cambios inmediatamente
+                updateTable(); 
+            } else {
+                alert("Error del servidor: " + result.message);
+                // Rehabilitar el botón si hubo error
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = submitBtn.dataset.origText || 'Guardar Cambios';
+                }
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("No se pudo conectar con el servidor.");
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = submitBtn.dataset.origText || 'Guardar Cambios';
+            }
+        }
+    };
+
+</script>
+{% endblock %}
