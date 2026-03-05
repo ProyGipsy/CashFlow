@@ -1071,7 +1071,7 @@ def get_SalesRepCommission(receipt_id):
                     FROM Commission_Receipt.SalesRepCommission C
                     JOIN Commission_Receipt.DebtAccount D ON C.AccountID = D.AccountID
 					JOIN Commission_Receipt.PaymentEntryCommission P ON C.AccountID = P.DebtAccountID AND C.ReceiptID = P.ReceiptID
-					JOIN Commission_Receipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID
+					JOIN Commission_Receipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID AND C.ReceiptID = R.PaymentReceiptID
                     WHERE C.ReceiptID = %s
 					GROUP BY D.N_CTA, C.AmountOwed, C.CommissionAmount_Bs, C.CommissionAmount_USD, P.DebtAccountID, R.PaidAmount
                     ''', (receipt_id,))
