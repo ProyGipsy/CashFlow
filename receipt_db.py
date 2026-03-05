@@ -1028,7 +1028,7 @@ def get_unvalidated_receipts_by_customer(customer_id, customer_isRembd):
 def get_invoices_by_receipt(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT(D.N_CTA), D.Amount, D.DueDate, D.DueDate, D.AppPaidAmount, D.AccountID, C.Description, D.SalesRepID, D.DocumentType, D.GalacPaidAmount
+    cursor.execute('''SELECT DISTINCT(D.N_CTA), D.Amount, D.DueDate, D.DueDate, D.AppPaidAmount, D.AccountID, C.Description, D.SalesRepID, D.DocumentType, D.GalacPaidAmount, R.PaidAmount
                     FROM Commission_Receipt.DebtAccount D
                     JOIN Commission_Receipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID
                     JOIN Main.Currency C ON D.CurrencyID = C.ID
@@ -1067,12 +1067,13 @@ def get_salesRep_isRetail(account_id):
 def get_SalesRepCommission(receipt_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''SELECT D.N_CTA, C.AmountOwed, STRING_AGG(CAST(P.DaysElapsed AS NVARCHAR(MAX)), ' / ') AS DaysElapsed, C.CommissionAmount_Bs, C.CommissionAmount_USD, P.DebtAccountID
+    cursor.execute('''SELECT D.N_CTA, C.AmountOwed, STRING_AGG(CAST(P.DaysElapsed AS NVARCHAR(MAX)), ' / ') AS DaysElapsed, C.CommissionAmount_Bs, C.CommissionAmount_USD, P.DebtAccountID, R.PaidAmount
                     FROM Commission_Receipt.SalesRepCommission C
                     JOIN Commission_Receipt.DebtAccount D ON C.AccountID = D.AccountID
 					JOIN Commission_Receipt.PaymentEntryCommission P ON C.AccountID = P.DebtAccountID AND C.ReceiptID = P.ReceiptID
-                    WHERE C.ReceiptID = %s
-					GROUP BY D.N_CTA, C.AmountOwed, C.CommissionAmount_Bs, C.CommissionAmount_USD, P.DebtAccountID
+					JOIN Commission_Receipt.DebtPaymentRelation R ON D.AccountID = R.DebtAccountID
+                    WHERE C.ReceiptID = 2161
+					GROUP BY D.N_CTA, C.AmountOwed, C.CommissionAmount_Bs, C.CommissionAmount_USD, P.DebtAccountID, R.PaidAmount
                     ''', (receipt_id,))
     salesRepComm = cursor.fetchall()
     conn.close()
@@ -1220,7 +1221,7 @@ def set_commissionsRules(rules):
                     target.Active = source.Active
             WHEN NOT MATCHED THEN
                 INSERT (CommissionName, CommissionRate, DaysSinceDue, Active, DateCreated)
-                VALUES (source.CommissionName, source.CommissionRate, source.DaysSinceDue, source.Active, GETDATE());
+                VALUES (source.CommissionName, source.CommissionRate, source.DaysSinceDue, source.Active, GETDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'Venezuela Standard Time');
         """, (id, name, percentage, days, is_active, None))
     
     conn.commit()
@@ -1228,12 +1229,7 @@ def set_commissionsRules(rules):
 
 
 def set_paymentReceipt(cursor, total_receipt_amount, commission_bs, commission_usd):
-    # cursor.execute('''
-    #                INSERT INTO Commission_Receipt.PaymentReceipt
-    #                (Amount, IsReviewed, FilePath, isRetail, IsApproved, CommissionAmount_Bs, CommissionAmount_USD)
-    #                VALUES (%s, %s, %s, %s, %s, %s, %s)
-    #                ''', (total_receipt_amount, 0, '', 0, 0, commission_bs, commission_usd))
-    print('''
+    cursor.execute('''
                    INSERT INTO Commission_Receipt.PaymentReceipt
                    (Amount, IsReviewed, FilePath, isRetail, IsApproved, CommissionAmount_Bs, CommissionAmount_USD)
                    VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -1247,12 +1243,7 @@ def set_paymentReceipt(cursor, total_receipt_amount, commission_bs, commission_u
 
 
 def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, proof_path): 
-    # cursor.execute('''
-    #     INSERT INTO Commission_Receipt.PaymentReceiptEntry
-    #     (ReceiptID, PaymentDate, Amount, Discount, Reference, PaymentDestinationID, TenderID, isRetail, ProofOfPaymentPath)
-    #     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-    #     ''', (receipt_id, payment_date, amount, discount, reference, destination_id, tender_id, 0, proof_path))
-    print('''
+    cursor.execute('''
         INSERT INTO Commission_Receipt.PaymentReceiptEntry
         (ReceiptID, PaymentDate, Amount, Discount, Reference, PaymentDestinationID, TenderID, isRetail, ProofOfPaymentPath)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -1266,12 +1257,7 @@ def set_paymentEntry(cursor, receipt_id, payment_date, amount, discount, referen
     
 
 def set_paymentEntryCommission(cursor, receipt_id, paymentEntry_id, DebtAccount_id, payment_date, amount, days_elapsed, commission_id, bs_commission, usd_commission):
-    # cursor.execute('''
-    #     INSERT INTO Commission_Receipt.PaymentEntryCommission
-    #     (ReceiptID, PaymentReceiptEntryID, DebtAccountID, PaymentDate, Amount, DaysElapsed, CommissionID, CommissionAmount_Bs, CommissionAmount_USD)
-    #     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-    #     ''', (receipt_id, paymentEntry_id, DebtAccount_id, payment_date, amount, days_elapsed, commission_id, bs_commission, usd_commission))
-    print('''
+    cursor.execute('''
         INSERT INTO Commission_Receipt.PaymentEntryCommission
         (ReceiptID, PaymentReceiptEntryID, DebtAccountID, PaymentDate, Amount, DaysElapsed, CommissionID, CommissionAmount_Bs, CommissionAmount_USD)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -1333,13 +1319,7 @@ def set_SyncStatus(account_id, sync_status):
     conn.close()
 
 def set_invoicePaidAmount(cursor, account_id, amount_to_add):
-    print("Estoy en set_invoicePaidAmount")
-    # cursor.execute('''
-    #                UPDATE Commission_Receipt.DebtAccount
-    #                SET AppPaidAmount = AppPaidAmount + %s
-    #                WHERE AccountID = %s
-    #                ''', (amount_to_add, account_id))
-    print('''
+    cursor.execute('''
                    UPDATE Commission_Receipt.DebtAccount
                    SET AppPaidAmount = AppPaidAmount + %s
                    WHERE AccountID = %s
@@ -1359,13 +1339,7 @@ def revert_invoicePaidAmount(account_id, new_PaidAmount):
     
 
 def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_PaidAmount):
-    print("Estoy en set_DebtPaymentRelation")
-    # cursor.execute('''
-    #                 INSERT INTO Commission_Receipt.DebtPaymentRelation
-    #                 (DebtAccountID, PaymentReceiptID, isRetail, PaidAmount)
-    #                 VALUES (%s, %s, %s, %s)
-    #                 ''', (account_id, int(receipt_id), 0, invoice_PaidAmount))
-    print('''
+    cursor.execute('''
                     INSERT INTO Commission_Receipt.DebtPaymentRelation
                     (DebtAccountID, PaymentReceiptID, isRetail, PaidAmount)
                     VALUES (%s, %s, %s, %s)
@@ -1373,16 +1347,10 @@ def set_DebtPaymentRelation(cursor, account_id, receipt_id, invoice_PaidAmount):
 
 
 def set_SalesRepCommission(cursor, sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission):
-    print("Estoy en set_SalesRepCommission")
-    # cursor.execute('''
-    #                 INSERT INTO Commission_Receipt.SalesRepCommission
-    #                 (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CreatedAt, ReceiptID, CommissionAmount_Bs, CommissionAmount_USD)
-    #                 VALUES (%s, %s, %s, %s, %s, GETDATE(), %s, %s, %s)
-    #                 ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission))
-    print('''
+    cursor.execute('''
                     INSERT INTO Commission_Receipt.SalesRepCommission
                     (SalesRepID, AccountID, IsRetail, AmountOwed, DaysElapsed, CreatedAt, ReceiptID, CommissionAmount_Bs, CommissionAmount_USD)
-                    VALUES (%s, %s, %s, %s, %s, GETDATE(), %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, GETDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'Venezuela Standard Time', %s, %s, %s)
                     ''', (sales_rep_id, account_id, is_retail, balance_amount, days_passed, receipt_id, bs_commission, usd_commission))
     
 
@@ -1391,7 +1359,7 @@ def set_isReviewedReceipt(receipt_id):
     cursor = conn.cursor()
     cursor.execute('''
                    UPDATE Commission_Receipt.PaymentReceipt
-                   SET IsReviewed = 1, ReviewedDate = GETDATE()
+                   SET IsReviewed = 1, ReviewedDate = GETDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'Venezuela Standard Time'
                    WHERE ReceiptID = %s
                    ''', (receipt_id))
     conn.commit()
