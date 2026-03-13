@@ -15,7 +15,15 @@
             <h2>Bienvenido(a) al Sistema de Administración Gipsy</h2>
         </div>
         <br>
-        <button class="loginButton">Inicie Sesión</button>
+        {% set is_maint = MAINTENANCE.APP == 'ON' %}
+        {% if not is_maint %}
+            <button class="loginButton">Inicie Sesión</button>
+        {% else %}
+            <div class="maintenance-box">
+                <img src="{{ url_for('static', filename='IMG/wip.png') }}" alt="Mantenimiento" class="maint-icon">
+                <h3>El sistema se encuentra en mantenimiento.<br> Por favor, vuelva más tarde.</h3>
+            </div>
+        {% endif %}
     </div>
     <script>
       document.querySelector('.loginButton').addEventListener('click', function() {

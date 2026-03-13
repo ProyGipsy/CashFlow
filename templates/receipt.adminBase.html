@@ -41,6 +41,12 @@
                         <a href="{{ url_for('businessRules') }}" class="optionLink">Reglas del Negocio</a>
                     </div>
                 </li>
+                <li>
+                    <div class="optionContainer {% if active_page == 'paymentOptions' %}active{% endif %}">
+                        {% if active_page == 'paymentOptions' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('paymentOptions') }}" class="optionLink">Opciones de Pago</a>
+                    </div>
+                </li>
             </ul>
             <ul class="bottomMenu">
                 <li>

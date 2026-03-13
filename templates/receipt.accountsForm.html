@@ -26,10 +26,11 @@
         <tr> 
             <th>N_CTA</th>
             <th>Tipo de Documento</th>
-            <th>Total Deuda (T/D)</th>
+            <th>Monto Documento</th>
             <th>Fecha Emisión</th>
             <th>Fecha Vencimiento</th>
             <th>Monto Abonado</th>
+            <th>Monto Pendiente</th>
         </tr> 
         {% for receipt in receiptDetails %}
         <tr> 
@@ -45,8 +46,10 @@
             <td><p>{{ receipt[2].strftime('%d-%m-%Y') }}</p></td>
             <td><p>{{ receipt[3].strftime('%d-%m-%Y') }}</p></td>
             <td><p>{{ receiptStoreCustomer[5] }} {{ "{:,.2f}".format(receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
+            <td><p>{{ receiptStoreCustomer[5] }} {{ "{:,.2f}".format(receipt[1]-receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
             <td class="hidden-column">
                 <input type="hidden" name="account_id[]" value="{{ receipt[5] }}" />
+                <input type="hidden" name="issue_date[]" value="{{ receipt[2].strftime('%Y-%m-%d') }}" />
             </td>
         </tr> 
         {% endfor %}
@@ -110,7 +113,7 @@
                     </select>
                 </td>
                 <td class="col-date"><input type="date" id="date_operation" name="date_operation" class="input-field"></td>
-                <td class="col-amount"><input type="number" name="payment_amount" step="0.01" class="input-field" value="0.00"></td>
+                <td class="col-amount"><input type="number" name="payment_amount" step="0.01" class="input-field" value="0.01" min="0.01"></td>
                 <td class="col-reference"><input type="text" name="reference" class="input-field"></td>
                 <td class="col-account"><select name="payment_made" class="input-field">
                     <option value="" disabled selected>Cuenta Bancaria</option> 
@@ -139,6 +142,7 @@
     <div class="file-upload-container">
         <div class="upload-header">
             <label for="proof_of_payment">Cargar Comprobante(s):</label>
+            <p>Debe cargar tantos comprobantes como formas de pago haya agregado.</p>
         </div>
         <div class="upload-area">
             <div class="file-input-wrapper">
@@ -152,10 +156,25 @@
     </div>
     
     <br>
+    <div class="inline-label">
+        <label for="commission-calculation">Asignación de Pagos y Cálculo de Comisión:</label>
+    </div>
     <table class="styled-table heading-table"> 
         <tr>
             <th>Tipo</th> 
             <th>N_CTA</th>
+            <!-- <th>Importe Pagado</th> -->
+             <th>
+                <div style="display: flex; gap: 5px;">
+                    Importe Pagado
+                    <div class="tooltip-container">
+                        <span class="info-icon">i</span>
+                        <span class="tooltip-text">
+                            Este monto representa la distribución del monto total del recibo entre los documentos involucrados. Puede ajustar manualmente cada importe abonado, el sistema ajustará automáticamente el resto de abonos para no exceder el total ingresado.
+                        </span>
+                    </div>
+                </div>
+            </th>
             <th>Importe Adeudado</th>
             <th class="col-daysElapsed">Días Transcurridos</th>
             <th class="col-commission">Comisión</th>
@@ -165,6 +184,15 @@
         <tr class="{% if receipt[6] == 'N/C' %}hidden-nc{% endif %}">
             <td><p>{{ receipt[6] }}</p></td> 
             <td><p>{{ receipt[0] }}</p></td>
+            <!-- <td><p class="applied-amount">0,00</p></td> -->
+            <td>
+                <input type="number" 
+                    class="input-field small-input applied-amount-input" 
+                    step="0.01" 
+                    min="0" 
+                    value="0.00" 
+                    onchange="handleManualAssignment(this)">
+            </td>
             <td><p id="balance_calculation" data-original-value="{{ "%.2f"|format(receipt[1] - receipt[4]) }}" data-due-date="{{ receipt[3] }}">{{ "{:,.2f}".format(receipt[1] - receipt[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</p></td>
             <td><p id="days_passed"></p></td>
             <td><p id="commission_received"></p></td>
@@ -172,7 +200,6 @@
         {% endfor %}
     </table>
 
-    <br><br>
     <div class="inline-label">
         <label for="commission_note">Comisión Total:</label>
         <span id="commission_note" class="small-input">0,00</span> 
@@ -221,6 +248,13 @@
 
 {% block extra_js %}
 <script>
+    // Global lista de monedas disponible para funciones de conversión
+    const CURRENCIES_LIST = JSON.parse('{{ currencies | tojson | safe }}') || [];
+    function getCurrencyCodeById(id){
+        if (!CURRENCIES_LIST) return String(id);
+        const found = CURRENCIES_LIST.find(c => String(c[0]) == String(id));
+        return found ? (found[1] || String(found[0])) : String(id);
+    }
     // Filtro de Formas de Pago
     function handleCurrencyChange(event) {
         const currencyId = event.target.value;
@@ -385,19 +419,98 @@
         const month = String(today.getMonth() + 1).padStart(2, '0');
         const year = today.getFullYear();
         const maxDate = `${year}-${month}-${day}`;
-        dateInput.setAttribute("max", maxDate);
 
         document.getElementById('payment-table').appendChild(newPagoRow);
+
+        // Obtener la fecha mínima (más antigua de las fechas de emisión)
+        const minDate = getEarliestIssueDate();
+
+        dateInput.setAttribute("max", maxDate);
+        dateInput.setAttribute("min", minDate);
 
         // Carga de tenders default
         const defaultCurrencyId = '1';
         loadTenders(defaultCurrencyId, newPagoRow);
+        // Inicializar tasa de conversión para la nueva fila según la fecha (si existe)
+        (async function(){
+            const dateVal = newPagoRow.querySelector('input[name="date_operation"]').value || maxDate;
+            const currencyIdNew = newPagoRow.querySelector('select[name="currency"]')?.value || defaultCurrencyId;
+            const rate = await fetchExchangeRate(dateVal, currencyIdNew);
+            newPagoRow.dataset.exchangeRate = rate;
+        })();
         
         // Establecer listeners para los nuevos inputs
         addInputListeners();
         // Aplicar deshabilitación global en la nueva fila en caso de que aplique
         applyGlobalRetentionDisableToRows();
     });
+
+    // Función para obtener la fecha de emisión más temprana de todas las facturas
+    function getEarliestIssueDate() {
+        const issueDateInputs = document.querySelectorAll('input[name="issue_date[]"]');
+        let earliestDate = null;
+        
+        issueDateInputs.forEach(input => {
+            const dateStr = input.value;
+            if (dateStr) {
+                const date = new Date(dateStr);
+                if (!earliestDate || date < earliestDate) {
+                    earliestDate = date;
+                }
+            }
+        });
+        
+        if (!earliestDate) {
+            // Si no hay fechas, usar fecha actual menos 30 días como fallback
+            earliestDate = new Date();
+            earliestDate.setDate(earliestDate.getDate() - 30);
+        }
+        earliestDate.setDate(earliestDate.getDate() + 1);
+        
+        // Formatear a YYYY-MM-DD
+        const year = earliestDate.getFullYear();
+        const month = String(earliestDate.getMonth() + 1).padStart(2, '0');
+        const day = String(earliestDate.getDate()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}`;
+    }
+
+    // Función para formatear fecha para mostrar
+    function formatDateForDisplay(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
+    }
+
+    // Función para validar una fecha de pago específica
+    function validatePaymentDate(dateStr, row) {
+        if (!dateStr) return { isValid: true, message: '' };
+        
+        const paymentDate = new Date(dateStr);
+        const today = new Date();
+        const earliestIssueDate = new Date(getEarliestIssueDate());
+        
+        // Verificar que no sea mayor a hoy
+        if (paymentDate > today) {
+            return { 
+                isValid: false, 
+                message: 'La fecha de pago no puede ser mayor al día actual' 
+            };
+        }
+        
+        // Verificar que no sea menor a la fecha de emisión más temprana
+        if (paymentDate < earliestIssueDate) {
+            return { 
+                isValid: false, 
+                message: `La fecha de pago no puede ser anterior a ${formatDateForDisplay(earliestIssueDate.toISOString().split('T')[0])} (fecha de emisión más temprana)` 
+            };
+        }
+        
+        return { isValid: true, message: '' };
+    }
 
     function deleteRow(btn) {
         const row = btn.parentNode.parentNode;
@@ -416,63 +529,152 @@
 
     // Reconversión monetaria para formas de pago de diferente moneda
     function convertAmount(receiptCurrency, amount){
-        const exchangeRate = "{{ currencies[0][2] }}"
+        // Deprecated synchronous conversion kept for compatibility; prefer per-row rate.
+        const exchangeRate = parseFloat("{{ currencies[0][2] }}") || 1;
 
-        convertedAmount = 0;
-        if(receiptCurrency == '1'){
-            convertedAmount = parseFloat(amount) * parseFloat(exchangeRate)
+        let convertedAmount = 0;
+        if (receiptCurrency == '1') {
+            convertedAmount = parseFloat(amount) * (exchangeRate || 1);
         } else if (receiptCurrency == '2') {
-            convertedAmount = parseFloat(amount) / parseFloat(exchangeRate) 
+            convertedAmount = parseFloat(amount) / (exchangeRate || 1);
         }
         return convertedAmount;
     }
 
+    // Fetch exchange rate for a given date and currency. Returns numeric rate.
+    async function fetchExchangeRate(dateStr, currencyId) {
+        const defaultRate = parseFloat("{{ currencies[0][2] }}") || 1;
+        if (!dateStr) return defaultRate;
+        // Use Flask url_for to build the endpoint (must exist in app.py)
+        const endpoint = "{{ url_for('get_exchange_rate') }}";
+        const params = `?date=${encodeURIComponent(dateStr)}&currency_id=${encodeURIComponent(currencyId)}`;
+        try {
+            let resp = await fetch(endpoint + params);
+            if (resp.status === 404) {
+                // Try fallback without url_for (in case route differs)
+                console.warn('get_exchange_rate returned 404 for', endpoint + params, 'trying fallback /get_exchange_rate');
+                resp = await fetch('/get_exchange_rate' + params);
+            }
+            if (!resp.ok) {
+                console.warn('Exchange rate fetch failed, status:', resp.status);
+                return defaultRate;
+            }
+            const data = await resp.json();
+            const rate = (typeof data === 'object' && data.rate !== undefined) ? parseFloat(data.rate) : parseFloat(data);
+            return isNaN(rate) ? defaultRate : rate;
+        } catch (e) {
+            console.error('Error fetching exchange rate:', e);
+            return defaultRate;
+        }
+    }
+
+    // Modern convertAmount that accepts an optional per-row rate
+    // Convert amount from paymentCurrency to receiptCurrency using provided rate.
+    // paymentCurrency: id of the currency in which `amount` is provided.
+    function convertAmountWithRate(receiptCurrency, paymentCurrency, amount, rate) {
+        const exchangeRate = (rate !== undefined && rate !== null) ? parseFloat(rate) : (parseFloat("{{ currencies[0][2] }}") || 1);
+        const amt = parseFloat(amount) || 0;
+        // If same currency, no conversion
+        if (String(receiptCurrency) === String(paymentCurrency)) return amt;
+
+        // Try to detect USD by currency code (robust to id mappings)
+        const payCode = String(getCurrencyCodeById(paymentCurrency)).toUpperCase();
+        const receiptCode = String(getCurrencyCodeById(receiptCurrency)).toUpperCase();
+
+        // Common rule: exchangeRate is expressed as Bs per 1 USD
+        // If payment is USD and receipt is Bs -> multiply
+        if (payCode.indexOf('USD') !== -1 && receiptCode.indexOf('USD') === -1) {
+            return amt * (exchangeRate || 1);
+        }
+        // If payment is Bs and receipt is USD -> divide
+        if (payCode.indexOf('USD') === -1 && receiptCode.indexOf('USD') !== -1) {
+            return amt / (exchangeRate || 1);
+        }
+
+        // Fallback to previous id-based heuristic if codes not available
+        if (String(receiptCurrency) == '1') {
+            return amt * (exchangeRate || 1);
+        } else {
+            return amt / (exchangeRate || 1);
+        }
+    }
+
     // Selección de Comprobantes de Pago
+    // Keep selected files across multiple selections
+    let selectedFiles = [];
+
     function handleFileSelection(input) {
         const container = document.getElementById('selected-files-container');
-        container.innerHTML = '';
-        
         const paymentRows = document.querySelectorAll('.payment-row').length;
-        const filesToProcess = Array.from(input.files).slice(0, paymentRows); // Limitar a N archivos
-        
-        if (filesToProcess.length > 0) {
+        const newFiles = Array.from(input.files || []);
 
-            if (input.files.length > paymentRows) {
-                alert(`Solo puede cargar un máximo de ${paymentRows} comprobante(s) para ${paymentRows} forma(s) de pago`);
-                
-                const dataTransfer = new DataTransfer();
-                filesToProcess.forEach(file => dataTransfer.items.add(file));
-                input.files = dataTransfer.files;
-            }
-            
-            filesToProcess.forEach((file, i) => {
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    const previewDiv = document.createElement('div');
-                    previewDiv.className = 'file-preview';
-                    previewDiv.dataset.index = i;
-                    
-                    if (file.type.startsWith('image/')) {
-                        previewDiv.innerHTML = `
-                            <img src="${e.target.result}" alt="${file.name}">
-                            <button class="remove-file" onclick="removeFile(${i})">×</button>
-                            <div class="file-name">${file.name}</div>
-                        `;
-                    } else {
-                        previewDiv.innerHTML = `
-                            <div style="padding: 10px; text-align: center;">
-                                <p>PDF</p>
-                                <p>${file.name}</p>
-                            </div>
-                            <button class="remove-file" onclick="removeFile(${i})">×</button>
-                        `;
-                    }
-                    container.appendChild(previewDiv);
-                };
-                reader.readAsDataURL(file);
-            });
+        const remainingSlots = paymentRows - selectedFiles.length;
+        if (remainingSlots <= 0 && newFiles.length > 0) {
+            alert(`Solo puede cargar un máximo de ${paymentRows} comprobante(s) para ${paymentRows} forma(s) de pago`);
+            try { input.value = ''; } catch(e){}
+            return;
         }
+
+        let addedCount = 0;
+        for (const file of newFiles) {
+            if (addedCount >= remainingSlots) break;
+            // avoid duplicates by name+size
+            const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size && f.type === file.type);
+            if (!exists) {
+                selectedFiles.push(file);
+                addedCount++;
+            }
+        }
+
+        if (newFiles.length > addedCount) {
+            // some files were not added due to limit
+            alert(`Solo puede cargar un máximo de ${paymentRows} comprobante(s) para ${paymentRows} forma(s) de pago`);
+        }
+
+        // Reflect selectedFiles into the input element so form submit works
+        const dataTransfer = new DataTransfer();
+        selectedFiles.forEach(f => dataTransfer.items.add(f));
+        try { input.files = dataTransfer.files; } catch (e) { /* some browsers prevent setting files; still show previews */ }
+
+        syncInputFiles(input); 
+        renderSelectedFiles();
+        updateFileName(selectedFiles.length);
+    }
+
+    function syncInputFiles(input) {
+        const dataTransfer = new DataTransfer();
+        selectedFiles.forEach(file => dataTransfer.items.add(file));
+        input.files = dataTransfer.files; 
+    }
+
+    function renderSelectedFiles(){
+        const container = document.getElementById('selected-files-container');
+        container.innerHTML = '';
+        selectedFiles.forEach((file, i) => {
+            const reader = new FileReader();
+            reader.onload = function(e){
+                const previewDiv = document.createElement('div');
+                previewDiv.className = 'file-preview';
+                previewDiv.dataset.index = i;
+                if (file.type.startsWith('image/')) {
+                    previewDiv.innerHTML = `
+                        <img src="${e.target.result}" alt="${file.name}">
+                        <button class="remove-file" onclick="removeFile(${i})">×</button>
+                        <div class="file-name">${file.name}</div>
+                    `;
+                } else {
+                    previewDiv.innerHTML = `
+                        <div style="padding: 10px; text-align: center;">
+                            <p>PDF</p>
+                            <p>${file.name}</p>
+                        </div>
+                        <button class="remove-file" onclick="removeFile(${i})">×</button>
+                    `;
+                }
+                container.appendChild(previewDiv);
+            };
+            reader.readAsDataURL(file);
+        });
     }
     function updateFileName() {
         const fileInput = document.getElementById('proof_of_payment');
@@ -485,15 +687,14 @@
         }
     }
     function removeFile(index) {
+        selectedFiles.splice(index, 1);
+        // update the real input.files as well
         const input = document.getElementById('proof_of_payment');
-        const files = Array.from(input.files);
-        files.splice(index, 1);
-
         const dataTransfer = new DataTransfer();
-        files.forEach(file => dataTransfer.items.add(file));
-        input.files = dataTransfer.files;
-
-        handleFileSelection(input);
+        selectedFiles.forEach(file => dataTransfer.items.add(file));
+        try { input.files = dataTransfer.files; } catch(e){}
+        renderSelectedFiles();
+        updateFileName();
     }
 
     // Listener
@@ -504,15 +705,31 @@
         const year = today.getFullYear();
         const maxDate = `${year}-${month}-${day}`;
 
+        // Obtener fecha mínima basada en fechas de emisión
+        const minDate = getEarliestIssueDate();
+
         const firstDateInput = document.querySelector('input[name="date_operation"]');
         if (firstDateInput) {
             firstDateInput.setAttribute("max", maxDate);
+            firstDateInput.setAttribute("min", minDate);
         }
 
         addInputListeners();
 
-        updateDaysAndCommission();
-        updateBalanceNote();
+        // Fetch initial exchange rates per row (use existing date value if present)
+        (async function initRowRates(){
+            const paymentRows = document.querySelectorAll('.payment-row');
+            for (const row of paymentRows) {
+                const dateVal = row.querySelector('input[name="date_operation"]').value;
+                const currencyId = row.querySelector('select[name="currency"]')?.value;
+                if (currencyId) {
+                    const rate = await fetchExchangeRate(dateVal, currencyId);
+                    row.dataset.exchangeRate = rate;
+                }
+            }
+            updateDaysAndCommission();
+            updateBalanceNote();
+        })();
     });
 
     function addInputListeners() {
@@ -524,27 +741,76 @@
             const currencySelect = row.querySelector('select[name="currency"]');
             const dateInput = row.querySelector('input[name="date_operation"]');
             
-            // Eliminar listeners existentes para evitar duplicados
-            amountInput.removeEventListener('input', updateBalanceNote);
-            amountInput.removeEventListener('input', updateDaysAndCommission);
-            currencySelect.removeEventListener('change', handleCurrencyChange);
-            dateInput.removeEventListener('change', updateDaysAndCommission);
-            dateInput.removeEventListener('input', updateDaysAndCommission);
-            
-            // Agregar nuevos listeners con lógica unificada
-            amountInput.addEventListener('input', function() {
+            // Remove previously bound handlers if present
+            if (amountInput._onInput) amountInput.removeEventListener('input', amountInput._onInput);
+            if (currencySelect._onChange) currencySelect.removeEventListener('change', currencySelect._onChange);
+            if (dateInput._onChange) dateInput.removeEventListener('change', dateInput._onChange);
+            if (dateInput._onInput) dateInput.removeEventListener('input', dateInput._onInput);
+
+            // Add handlers and keep references to allow removal later
+            amountInput._onInput = function() {
                 updateBalanceNote();
                 updateDaysAndCommission(); // Actualizar días y comisión cuando cambia el monto
-            });
-            
-            currencySelect.addEventListener('change', function(e) {
-                handleCurrencyChange(e); // Manejar cambio de moneda
+            };
+            amountInput.addEventListener('input', amountInput._onInput);
+
+            currencySelect._onChange = async function(e) {
+                handleCurrencyChange(e); // Manejar cambio de moneda (carga tenders)
+                // Also refresh rate for this row according to current date
+                const rowEl = this.closest('.payment-row');
+                const dateVal = rowEl.querySelector('input[name="date_operation"]').value;
+                const curId = this.value;
+                const rate = await fetchExchangeRate(dateVal, curId);
+                rowEl.dataset.exchangeRate = rate;
                 updateBalanceNote();    // Actualizar saldo
                 updateDaysAndCommission(); // Actualizar días y comisión
-            });
-            
-            dateInput.addEventListener('change', updateDaysAndCommission);
-            dateInput.addEventListener('input', updateDaysAndCommission);
+            };
+            currencySelect.addEventListener('change', currencySelect._onChange);
+
+            dateInput._onChange = async function(e) {
+                const rowEl = this.closest('.payment-row');
+                const currencyId = rowEl.querySelector('select[name="currency"]')?.value;
+                const dateVal = this.value;
+                const rate = await fetchExchangeRate(dateVal, currencyId);
+                rowEl.dataset.exchangeRate = rate;
+                updateBalanceNote();
+                updateDaysAndCommission();
+            };
+            dateInput._onInput = dateInput._onChange;
+            dateInput.addEventListener('change', dateInput._onChange);
+            dateInput.addEventListener('input', dateInput._onInput);
+        });
+
+        // Listeners for los inputs 'Importe Pagado' (asigned amounts) para control manual
+        const appliedAmountInputs = document.querySelectorAll('.applied-amount-input');
+        appliedAmountInputs.forEach((input, idx) => {
+            if (input._onInputManual) input.removeEventListener('input', input._onInputManual);
+            input._onInputManual = function() {
+                input.dataset.manual = "true";
+                // Normalizar valor y no permitir negativos
+                let val = parseFloat(input.value) || 0;
+                if (val < 0) { val = 0; input.value = val.toFixed(2); }
+
+                // Limitar por el importe adeudado descontado
+                const balanceEls = document.querySelectorAll('#balance_calculation');
+                const balanceEl = balanceEls[idx];
+                const original = balanceEl ? parseFloat(balanceEl.dataset.originalValue) || 0 : 0;
+                const generalDiscount = parseFloat(document.getElementById('general_discount').value) || 0;
+                const discounted = original * (1 - generalDiscount / 100);
+                if (val > discounted) { val = discounted; input.value = val.toFixed(2); }
+
+                // No exceder el total ingresado en el recibo
+                const totalPaid = parseFloat(cleanNumberForServer(document.getElementById('balance_note').textContent)) || 0;
+                let sumOthers = 0;
+                appliedAmountInputs.forEach((el, i) => {
+                    if (i !== idx && el.dataset.manual === "true") sumOthers += parseFloat(el.value) || 0;
+                });
+                const availableForThis = Math.max(0, totalPaid - sumOthers);
+                if (val > availableForThis) { val = availableForThis; input.value = val.toFixed(2); }
+
+                distributeBalanceAcrossReceipts(totalPaid);
+            };
+            input.addEventListener('input', input._onInputManual);
         });
     }
 
@@ -561,7 +827,8 @@
             
             // Conversión solo si la moneda de la fila es diferente a la del recibo
             if (currencySelect.value != receiptCurrency) {
-                const convertedAmount = convertAmount(receiptCurrency, amount);
+                const rate = row.dataset.exchangeRate ? parseFloat(row.dataset.exchangeRate) : null;
+                const convertedAmount = convertAmountWithRate(receiptCurrency, currencySelect.value, amount, rate);
                 totalBalance += convertedAmount;
             } else {
                 totalBalance += amount;
@@ -575,7 +842,7 @@
     // Cálculo de Días Transcurridos y Comisión
     function updateDaysAndCommission() {
         updateBalanceNote();
-        const balanceNoteValue = parseFloat(document.getElementById('balance_note').textContent) || 0;
+        const balanceNoteValue = document.getElementById('balance_note').textContent || 0;
         distributeBalanceAcrossReceipts(balanceNoteValue);
     }
 
@@ -625,6 +892,15 @@
         });
     }
 
+    // Asignación Manual de Montos a Facturas (con validación)
+    function handleManualAssignment(input) {
+        // Marcar como manual y delegar validación a la rutina central
+        input.dataset.manual = "true";
+        // Recalcular usando el balance actual (updateBalanceNote ya actualiza #balance_note)
+        const balanceNoteValue = parseFloat(cleanNumberForServer(document.getElementById('balance_note').textContent)) || 0;
+        distributeBalanceAcrossReceipts(balanceNoteValue);
+    }
+
     // Cálculo de Impuesto Adeudado. Días Transcurridos y Comisión para las demás filas
     function distributeBalanceAcrossReceipts(balanceNote) {
         const balanceCalculationFields = document.querySelectorAll('#balance_calculation');
@@ -633,6 +909,17 @@
         const generalDiscount = parseFloat(document.getElementById('general_discount').value) || 0;
         const paymentRows = document.querySelectorAll('.payment-row');
         const receiptCurrency = "{{ receiptStoreCustomer[6] }}";
+
+        // Asegurar un valor numérico de balanceNote (se acepta undefined cuando se llama sin parámetro)
+        if (typeof balanceNote !== 'number') {
+            balanceNote = parseFloat(cleanNumberForServer(document.getElementById('balance_note').textContent)) || 0;
+        }
+
+        // Lista de inputs que representan el "Importe Pagado" por factura
+        const amountInputs = document.querySelectorAll('.applied-amount-input');
+        // Saldo disponible para distribución (en moneda del recibo)
+        let availableBalance = parseFloat(balanceNote) || 0;
+
         // Cargar lista de monedas desde template
         const currenciesList = JSON.parse('{{ currencies | tojson | safe }}');
         const exchangeRate = parseFloat("{{ currencies[0][2] }}");
@@ -641,17 +928,21 @@
             const found = currenciesList.find(c => String(c[0]) == String(id));
             return found ? (found[1] || found[0]) : id;
         }
+
         // Preparar datos de pagos
         // Agregar paymentRowIdx para rastrear el índice de la forma de pago
         const paymentData = Array.from(paymentRows).map((row, idx) => {
             const currencySelect = row.querySelector('select[name="currency"]');
-            let entryAmount = row.querySelector('input[name="payment_amount"]').value;
+            let entryAmount = row.querySelector('input[name="payment_amount"]') .value;
             let convertedAmount = entryAmount;
             const paymentMethodSelect = row.querySelector('select[name="payment_method"]');
             const paymentMethodText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex]?.text || '';
-            if(currencySelect.value != receiptCurrency){
-                convertedAmount = convertAmount(receiptCurrency, entryAmount);
+
+            if (currencySelect.value != receiptCurrency) {
+                const rate = row.dataset.exchangeRate ? parseFloat(row.dataset.exchangeRate) : null;
+                convertedAmount = convertAmountWithRate(receiptCurrency, currencySelect.value, entryAmount, rate);
             }
+            
             return {
                 // amount: usado para asignación en moneda del recibo (convertido si aplica)
                 amount: parseFloat(convertedAmount) || 0,
@@ -659,12 +950,13 @@
                 originalAmount: parseFloat(entryAmount) || 0,
                 currencyId: currencySelect.value,
                 date: row.querySelector('input[name="date_operation"]').value,
-                dateObj: row.querySelector('input[name="date_operation"]').value ? new Date(row.querySelector('input[name="date_operation"]').value) : null,
+                dateObj: row.querySelector('input[name="date_operation"]') .value ? new Date(row.querySelector('input[name="date_operation"]').value) : null,
                 isRetention: paymentMethodText.toUpperCase().includes('RETENCIONES'),
                 row: row,
                 paymentRowIdx: idx // Índice de la forma de pago
             };
         });
+
         // Preparar datos de facturas
         const receiptData = Array.from(balanceCalculationFields).map((field, index) => {
             const originalValue = parseFloat(field.getAttribute('data-original-value')) || 0;
@@ -686,16 +978,100 @@
             };
         });
 
+        // 1. Primero: Respetar asignaciones manuales y N/C
+        receiptData.forEach((invoice, idx) => {
+            const input = amountInputs[idx];
+            if (input && input.dataset.manual === "true") {
+                let manualVal = parseFloat(input.value) || 0;
+
+                // No permitir que el usuario exceda el importe adeudado de la factura
+                if (manualVal > invoice.discountedValue) {
+                    manualVal = invoice.discountedValue;
+                    input.value = manualVal.toFixed(2);
+                }
+
+                // Validar que no exceda el saldo total ingresado en formas de pago
+                if (manualVal > availableBalance) {
+                    manualVal = availableBalance;
+                    input.value = manualVal.toFixed(2);
+                }
+
+                invoice.amountPaid = manualVal;
+                availableBalance = parseFloat((availableBalance - manualVal).toFixed(2));
+                invoice.remaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+                
+                let remainingToCover = manualVal;
+
+                // Buscamos en las formas de pago (paymentData) para ver qué fecha usar
+                for (let p of paymentData) {
+                    if (remainingToCover <= 0) break;
+                    if (p.amount <= 0) continue;
+
+                    let take = Math.min(p.amount, remainingToCover);
+                    
+                    // Calculamos días usando la fecha de ESTA forma de pago
+                    let realDays = 0;
+                    if (p.dateObj && !isNaN(invoice.dueDate.getTime())) {
+                        const diff = p.dateObj - invoice.dueDate;
+                        realDays = Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
+                    }
+
+                    const effectiveDays = p.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays);
+
+                    invoice.payments.push({
+                        amount: take,
+                        paymentDate: p.dateObj,
+                        daysElapsed: effectiveDays,
+                        realDays: isNaN(realDays) ? 0 : realDays,
+                        paymentRowIdx: p.paymentRowIdx,
+                        calculateCommission: true
+                    });
+
+                    // Restamos del saldo de la forma de pago para que la distribución auto no lo use
+                    p.amount = parseFloat((p.amount - take).toFixed(2));
+                    remainingToCover = parseFloat((remainingToCover - take).toFixed(2));
+                    
+                    if (p.isRetention) {
+                        invoice.retentionApplied = parseFloat((invoice.retentionApplied + take).toFixed(2));
+                    }
+                }
+            }
+        });
+
         // Distribución de N/C como si fueran pagos del vendedor
         applyCreditNotesAsPayments(receiptData)
 
-        // Distribuir pagos y retenciones a facturas en orden
+        // Ajustar paymentData para reservar las porciones ya consumidas por asignaciones manuales.
+        // Esto evita que la distribución automática vuelva a usar esos montos.
+        try {
+            const totalPaymentSum = paymentData.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+            const consumedByManual = parseFloat((totalPaymentSum - availableBalance).toFixed(2));
+            if (consumedByManual > 0) {
+                let remainingToDeduct = consumedByManual;
+                for (let i = 0; i < paymentData.length && remainingToDeduct > 0; i++) {
+                    const take = Math.min(paymentData[i].amount, remainingToDeduct);
+                    paymentData[i].amount = parseFloat((paymentData[i].amount - take).toFixed(2));
+                    remainingToDeduct = parseFloat((remainingToDeduct - take).toFixed(2));
+                }
+            }
+        } catch (e) {
+            console.error('Error ajustando paymentData por asignaciones manuales:', e);
+        }
+
+        // 3. Distribuir el availableBalance restante en las facturas NO manuales
         let paymentIndex = 0;
         let invoiceIndex = 0;
+
         while (paymentIndex < paymentData.length && invoiceIndex < receiptData.length) {
             let payment = paymentData[paymentIndex];
             let invoice = receiptData[invoiceIndex];
+            const input = amountInputs[invoiceIndex];
             let invoiceRemaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+            // Saltamos si ya fue asignada manualmente
+            if (input && input.dataset.manual === "true") {
+                invoiceIndex++;
+                continue;
+            }
             if (invoiceRemaining <= 0) {
                 invoiceIndex++;
                 continue;
@@ -776,6 +1152,12 @@
         let totalCommissionPerCurrency = {}; // Ejemplo: { 'Bs': 150.00, 'USD': 50.00 }
         const businessRules = JSON.parse('{{ commissions | tojson | safe }}');
         receiptData.forEach((invoice, idx) => {
+            // Referencia a la celda de "Importe Pagado"
+            const input = amountInputs[idx];
+            if (input && input.dataset.manual !== "true") {
+                input.value = invoice.amountPaid.toFixed(2);
+            }
+
             // Mostrar saldo pendiente
             balanceCalculationFields[idx].textContent = formatSpanishNumber(invoice.remaining);
             invoice.element.dataset.invoicePaidAmount = invoice.amountPaid.toFixed(2);
@@ -1023,6 +1405,9 @@
         return typeof numberStr !== 'string' ? numberStr : numberStr.replace(/\./g, '').replace(',', '.');
     }
 
+    // ¡¡OJO!!
+    // SendReceipt repite parte del código de BalanceDistribution
+    // El primero es lo que se muestra en la interfaz y el segundo es lo que se envía al servidor, por lo que en ocasiones se necesitan ambos para manejar diferencias entre lo mostrado y lo enviado
     function sendReceipt() {
         closeConfirmationModal();
         document.getElementById('loadingModal').style.display = 'flex';
@@ -1116,8 +1501,9 @@
             let convertedAmount = entryAmount;
             const paymentMethodSelect = row.querySelector('select[name="payment_method"]');
             const paymentMethodText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex]?.text || '';
-            if(currencySelect.value != receiptCurrency){
-                convertedAmount = convertAmount(receiptCurrency, entryAmount);
+            if (currencySelect.value != receiptCurrency) {
+                const rate = row.dataset.exchangeRate ? parseFloat(row.dataset.exchangeRate) : null;
+                convertedAmount = convertAmountWithRate(receiptCurrency, currencySelect.value, entryAmount, rate);
             }
             return {
                 amount: parseFloat(convertedAmount) || 0,
@@ -1156,16 +1542,70 @@
         applyCreditNotesAsPayments(receiptData)
 
         // Reconstruir los pagos aplicados a cada factura usando la misma lógica
+        const amountInputs = document.querySelectorAll('.applied-amount-input');
+        let availableBalance = paymentData.reduce((sum, p) => sum + p.amount, 0);
+
+        // A. Primero: Procesar los inputs manuales
+        receiptData.forEach((invoice, idx) => {
+            const input = amountInputs[idx];
+            if (input && input.dataset.manual === "true") {
+                let manualVal = parseFloat(cleanNumberForServer(input.value)) || 0;
+                manualVal = Math.min(manualVal, invoice.discountedValue, availableBalance);
+
+                let remainingToCover = manualVal;
+                // Consumir de paymentData
+                for (let p of paymentData) {
+                    if (remainingToCover <= 0.001) break;
+                    if (p.amount <= 0.001) continue;
+
+                    let take = Math.min(p.amount, remainingToCover);
+                    let realDays = 0;
+                    if (p.dateObj && !isNaN(invoice.dueDate.getTime())) {
+                        const diff = p.dateObj - invoice.dueDate;
+                        realDays = Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
+                    }
+
+                    invoice.payments.push({
+                        amount: take,
+                        paymentDate: p.dateObj,
+                        daysElapsed: p.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays),
+                        realDays: isNaN(realDays) ? 0 : realDays,
+                        paymentRowIdx: p.paymentRowIdx
+                    });
+
+                    p.amount = parseFloat((p.amount - take).toFixed(2));
+                    remainingToCover = parseFloat((remainingToCover - take).toFixed(2));
+                    invoice.amountPaid = parseFloat((invoice.amountPaid + take).toFixed(2));
+                    availableBalance = parseFloat((availableBalance - take).toFixed(2));
+                }
+                invoice.remaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+            }
+        });
+
+        // B. Segundo: Distribución automática para el resto (Bucle While Original)
         let paymentIndex = 0;
         let invoiceIndex = 0;
         while (paymentIndex < paymentData.length && invoiceIndex < receiptData.length) {
             let payment = paymentData[paymentIndex];
             let invoice = receiptData[invoiceIndex];
-            let invoiceRemaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
-            if (invoiceRemaining <= 0) {
+            
+            // Si es manual, ya se procesó, saltar
+            if (amountInputs[invoiceIndex]?.dataset.manual === "true") {
                 invoiceIndex++;
                 continue;
             }
+
+            let invoiceRemaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
+            if (invoiceRemaining <= 0.001) {
+                invoiceIndex++;
+                continue;
+            }
+
+            if (payment.amount <= 0.001) {
+                paymentIndex++;
+                continue;
+            }
+
             let amountToApply = Math.min(payment.amount, invoiceRemaining);
             if (amountToApply > 0) {
                 let realDays = 0;
@@ -1173,27 +1613,22 @@
                     const difference = payment.dateObj - invoice.dueDate;
                     realDays = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
                 }
-                const effectiveDays = payment.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays);
+                
                 invoice.payments.push({
                     amount: amountToApply,
                     paymentDate: payment.dateObj,
-                    daysElapsed: effectiveDays,
+                    daysElapsed: payment.isRetention ? 0 : (isNaN(realDays) ? 0 : realDays),
                     realDays: isNaN(realDays) ? 0 : realDays,
                     paymentRowIdx: payment.paymentRowIdx
                 });
+
                 invoice.amountPaid = parseFloat((invoice.amountPaid + amountToApply).toFixed(2));
                 invoice.remaining = parseFloat((invoice.discountedValue - invoice.amountPaid).toFixed(2));
-                if (payment.isRetention) {
-                    invoice.retentionApplied = parseFloat((invoice.retentionApplied + amountToApply).toFixed(2));
-                }
                 payment.amount = parseFloat((payment.amount - amountToApply).toFixed(2));
             }
-            if (payment.amount <= 0.001) {
-                paymentIndex++;
-            }
-            if (invoice.remaining <= 0.001) {
-                invoiceIndex++;
-            }
+
+            if (payment.amount <= 0.001) paymentIndex++;
+            if (invoice.remaining <= 0.001) invoiceIndex++;
         }
         // Obtener businessRules
         const businessRules = JSON.parse('{{ commissions | tojson | safe }}');
@@ -1244,7 +1679,12 @@
                     // del monto original de la forma de pago que corresponde al 'payment.amount' aplicado.
                     let amountForCommissionInPaymentCurrency = payment.amount; // default (cuando misma moneda)
                     if (String(payCurrencyId) !== String(receiptCurrency)) {
-                        const originalTotalConverted = convertAmount(receiptCurrency, paymentData[paymentRowIdx].originalAmount);
+                        const originalTotalConverted = convertAmountWithRate(
+                            receiptCurrency,
+                            paymentData[paymentRowIdx].currencyId,
+                            paymentData[paymentRowIdx].originalAmount,
+                            paymentData[paymentRowIdx] && paymentData[paymentRowIdx].row ? parseFloat(paymentData[paymentRowIdx].row.dataset.exchangeRate) : null
+                        );
                         if (originalTotalConverted > 0) {
                             const proportion = payment.amount / originalTotalConverted;
                             amountForCommissionInPaymentCurrency = paymentData[paymentRowIdx].originalAmount * proportion;
@@ -1282,8 +1722,13 @@
                 const payCurrencyCodeForLog = getCurrencyCodeById(payCurrencyIdForLog);
                 // amountAppliedInPaymentCurrency corresponde a la base usada para la comisión
                 let amountAppliedInPaymentCurrency = payment.amount;
-                if (String(payCurrencyIdForLog) !== String(receiptCurrency)) {
-                    const originalTotalConverted = convertAmount(receiptCurrency, paymentData[paymentRowIdx].originalAmount);
+                    if (String(payCurrencyIdForLog) !== String(receiptCurrency)) {
+                    const originalTotalConverted = convertAmountWithRate(
+                        receiptCurrency,
+                        paymentData[paymentRowIdx].currencyId,
+                        paymentData[paymentRowIdx].originalAmount,
+                        paymentData[paymentRowIdx] && paymentData[paymentRowIdx].row ? parseFloat(paymentData[paymentRowIdx].row.dataset.exchangeRate) : null
+                    );
                     if (originalTotalConverted > 0) {
                         const proportion = payment.amount / originalTotalConverted;
                         amountAppliedInPaymentCurrency = paymentData[paymentRowIdx].originalAmount * proportion;

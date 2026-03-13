@@ -1,0 +1,651 @@
+{% extends "receipt.sellerBase.html" %}
+
+{% block title %}Gipsy - Historial de Cuentas{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/accountsHistory.css') }}"/>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="title-container">
+        <a class="back" href="{{ url_for('homeSeller') }}"><img src="{{ url_for('static', filename='IMG/back.png') }}" alt="Back"></a>
+        <div class="title-center">
+            <h2>Historial de Cuentas</h2>
+        </div>
+    </div>
+
+    <div class="filter-row-container">
+        <form action="#" method="GET" class="history-filters">
+            <div class="filter-line">
+                <div class="filter-group">
+                    <label for="year">Año:</label>
+                    <select id="year" name="year"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="month">Mes:</label>
+                    <select id="month" name="month"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="store">Tienda:</label>
+                    <select id="store" name="store"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="customer">Cliente:</label>
+                    <div class="customer-combobox">
+                        <div class="cs-display" tabindex="0">Todos</div>
+                        <div class="cs-panel">
+                            <input id="customer_search" placeholder="Buscar cliente..." autocomplete="off" />
+                            <ul id="customer_list"></ul>
+                        </div>
+                        <select id="customer" name="customer" style="display:none;"></select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-line">
+                <div class="filter-group">
+                    <label for="currency">Moneda:</label>
+                    <select id="currency" name="currency"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="docType">Tipo Doc:</label>
+                    <select id="docType" name="docType"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="status">Estatus:</label>
+                    <select id="status" name="status"></select>
+                </div>
+                <div class="filter-group">
+                    <label for="status">N_CTA:</label>
+                    <input id="ncta_search" placeholder="Buscar por N_CTA..." autocomplete="off" />
+                </div>
+                <button type="button" id="reset-filters" class="btn-filter">Reiniciar</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-container">
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>N_CTA</th>
+                    <th>Tipo</th>
+                    <th>Tienda</th>
+                    <th>Cliente</th>
+                    <th>Monto Total</th>
+                    <th>Monto Abonado</th>
+                    <th>Recibos</th>
+                    <th>Status Pago</th>
+                    <th>F. Cierre de Ciclo</th>
+                    <th>Pago de Comisión</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for account in accounts_history %}
+                <tr>
+                    <td>{{ account[1] }}</td>
+                    <td>{{ account[2] }}</td>
+                    <td>{{ account[3] }}</td>
+                    <td>{{ account[4] }}</td>
+                    <td>{{ account[5] }} {{ "{:,.2f}".format(account[6]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
+                    <td>{{ account[5] }} {{ "{:,.2f}".format(account[7]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
+                    <td>{{ account[8] | default('', true) }}</td>
+                    <td>
+                        {% set status_class = '' %}
+                        {% if account[9] in ['Pagada', 'Usada'] %}
+                            {% set status_class = 'paid' %}
+                        {% elif account[9] in ['Abonada', 'Parcialmente Usada'] %}
+                            {% set status_class = 'partial' %}
+                        {% elif account[9] in ['Pendiente', 'Disponible'] %}
+                            {% set status_class = 'pending' %}
+                        {% endif %}
+                        <span class="status-badge {{ status_class }}">
+                            {{ account[9] }}
+                        </span>
+                    </td>                  
+                    <td>{{ account[10] or ' -- ' }}</td>
+                    <td>{{ account[11] or ' -- ' }}</td>
+                </tr>
+                {% endfor %}                
+            </tbody>
+        </table>
+    </div>
+
+    <div id="no-results" style="display:none; padding:16px; color:#444;">No hay cuentas que cumplan con esos filtros.</div>
+
+    <div class="pagination">
+        {% if current_page > 1 %}
+            <a href="{{ url_for('accountsHistory', page=current_page-1) }}">Anterior</a>
+        {% endif %}
+
+        {% if total_pages <= 10 %}
+            {# Si hay 10 o menos, las mostramos todas #}
+            {% for p in range(1, total_pages + 1) %}
+                <a href="{{ url_for('accountsHistory', page=p) }}" class="{% if p == current_page %}active{% endif %}">{{ p }}</a>
+            {% endfor %}
+        {% else %}
+            {# Lógica de puntos suspensivos: 5 primeras y 5 últimas #}
+            {% for p in range(1, 6) %}
+                <a href="{{ url_for('accountsHistory', page=p) }}" class="{% if p == current_page %}active{% endif %}">{{ p }}</a>
+            {% endfor %}
+
+            <span class="dots">...</span>
+
+            {% for p in range(total_pages - 4, total_pages + 1) %}
+                <a href="{{ url_for('accountsHistory', page=p) }}" class="{% if p == current_page %}active{% endif %}">{{ p }}</a>
+            {% endfor %}
+        {% endif %}
+
+        {% if current_page < total_pages %}
+            <a href="{{ url_for('accountsHistory', page=current_page+1) }}">Siguiente</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+    const selectors = {
+        year: document.getElementById('year'),
+        month: document.getElementById('month'),
+        store: document.getElementById('store'),
+        customer: document.getElementById('customer'),
+        currency: document.getElementById('currency'),
+        docType: document.getElementById('docType'),
+        status: document.getElementById('status'),
+        ncta: document.getElementById('ncta_search')
+    };
+    const customerSearchInput = document.getElementById('customer_search');
+    let fullCustomerList = [];
+    const csDisplay = document.querySelector('.cs-display');
+    const csPanel = document.querySelector('.cs-panel');
+    const customerListEl = document.getElementById('customer_list');
+
+    const monthNames = {
+        '01': 'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio',
+        '07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'
+    };
+
+    const table = document.querySelector('.table-container table');
+    const tbody = table && table.tBodies[0];
+    if(!tbody) return;
+
+    // Función para formatear números a estilo español (1.234,56)
+    function formatMoneySpanish(amount) {
+        if (amount === null || amount === undefined) return "0,00";
+        
+        return new Intl.NumberFormat('es-ES', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(amount);
+    }
+
+    // Full dataset is requested from API when needed. Server provided filter options:
+    const fullData = [];
+    const serverFilters = {{ filters|tojson | safe }} || {};
+    const PER_PAGE = {{ per_page }} || 30;
+
+    // Rows for the initially rendered server page (kept for initial view)
+    const serverRows = Array.from(tbody.rows);
+
+    function getCellText(row, index){
+        const cell = row.cells[index];
+        return cell ? cell.textContent.trim() : '';
+    }
+
+    function parseDateParts(text){
+        if(!text) return {year:'', month:''};
+        // Try ISO YYYY-MM-DD
+        let m = text.match(/(\d{4})[-\/](\d{2})[-\/](\d{2})/);
+        if(m) return {year: m[1], month: m[2]};
+        // Try DD/MM/YYYY or D/M/YYYY
+        m = text.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+        if(m){
+            const mm = m[2].padStart(2,'0');
+            return {year: m[3], month: mm};
+        }
+        // Fallback: try to parse year anywhere
+        m = text.match(/(20\d{2})/);
+        if(m) return {year: m[1], month: ''};
+        return {year:'', month:''};
+    }
+
+    function extractCurrencyFromAmount(text){
+        if(!text) return '';
+        // Assume currency is last token (e.g., "1234.00 USD" or "Bs")
+        const parts = text.split(/\s+/).filter(Boolean);
+        if(parts.length===0) return '';
+        const last = parts[parts.length-1];
+        // Normalize some common representations
+        if(['Bs','VEF','VES','USD','EUR'].includes(last)) return last;
+        // If last is symbol like "$" or "Bs.", return trimmed
+        return last.replace(/[^A-Za-z0-9]/g,'') || last;
+    }
+
+    function collectOptionsFromRows(visibleRows){
+        const years = new Set();
+        const months = new Set();
+        const stores = new Set();
+        const customers = new Set();
+        const currencies = new Set();
+        const docTypes = new Set();
+        const statuses = new Set();
+
+        visibleRows.forEach(row => {
+            // When passed DOM rows, use cell text
+            if(row && row.cells){
+                const tipo = getCellText(row,1);
+                const tienda = getCellText(row,2);
+                const cliente = getCellText(row,3);
+                const montoTotal = getCellText(row,4);
+                const status = getCellText(row,7);
+                const fecha = getCellText(row,8);
+                const {year, month} = parseDateParts(fecha);
+                if(year) years.add(year);
+                if(month) months.add(month);
+                if(tienda) stores.add(tienda);
+                if(cliente) customers.add(cliente);
+                const cur = extractCurrencyFromAmount(montoTotal);
+                if(cur) currencies.add(cur);
+                if(tipo) docTypes.add(tipo);
+                if(status) statuses.add(status);
+            } else if(Array.isArray(row)){
+                // When passed data array from fullData
+                const tipo = row[2] || '';
+                const tienda = row[3] || '';
+                const cliente = row[4] || '';
+                const moneda = row[5] || '';
+                const montoTotal = (row[6] !== undefined) ? String(row[6]) : '';
+                const status = row[9] || '';
+                const fecha = row[10] || '';
+                const {year, month} = parseDateParts(fecha);
+                if(year) years.add(year);
+                if(month) months.add(month);
+                if(tienda) stores.add(tienda);
+                if(cliente) customers.add(cliente);
+                if(moneda) currencies.add(moneda);
+                if(tipo) docTypes.add(tipo);
+                if(status) statuses.add(status);
+            }
+        });
+
+        return {years, months, stores, customers, currencies, docTypes, statuses};
+    }
+
+    function clearSelect(sel){
+        while(sel.options.length) sel.remove(0);
+    }
+
+    function populateSelect(sel, values, formatMonth = false) {
+        clearSelect(sel);
+        const allOpt = new Option('Todos', 'ALL');
+        sel.add(allOpt);
+        
+        const sorted = Array.from(values).sort();
+        sorted.forEach(v => {
+            const text = (formatMonth && monthNames[v]) ? monthNames[v] : v;
+            sel.add(new Option(text, v));
+        });
+    }
+
+    function populateCustomerFiltered(query){
+        if(!selectors.customer) return;
+        clearSelect(selectors.customer);
+        const allOpt = new Option('Todos', 'ALL');
+        selectors.customer.add(allOpt);
+        const q = (query || '').toLowerCase().trim();
+        const source = fullCustomerList.slice();
+        const matches = q ? source.filter(c => c.toLowerCase().includes(q)) : source;
+        // populate hidden select
+        matches.forEach(v => selectors.customer.add(new Option(v, v)));
+        // populate visible list
+        if(customerListEl){
+            customerListEl.innerHTML = '';
+            // add Todos
+            const liAll = document.createElement('li');
+            liAll.textContent = 'Todos';
+            liAll.dataset.value = 'ALL';
+            liAll.style.padding = '6px 8px';
+            liAll.style.cursor = 'pointer';
+            customerListEl.appendChild(liAll);
+            liAll.addEventListener('click', function(){
+                const selVal = 'ALL';
+                selectors.customer.value = selVal;
+                if(csDisplay) csDisplay.textContent = 'Todos';
+                if(customerSearchInput) customerSearchInput.value = '';
+                if(csPanel) csPanel.style.display = 'none';
+                // repopulate to full list and restore selection
+                populateCustomerFiltered('');
+                try{ selectors.customer.value = selVal; }catch(e){}
+                applyFilters();
+            });
+
+            matches.forEach(v => {
+                const li = document.createElement('li');
+                li.textContent = v;
+                li.dataset.value = v;
+                li.style.padding = '6px 8px';
+                li.style.cursor = 'pointer';
+                customerListEl.appendChild(li);
+                li.addEventListener('click', function(){
+                    const selVal = this.dataset.value;
+                    // set selection
+                    try{ selectors.customer.value = selVal; }catch(e){}
+                    if(csDisplay) csDisplay.textContent = selVal;
+                    if(customerSearchInput) customerSearchInput.value = '';
+                    if(csPanel) csPanel.style.display = 'none';
+                    // repopulate the visible list to full after selection and restore selection
+                    populateCustomerFiltered('');
+                    try{ selectors.customer.value = selVal; }catch(e){}
+                    applyFilters();
+                });
+            });
+        }
+    }
+
+    function initialPopulate(){
+        // Use server-provided distinct options to avoid loading entire dataset
+        const opts = {years: new Set(serverFilters.years || []), months: new Set(serverFilters.months || []), stores: new Set(serverFilters.stores || []), customers: new Set(serverFilters.customers || []), currencies: new Set(serverFilters.currencies || []), docTypes: new Set(serverFilters.docTypes || []), statuses: new Set(serverFilters.statuses || []) };
+        populateSelect(selectors.year, opts.years);
+        populateSelect(selectors.month, opts.months, true);
+        populateSelect(selectors.store, opts.stores);
+        populateSelect(selectors.customer, opts.customers);
+        fullCustomerList = Array.from(opts.customers).sort();
+        const currencySet = new Set();
+        (serverFilters.currencies || []).forEach(c => {
+            const normalized = String(c).toUpperCase();
+            if(normalized.includes('USD')) currencySet.add('USD');
+            else if(normalized.includes('BS') || normalized.includes('VEF') || normalized.includes('VES')) currencySet.add('Bs');
+        });
+        populateSelect(selectors.currency, currencySet);
+        populateSelect(selectors.docType, opts.docTypes);
+        populateSelect(selectors.status, opts.statuses);
+    }
+
+    let clientState = {currentPage:1, filteredData: []};
+    const pagContainer = document.querySelector('.pagination');
+    const originalPaginationHTML = pagContainer ? pagContainer.innerHTML : '';
+    const originalPaginationDisplay = pagContainer ? (pagContainer.style.display || '') : '';
+
+    function renderTableFromData(data, page){
+        tbody.innerHTML = '';
+        page = page || 1;
+        const start = (page-1) * PER_PAGE;
+        const end = start + PER_PAGE;
+        const slice = data.slice(start, end);
+        slice.forEach(account => {
+            const tr = document.createElement('tr');
+            function td(text){ const c = document.createElement('td'); c.textContent = text !== undefined && text !== null ? text : ''; return c; }
+            tr.appendChild(td(account[1])); // N_CTA
+            tr.appendChild(td(account[2])); // Tipo
+            tr.appendChild(td(account[3])); // Tienda
+            tr.appendChild(td(account[4])); // Cliente
+            tr.appendChild(td((account[5] || '') + ' ' + (formatMoneySpanish(account[6]) !== undefined ? formatMoneySpanish(account[6]) : '')));
+            tr.appendChild(td((account[5] || '') + ' ' + (formatMoneySpanish(account[7]) !== undefined ? formatMoneySpanish(account[7]) : '')));
+            tr.appendChild(td(account[8]));
+            const statusTd = document.createElement('td');
+            const span = document.createElement('span');
+            let status_class = '';
+            const statusText = account[9] || '';
+            if (['Pagada','Usada'].includes(statusText)) status_class = 'paid';
+            else if (['Abonada','Parcialmente Usada'].includes(statusText)) status_class = 'partial';
+            else if (['Pendiente','Disponible'].includes(statusText)) status_class = 'pending';
+            span.className = 'status-badge ' + status_class;
+            span.textContent = statusText;
+            statusTd.appendChild(span);
+            tr.appendChild(statusTd);
+            tr.appendChild(td(account[10] || ' -- '));
+            tr.appendChild(td(account[11] || ' -- '));
+            tbody.appendChild(tr);
+        });
+        renderClientPagination(data.length);
+    }
+
+    function renderClientPagination(count) {
+        if (!pagContainer) return;
+
+        const totalPages = Math.ceil(count / PER_PAGE);
+
+        // Si no hay nada que mostrar o solo hay una página, ocultamos y salimos
+        if (count <= PER_PAGE) {
+            pagContainer.style.display = 'none';
+            return;
+        }
+
+        pagContainer.style.display = '';
+        pagContainer.innerHTML = '';
+        const current = clientState.currentPage;
+
+        // Helper para crear botones
+        const addPage = (p) => {
+            if (p === current) {
+                const span = document.createElement('span');
+                span.className = 'active a';
+                span.style.cssText = 'padding: 8px 12px; background: #324bab; color: white; border-radius: 4px; margin-right: 6px;';
+                span.textContent = p;
+                pagContainer.appendChild(span);
+            } else {
+                const a = document.createElement('a');
+                a.href = '#';
+                a.style.marginRight = '6px';
+                a.textContent = p;
+                a.onclick = (e) => { 
+                    e.preventDefault(); 
+                    clientState.currentPage = p; 
+                    renderTableFromData(clientState.filteredData, p); 
+                };
+                pagContainer.appendChild(a);
+            }
+        };
+
+        // Helper para puntos suspensivos
+        const addEllipsis = () => {
+            const span = document.createElement('span');
+            span.textContent = '...';
+            span.style.marginRight = '6px';
+            pagContainer.appendChild(span);
+        };
+
+        // 1. Botón Anterior
+        if (current > 1) {
+            const prev = document.createElement('a');
+            prev.href = '#';
+            prev.textContent = 'Anterior';
+            prev.style.marginRight = '8px';
+            prev.onclick = (e) => {
+                e.preventDefault();
+                clientState.currentPage--;
+                renderTableFromData(clientState.filteredData, clientState.currentPage);
+            };
+            pagContainer.appendChild(prev);
+        }
+
+        // 2. Lógica de bloques con puntos suspensivos
+        if (totalPages <= 10) {
+            // Si hay pocas páginas, mostrar todas
+            for (let i = 1; i <= totalPages; i++) addPage(i);
+        } else {
+            // Caso complejo: Mostrar 1, 2, 3, 4, 5 ... y las últimas 5
+            if (current <= 4) {
+                // Estamos al principio
+                for (let i = 1; i <= 5; i++) addPage(i);
+                addEllipsis();
+                for (let i = totalPages - 4; i <= totalPages; i++) addPage(i);
+            } else if (current >= totalPages - 3) {
+                // Estamos al final
+                for (let i = 1; i <= 5; i++) addPage(i);
+                addEllipsis();
+                for (let i = totalPages - 4; i <= totalPages; i++) addPage(i);
+            } else {
+                // Estamos en el medio: Mostrar 1... actual ...última
+                addPage(1);
+                addEllipsis();
+                for (let i = current - 1; i <= current + 1; i++) addPage(i);
+                addEllipsis();
+                addPage(totalPages);
+            }
+        }
+
+        // 3. Botón Siguiente
+        if (current < totalPages) {
+            const next = document.createElement('a');
+            next.href = '#';
+            next.textContent = 'Siguiente';
+            next.style.marginLeft = '8px';
+            next.onclick = (e) => {
+                e.preventDefault();
+                clientState.currentPage++;
+                renderTableFromData(clientState.filteredData, clientState.currentPage);
+            };
+            pagContainer.appendChild(next);
+        }
+    }
+
+    function applyFilters(){
+        const selValues = {
+            year: selectors.year.value,
+            month: selectors.month.value,
+            store: selectors.store.value,
+            customer: selectors.customer.value,
+            currency: selectors.currency.value,
+            docType: selectors.docType.value,
+            status: selectors.status.value,
+            ncta: (selectors.ncta && selectors.ncta.value) ? selectors.ncta.value.trim() : ''
+        };
+        const customerSearchVal = customerSearchInput ? customerSearchInput.value.trim() : '';
+        // If no filters selected, restore server-rendered page
+        const anyFilter = (Object.values(selectors).some(s => s && s.value && s.value !== 'ALL' && s.id !== 'ncta_search') || (customerSearchVal && customerSearchVal !== '') || (selValues.ncta && selValues.ncta !== ''));
+        if(!anyFilter){
+            tbody.innerHTML = '';
+            serverRows.forEach(r => tbody.appendChild(r.cloneNode(true)));
+            if(pagContainer){ pagContainer.innerHTML = originalPaginationHTML; pagContainer.style.display = originalPaginationDisplay || ''; }
+            const noResultsDiv = document.getElementById('no-results'); if(noResultsDiv) noResultsDiv.style.display = 'none';
+            return;
+        }
+
+        // Build query string and request full filtered set from server (so filters apply to all data)
+        const params = new URLSearchParams();
+        params.set('all', 'true');
+        if(selValues.year && selValues.year !== 'ALL') params.set('year', selValues.year);
+        if(selValues.month && selValues.month !== 'ALL') params.set('month', selValues.month);
+        if(selValues.store && selValues.store !== 'ALL') params.set('store', selValues.store);
+        if(selValues.customer && selValues.customer !== 'ALL') params.set('customer', selValues.customer);
+        if(selValues.currency && selValues.currency !== 'ALL') params.set('currency', selValues.currency);
+        if(selValues.docType && selValues.docType !== 'ALL') params.set('docType', selValues.docType);
+        if(selValues.status && selValues.status !== 'ALL') params.set('status', selValues.status);
+        if(selValues.ncta && selValues.ncta !== '') params.set('ncta', selValues.ncta);
+        if(customerSearchVal) params.set('customerSearch', customerSearchVal);
+
+        fetch('/api/accountsHistory?' + params.toString()).then(r => r.json()).then(data => {
+            const accounts = data.accounts || [];
+            if(accounts.length === 0){
+                const noResultsDiv = document.getElementById('no-results'); if(noResultsDiv) noResultsDiv.style.display = '';
+                document.querySelector('.table-container').style.display = 'none';
+                if(pagContainer) pagContainer.style.display = 'none';
+                return;
+            }
+            if(document.getElementById('no-results')) document.getElementById('no-results').style.display = 'none';
+            document.querySelector('.table-container').style.display = '';
+            clientState.filteredData = accounts;
+            clientState.currentPage = 1;
+            renderTableFromData(clientState.filteredData, 1);
+        }).catch(err => {
+            console.error('Error fetching filtered accounts', err);
+        });
+    }
+
+    const form = document.querySelector('.history-filters');
+    if(form){
+        const resetBtn = document.getElementById('reset-filters');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function() {
+                // 1. Resetear todos los selectores al valor por defecto
+                Object.values(selectors).forEach(s => { try { if(s.id === 'ncta_search') s.value = ''; else s.value = 'ALL' } catch(e){} });
+                if(customerSearchInput) customerSearchInput.value = '';
+                if(csDisplay) csDisplay.textContent = 'Todos';
+                        if(csPanel) csPanel.style.display = 'none';
+                        // repoblar la lista de clientes a la lista completa
+                        populateCustomerFiltered('');
+
+                // 2. Limpiar visualmente el estado de "No hay resultados"
+                const noResultsDiv = document.getElementById('no-results');
+                if (noResultsDiv) noResultsDiv.style.display = 'none';
+
+                // 3. Volver a mostrar los contenedores principales
+                document.querySelector('.table-container').style.display = '';
+                const pagContainer = document.querySelector('.pagination');
+                if (pagContainer) {
+                    pagContainer.style.display = '';
+                }
+
+                // 4. Ejecutar la función de filtrado (que ahora detectará que todo es 'ALL')
+                applyFilters();
+            });
+        }
+    }
+
+    Object.values(selectors).forEach(sel => {
+        sel.addEventListener('change', () => applyFilters());
+    });
+
+    if(customerSearchInput){
+        customerSearchInput.addEventListener('input', function(){
+            populateCustomerFiltered(this.value);
+            applyFilters();
+        });
+    }
+
+    // Debounce helper for N_CTA search
+    function debounce(fn, wait) {
+        let t = null;
+        return function(...args){
+            clearTimeout(t);
+            t = setTimeout(() => fn.apply(this, args), wait);
+        };
+    }
+
+    // N_CTA live search: debounce and call applyFilters (server-side filtered)
+    if(selectors.ncta){
+        selectors.ncta.addEventListener('input', debounce(function(){
+            applyFilters();
+        }, 300));
+    }
+
+    // Toggle the custom panel when clicking the display
+    if(csDisplay){
+        csDisplay.addEventListener('click', function(e){
+            if(!csPanel) return;
+            csPanel.style.display = (csPanel.style.display === 'none' || csPanel.style.display === '') ? 'block' : 'none';
+            if(csPanel.style.display === 'block' && customerSearchInput) { customerSearchInput.focus(); }
+        });
+        csDisplay.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); csDisplay.click(); } if(e.key === 'Escape' && csPanel){ csPanel.style.display='none'; } });
+    }
+
+    // Close panel on outside click
+    document.addEventListener('click', function(e){
+        const combobox = document.querySelector('.customer-combobox');
+        if(!combobox) return;
+        if(!combobox.contains(e.target)){
+            if(csPanel) csPanel.style.display = 'none';
+        }
+    });
+
+    // Keep display synced if hidden select changes
+    if(selectors.customer){
+        selectors.customer.addEventListener('change', function(){
+            const v = this.value === 'ALL' ? 'Todos' : this.value;
+            if(csDisplay) csDisplay.textContent = v;
+        });
+    }
+
+    initialPopulate();
+    if(customerSearchInput) populateCustomerFiltered('');
+    if(selectors.customer && selectors.customer.value){
+        const v = selectors.customer.value === 'ALL' ? 'Todos' : selectors.customer.value;
+        if(csDisplay) csDisplay.textContent = v;
+    }
+})();
+</script>
+{% endblock %}

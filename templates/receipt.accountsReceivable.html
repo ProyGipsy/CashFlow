@@ -69,6 +69,9 @@
                     <th>Monto Original</th>
                     <th>Monto Abonado</th>
                     <th>Monto Restante</th>
+                    {% if isAdmin %}
+                        <th>Estado de Sincronización</th>
+                    {% endif %}
                     <th>Registrar</th>
                 </tr>
             </thead>
@@ -212,6 +215,30 @@
                         // Guardamos el tipo de documento en un atributo de datos para filtrar
                         row.setAttribute("data-doc-type", invoice.DocumentType);
 
+                        // Estados de sincronización
+                        const statusMessages = {
+                            1: "Conciliado",
+                            2: "App por delante",
+                            3: "Gálac por delante"
+                        };
+                        const statusText = statusMessages[invoice.SyncStatus] || "Desconocido";
+
+                        // Mensajes tooltips
+                        const syncHelpMessages = {
+                            1: "Los abonos registrados en la Aplicación de Cobranza y en el Sistema Gálac se encuentran sincronizados",
+                            2: "Los abonos registrados en la Aplicación de Cobranza no se han registrado en el Sistema Gálac",
+                            3: "Los abonos registrados en el Sistema Gálac no se han registrado en la Aplicación de Cobranza"
+                        };
+                        const helpMsg = syncHelpMessages[invoice.SyncStatus] || "Estado no definido";
+
+                        // Estilo color status
+                        const syncStatusBadge = {
+                            1: "matched",
+                            2: "appAhead",
+                            3: "galacAhead"
+                        }
+                        const statusClass = syncStatusBadge[invoice.SyncStatus] || "";
+
                         row.innerHTML = `
                             <td>${invoice.N_CTA}</td>
                             <td>${invoice.DocumentType}</td>
@@ -219,6 +246,17 @@
                             <td>${formatSpanishNumber(invoice.Amount)}</td>
                             <td>${formatSpanishNumber(invoice.Balance)}</td>
                             <td>${formatSpanishNumber(invoice.Remaining)}</td>
+                            {% if isAdmin %}
+                                <td>
+                                    <div class="sync-container">
+                                        <span class="status-badge ${statusClass}">${statusText}</span>
+                                        <div class="tooltip-container">
+                                            <span class="info-icon">i</span>
+                                            <span class="tooltip-text">${helpMsg}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                            {% endif %}
                             <td><input type="checkbox" class="invoice-checkbox" data-account-id="${invoice.AccountID}" /></td>
                         `;
                         tableBody.appendChild(row);

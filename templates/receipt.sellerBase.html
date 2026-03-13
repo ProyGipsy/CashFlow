@@ -28,6 +28,12 @@
                         <a href="{{ url_for('accountsReceivable') }}" class="optionLink">Cuentas por Cobrar</a>
                     </div>
                 </li>
+                <li>
+                    <div class="optionContainer {% if active_page == 'accountsHistory' %}active{% endif %}">
+                        {% if active_page == 'accountsHistory' %}<div class="verticalLine"></div>{% endif %}
+                        <a href="{{ url_for('accountsHistory') }}" class="optionLink">Historial de Cuentas</a>
+                    </div>
+                </li>
             </ul>
             <ul class="bottomMenu">
                 <li>

@@ -38,10 +38,11 @@
             <tr> 
                 <th>N_CTA</th>
                 <th>Tipo de Documento</th>
-                <th>Total Deuda (T/D)</th>
+                <th>Monto Documento</th>
                 <th>Fecha Emisión</th>
                 <th>Fecha Vencimiento</th>
                 <th>Monto Abonado</th>
+                <th>Monto Pendiente</th>
             </tr> 
             {% for invoice in invoices %}
             <tr>
@@ -51,6 +52,7 @@
                 <td>{{ invoice[2].strftime('%d-%m-%Y') }}</td> 
                 <td>{{ invoice[3].strftime('%d-%m-%Y') }}</td> 
                 <td>{{ invoices[0][6] }} {{ "{:,.2f}".format(invoice[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td> 
+                <td>{{ invoices[0][6] }} {{ "{:,.2f}".format(invoice[1]-invoice[4]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td> 
             </tr>
             {% endfor %}
         </table>
@@ -124,6 +126,7 @@
             <tr> 
                 <th>N_CTA</th>
                 <th>Importe Adeudado</th>
+                <th>Importe Pagado en este Recibo</th>
                 <th>Días Transcurridos</th>
                 <th>Comisión</th>
             </tr> 
@@ -131,6 +134,7 @@
             <tr> 
                 <td>{{ repComm[0] }}</td>
                 <td>{{ invoices[0][6] }} {{ "{:,.2f}".format(repComm[1]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
+                <td>{{ invoices[0][6] }} {{ "{:,.2f}".format(repComm[6]).replace(".", "X").replace(",", ".").replace("X", ",") }}</td>
                 <td>{{ repComm[2] }}</td>
                 <td>
                     {% if repComm[3] != 0 %}

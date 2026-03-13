@@ -3,6 +3,7 @@ import json
 import base64
 import requests
 import mimetypes
+from decimal import Decimal
 
 from io import BytesIO
 from reports import reports_bp
@@ -103,7 +104,20 @@ from receipt_db import (
     check_already_paid_invoices, 
     check_duplicate_receipt,
     set_DebtSettlement,
-    get_all_related_receipts
+    get_all_related_receipts,
+    set_SyncStatus,
+    get_accountsHistory,
+    get_accountsHistory_admin,
+    get_accounts_history_page,
+    get_accounts_history_all,
+    get_accounts_history_filters,
+    get_accounts_history_count,
+    get_paymentOptions,
+    _get_payment_options_where,
+    get_payment_options_page,
+    get_payment_options_count,
+    get_payment_options_filters,
+    set_payment_option
     )
     
 from accessControl import (
@@ -168,6 +182,19 @@ app.config['MAIL_PORT'] = os.environ.get('MAIL_PORT')
 app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
 
 serializer = URLSafeTimedSerializer(app.secret_key)
+
+# Variables de Mantenimiento para toda la app, inyectadas en el contexto de Jinja para su uso en templates
+@app.context_processor
+def inject_maintenance_vars():
+    return {
+        'MAINTENANCE': {
+            'APP': os.environ.get('MAINTENANCE_MODE_APP', 'OFF'),
+            'CASHFLOW': os.environ.get('MAINTENANCE_MODE_CASHFLOW', 'OFF'),
+            'PAYMENTRECEIPT': os.environ.get('MAINTENANCE_MODE_PAYMENTRECEIPT', 'OFF'),
+            'REPORTS': os.environ.get('MAINTENANCE_MODE_REPORTS', 'OFF'),
+            'DOCUMENTS': os.environ.get('MAINTENANCE_MODE_DOCUMENTS', 'OFF')
+        }
+    }
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -660,30 +687,206 @@ def businessRules():
         return jsonify(success=True)
     return render_template('receipt.businessRules.html', page='businessRules', active_page='businessRules', rules=rules)
 
+@app.route('/paymentOptions')
+def paymentOptions():
+    page_num = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    # Carga inicial
+    options = get_payment_options_page(page=page_num, per_page=per_page)
+    total = get_payment_options_count()
+    available_filters = get_payment_options_filters()
+    
+    total_pages = (total + per_page - 1) // per_page
+    
+    return render_template('receipt.paymentOptions.html', 
+                           page='paymentOptions', 
+                           active_page='paymentOptions', 
+                           payment_options=options,
+                           filters=available_filters,
+                           current_page=page_num,
+                           total_pages=total_pages)
+
+@app.route('/api/paymentOptions')
+def api_payment_options():
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    filters = {
+        'store': request.args.get('store'),
+        'currency': request.args.get('currency'),
+        'tender': request.args.get('tender')
+    }
+    
+    rows = get_payment_options_page(page=page, per_page=per_page, filters=filters)
+    total = get_payment_options_count(filters=filters)
+    
+    return jsonify({
+        'options': rows,
+        'total': total,
+        'page': page,
+        'total_pages': (total + per_page - 1) // per_page
+    })
+
+@app.route('/api/savePaymentOption', methods=['POST'])
+def save_payment_option():
+    data = request.get_json()
+    
+    try:
+        # Convertimos a int los IDs que vienen como string del JSON
+        # El ID de la opción puede ser None o vacío si es un INSERT
+        raw_id = data.get('id')
+        option_id = int(raw_id) if raw_id and str(raw_id).strip() != "" else None
+        
+        store_id = int(data.get('store'))
+        currency_id = int(data.get('currency'))
+        tender_id = int(data.get('tender'))
+        raw_is_retail = data.get('storeIsRetail')
+        
+        if isinstance(raw_is_retail, str):
+            # Si es un string "false" o "true", lo convertimos a su equivalente lógico
+            if raw_is_retail.lower() == 'true':
+                is_retail = 1
+            elif raw_is_retail.lower() == 'false':
+                is_retail = 0
+            else:
+                # Si es un string numérico "0" o "1"
+                is_retail = int(raw_is_retail)
+        else:
+            # Si ya viene como booleano real o int desde el JSON
+            is_retail = 1 if raw_is_retail else 0
+            
+        bank_name = data.get('bank_account')
+        destiny = data.get('destination')
+        description = data.get('description')
+        rif = data.get('rif')
+
+        saved_id = set_payment_option(option_id, store_id, currency_id, tender_id, 
+                   bank_name, destiny, description, rif, is_retail)
+        print(f"[APP] save_payment_option saved_id={saved_id}")
+        return jsonify({'status': 'success', 'message': 'Guardado correctamente', 'id': saved_id})
+
+    except Exception as e:
+        print(f"Error detallado: {e}") # Esto saldrá en tu terminal de Python
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    
+
 @app.route('/receiptSeller')
 def homeSeller():
     return render_template('receipt.homeSeller.html', page='homeSeller', active_page='homeSeller')
 
+@app.route('/accountsHistory')
+def accountsHistory():
+    page_num = request.args.get('page', 1, type=int)
+    per_page = 30
+
+    is_admin = (0 in session.get('roles', []) and 1 in session.get('roles', []))
+    # Fetch only the page to render initially
+    if is_admin:
+        paginated_accounts = get_accounts_history_page(page=page_num, per_page=per_page, admin=True)
+        total = get_accounts_history_count(admin=True)
+        filters = get_accounts_history_filters(admin=True)
+    else:
+        paginated_accounts = get_accounts_history_page(salesRep_id=session.get('salesRep_id'), page=page_num, per_page=per_page)
+        total = get_accounts_history_count(salesRep_id=session.get('salesRep_id'))
+        filters = get_accounts_history_filters(salesRep_id=session.get('salesRep_id'))
+
+    total_pages = (total + per_page - 1) // per_page
+
+    return render_template('receipt.accountsHistory.html',
+                           page='accountsHistory',
+                           active_page='accountsHistory',
+                           accounts_history=paginated_accounts,
+                           filters=filters,
+                           current_page=page_num,
+                           total_pages=total_pages,
+                           per_page=per_page)
+
+
+
+@app.route('/api/accountsHistory')
+def api_accounts_history():
+    # Returns JSON for filtered/paginated accounts; if 'all' param is set, returns full filtered set
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 1000, type=int)
+    all_flag = request.args.get('all', 'false').lower() == 'true'
+
+    filters = {
+        'year': request.args.get('year'),
+        'month': request.args.get('month'),
+        'store': request.args.get('store'),
+        'customer': request.args.get('customer'),
+        'currency': request.args.get('currency'),
+        'docType': request.args.get('docType'),
+        'status': request.args.get('status'),
+        'ncta': request.args.get('ncta'),
+        'customerSearch': request.args.get('customerSearch')
+    }
+
+    is_admin = (0 in session.get('roles', []) and 1 in session.get('roles', []))
+
+    if all_flag:
+        if is_admin:
+            rows = get_accounts_history_all(filters=filters, admin=True)
+        else:
+            rows = get_accounts_history_all(salesRep_id=session.get('salesRep_id'), filters=filters)
+        def _serialize_row(r):
+            out = []
+            for v in r:
+                if isinstance(v, Decimal):
+                    out.append(float(v))
+                elif isinstance(v, (datetime,)):
+                    out.append(v.strftime('%Y-%m-%d'))
+                else:
+                    out.append(v)
+            return out
+        rows_s = [_serialize_row(r) for r in rows]
+        return jsonify({'accounts': rows_s, 'total': len(rows_s)})
+    else:
+        if is_admin:
+            total = get_accounts_history_count(filters=filters, admin=True)
+            rows = get_accounts_history_page(page=page, per_page=per_page, filters=filters, admin=True)
+        else:
+            total = get_accounts_history_count(salesRep_id=session.get('salesRep_id'), filters=filters)
+            rows = get_accounts_history_page(salesRep_id=session.get('salesRep_id'), page=page, per_page=per_page, filters=filters)
+        def _serialize_row(r):
+            out = []
+            for v in r:
+                if isinstance(v, Decimal):
+                    out.append(float(v))
+                elif isinstance(v, (datetime,)):
+                    out.append(v.strftime('%Y-%m-%d'))
+                else:
+                    out.append(v)
+            return out
+        rows_s = [_serialize_row(r) for r in rows]
+        return jsonify({'accounts': rows_s, 'total': total, 'page': page, 'per_page': per_page})
+
 @app.route('/accountsReceivable')
 def accountsReceivable():
-    if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    print(session['roles']);
+    # if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    if (0 in session['roles'] and 1 in session['roles']):
+        isAdmin = True
         stores = get_receiptStores_DebtAccount_admin()
         customers_by_store = {store[0]: get_customers_admin(store[0]) for store in stores}
         count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable_admin(store[0]) for store in stores}
     else:
+        isAdmin = False
         stores = get_receiptStores_DebtAccount(session['salesRep_id'])
         customers_by_store = {store[0]: get_customers(store[0], session['salesRep_id']) for store in stores}
         count_customers_by_store = {store[0]: get_count_customers_with_accountsReceivable(store[0], session['salesRep_id']) for store in stores}
     return render_template('receipt.accountsReceivable.html',
                            page='accountsReceivable',
                            active_page='accountsReceivable',
+                           isAdmin=isAdmin,
                            stores=stores,
                            customers_by_store=customers_by_store,
                            count_customers_by_store=count_customers_by_store)
 
 @app.route('/get_invoices/<customer_id>/<customer_isRembd>/<store_id>')
 def get_invoices(customer_id, customer_isRembd, store_id):
-    if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    # if (session['salesRep_id'] == '99' or session['user_id'] == 20):
+    if (0 in session['roles'] and 1 in session['roles']):
         invoices = get_invoices_by_customer_admin(customer_id, customer_isRembd, store_id)
     else: 
         invoices = get_invoices_by_customer(customer_id, customer_isRembd, store_id, session['salesRep_id'])
@@ -697,16 +900,19 @@ def get_invoices(customer_id, customer_isRembd, store_id):
             'IVA': 0,
             'Remaining': float(invoice[2] - invoice[3]),
             'Currency': invoice[4],
-            'DocumentType': invoice[5]
+            'DocumentType': invoice[5],
+            'SyncStatus': invoice[6]
         } for invoice in invoices
     ]
     return jsonify({'invoices': formatted_invoices})
 
+# Formulario de Cobranzas
 @app.route('/accountsForm/<string:account_ids>')
 def accountsForm(account_ids):
     account_ids_list = account_ids.split('-')
     receiptStoreCustomer = get_receiptsStoreCustomer(account_ids_list)
-    currencies = get_currency()
+    today = datetime.now().strftime('%Y-%m-%d')
+    currencies = get_currency(today)
     receiptsInfo = get_receiptsInfo(account_ids_list)
     bankAccounts = []
     commissions = get_commissions()
@@ -720,6 +926,23 @@ def accountsForm(account_ids):
         commissions=commissions,
         currencies=currencies
     )
+
+# Obtención de tasa de cambio según fecha
+@app.route('/get_exchange_rate')
+def get_exchange_rate():
+    # Leer parámetros de query string
+    date = request.args.get('date')
+
+    # Si no se provee fecha, usar hoy
+    if not date:
+        date = datetime.now().strftime('%Y-%m-%d')
+
+    currencies = get_currency(date)
+    if not currencies:
+        return jsonify({'success': False, 'message': 'Tasa no encontrada'}), 404
+
+    first = currencies[0]
+    return jsonify({'success': True, 'rate': float(first[2]), 'code': first[1]})
 
 # Obtención de formas de pago según moneda
 @app.route('/get_tenders/<int:currency_id>')
@@ -1179,8 +1402,6 @@ def send_rejectionEmail():
     ncta_list = [str(invoice[0]) for invoice in invoices]
     ncta_str = ", ".join(ncta_list)
 
-    set_isReviewedReceipt(receipt_id)
-
     # Revirtiendo monto abonado
     try:
         payment_relations = get_paymentRelations_by_receipt(receipt_id)
@@ -1203,6 +1424,9 @@ def send_rejectionEmail():
     except Exception as e:
         app.logger.error(f"Error al revertir pagos: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
+    
+    # Marcando como revisado (y rechazado)
+    set_isReviewedReceipt(receipt_id)
 
     rejection_reason = request.form.get('rejection_reason', '')
     rejection_reason_html = "<br>".join(line.strip() for line in rejection_reason.split('\n') if line.strip())
@@ -1305,19 +1529,38 @@ def send_validationEmail():
     Al implementar el pdf en producción, realizar la validación luego de este último renderizado.
     NOTA: Actualmente, el PDF se descarga directamente del correo, así que no ha sido solicitado
     """
-    set_isReviewedReceipt(receipt_id)
-    set_isApprovedReceipt(receipt_id)
-
-    # Si el recibo validado paga la totalidad de una factura, se registra en DebtSettlement
+    # Para cada factura asociada al recibo:
+    # - Se verifica y actualiza su estado respecto al sistema fuente GáLac
+    # - Si el recibo validado paga la totalidad de una factura, se registra en DebtSettlement
     for invoice in invoices:
         total_debt = invoice[1]
-        paid_amount = invoice[4]
+        app_paid_amount = invoice[4]
+        print("APP Paid Amount:", app_paid_amount)
         account_id = invoice[5]
-        if(total_debt == paid_amount):
+        galac_paid_amount = invoice[9]
+        print("Gálac Paid Amount:", galac_paid_amount)
+
+        # Actualizar el estado de la sincronización
+        diff = app_paid_amount - galac_paid_amount
+        print("Diferencia:", diff)
+        if abs(diff) <= 0.01: # MATCHED. StatusID 1
+            syncStatus = 1
+        elif diff > 0.01: # APP_AHEAD. StatusID 2
+            syncStatus = 2
+        elif diff < -0.01: # GALAC_AHEAD. StatusID 3
+            syncStatus = 3
+        print("Sync Status:", syncStatus)
+        set_SyncStatus(account_id, syncStatus)
+
+        # Facturas pagadas en su totalidad
+        if(total_debt <= app_paid_amount + Decimal('0.99')):
             related_receipt_ids = get_all_related_receipts(account_id)
             for r_id in related_receipt_ids:
                 set_DebtSettlement(account_id, r_id)
     
+    set_isReviewedReceipt(receipt_id)
+    set_isApprovedReceipt(receipt_id)
+
     # Logo Store (dinámico desde store[2])
     logo_store_path = store[2] if store and len(store) > 2 else None
     logo_store_cid = 'logo_store' if logo_store_path else None 

@@ -41,29 +41,36 @@
 
         <div class="grid {{ grid_class }}">
             {% if 1 in session['modules'] %}
-            <a href="{{ url_for('homeCashier') }}" class="card">
-                <img src="{{ url_for('static', filename='IMG/cash-flow.png') }}" alt="Flujo de Caja" class="card-img">
-                <h3>Flujo de Caja</h3>
-            </a>
+                {% set is_maint = MAINTENANCE.CASHFLOW == 'ON' %}
+                <a href="{{ url_for('homeCashier') }}" class="card {{ 'disabled' if is_maint else '' }}">
+                    <img src="{{ url_for('static', filename='IMG/cash-flow.png') }}" alt="Flujo de Caja" class="card-img">
+                    <h3>Flujo de Caja</h3>
+                    {% if is_maint %}<span class="disabledText">Módulo en mantenimiento.<br> Por favor, vuelva más tarde.</span>{% endif %}
+                </a>
             {% endif %}
             {% if 0 in session['modules'] %}
-            <a onclick="handleReceiptRole()" class="card">
-                <img src="{{ url_for('static', filename='IMG/receipt.png') }}" alt="Registro de Cobranza al Mayor" class="card-img">
-                <h3>Registro de Cobranza al Mayor</h3>
-                <!--<span>Sistema en mantenimiento. <br> Por favor, vuelva más tarde.</span>-->
-            </a>
+                {% set is_maint = MAINTENANCE.PAYMENTRECEIPT == 'ON' %}
+                <a onclick="handleReceiptRole()" class="card {{ 'disabled' if is_maint else '' }}">
+                    <img src="{{ url_for('static', filename='IMG/receipt.png') }}" alt="Registro de Cobranza al Mayor" class="card-img">
+                    <h3>Registro de Cobranza al Mayor</h3>
+                    {% if is_maint %}<span class="disabledText">Módulo en mantenimiento.<br> Por favor, vuelva más tarde.</span>{% endif %}
+                </a>
             {% endif %}
             {% if 2 in session['modules'] %}
-            <a href="{{ url_for('reports.homeReports') }}" class="card">
-                <img src="{{ url_for('static', filename='IMG/dashboard.png') }}" alt="Reportes" class="card-img">
-                <h3>Visualización de Reportes</h3>
-            </a>
+                {% set is_maint = MAINTENANCE.REPORTS == 'ON' %}
+                <a href="{{ url_for('reports.homeReports') }}" class="card {{ 'disabled' if is_maint else '' }}">
+                    <img src="{{ url_for('static', filename='IMG/dashboard.png') }}" alt="Reportes" class="card-img">
+                    <h3>Visualización de Reportes</h3>
+                    {% if is_maint %}<span class="disabledText">Módulo en mantenimiento.<br> Por favor, vuelva más tarde.</span>{% endif %}
+                </a>
             {% endif %}
             {% if 3 in session['modules'] %}
-            <a href="{{ react_app_url }}" class="card">
-                <img src="{{ url_for('static', filename='IMG/document.png') }}" alt="Documentos" class="card-img">
-                <h3>Gestión de Documentos</h3>
-            </a>
+                {% set is_maint = MAINTENANCE.DOCUMENTS == 'ON' %}
+                <a href="{{ react_app_url }}" class="card {{ 'disabled' if is_maint else '' }}">
+                    <img src="{{ url_for('static', filename='IMG/document.png') }}" alt="Documentos" class="card-img">
+                    <h3>Gestión de Documentos</h3>
+                    {% if is_maint %}<span class="disabledText">Módulo en mantenimiento.<br> Por favor, vuelva más tarde.</span>{% endif %}
+                </a>
             {% endif %}
             <!--
             <a href="{{ url_for('welcome') }}" class="card disabled">
@@ -81,18 +88,29 @@
                 <h2>Registro de Cobranza al Mayor</h2>
                 <p>Seleccione el rol con el que quiera ingresar.</p>
             </div>
-            
+
             <div class="grid role-grid">
-                {% for role in roles_info %}
-                {% if role.name not in ['Supervisor', 'Gerente de Ventas'] %}
-                <div class="role-card card" onclick="selectRole({{ role.id }})">
-                    <img src="{{ url_for('static', filename='IMG/' + ('admin2.png' if role.id == 1 else 'seller2.png')) }}" 
-                        alt="{{ role.name }}" class="role-card-img">
-                    <h4>{{ role.name }}</h4>
-                </div>
-                {% endif %}
+                {# Recorremos los permisos reales guardados en la sesión #}
+                {% for perm_id in session.get('permissions', []) %}
+                    
+                    {# Verificamos si es Vendedor (ID 0) o Administrador (ID 1) #}
+                    {% if perm_id == 0 %}
+                        <div class="role-card card" onclick="selectRole(0)">
+                            <img src="{{ url_for('static', filename='IMG/seller2.png') }}" 
+                                alt="Vendedor" class="role-card-img">
+                            <h4>Vendedor</h4>
+                        </div>
+                    {% elif perm_id == 1 %}
+                        <div class="role-card card" onclick="selectRole(1)">
+                            <img src="{{ url_for('static', filename='IMG/admin2.png') }}" 
+                                alt="Administrador" class="role-card-img">
+                            <h4>Administrador</h4>
+                        </div>
+                    {% endif %}
+
                 {% endfor %}
             </div>
+
         </div>
     </div>
 
@@ -100,16 +118,24 @@
 </html>
 
 <script>
-    function handleReceiptRole(){
-        const userRoles = {{ roles_info | tojson }};
+    function handleReceiptRole() {
 
-        if (userRoles.length == 1) {
-            const roleId = userRoles[0].id;
-            selectRole(roleId);
-        }
-        else if(userRoles.length > 1) {
-            const modal = document.getElementById("modalRole");
+        const sessionPermissions = {{ session.get('permissions', []) | tojson }};
+
+        const hasAccessToSeller = sessionPermissions.includes(0);
+        const hasAccessToAdmin = sessionPermissions.includes(1);
+        
+        // Caso A: Tiene ambos (0 y 1) -> Mostrar Modal
+        if (hasAccessToSeller && hasAccessToAdmin) {
             document.getElementById('modalRole').style.display = 'block';
+        } 
+        // Caso B: Solo tiene acceso a Administrador (1)
+        else if (hasAccessToAdmin) {
+            selectRole(1);
+        } 
+        // Caso C: Solo tiene acceso a Vendedor (0)
+        else if (hasAccessToSeller) {
+            selectRole(0);
         }
     }
 
