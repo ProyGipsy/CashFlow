@@ -192,7 +192,8 @@ def inject_maintenance_vars():
             'CASHFLOW': os.environ.get('MAINTENANCE_MODE_CASHFLOW', 'OFF'),
             'PAYMENTRECEIPT': os.environ.get('MAINTENANCE_MODE_PAYMENTRECEIPT', 'OFF'),
             'REPORTS': os.environ.get('MAINTENANCE_MODE_REPORTS', 'OFF'),
-            'DOCUMENTS': os.environ.get('MAINTENANCE_MODE_DOCUMENTS', 'OFF')
+            'DOCUMENTS': os.environ.get('MAINTENANCE_MODE_DOCUMENTS', 'OFF'),
+            'BALANCE': os.environ.get('MAINTENANCE_MODE_BALANCE', 'OFF')
         }
     }
 
