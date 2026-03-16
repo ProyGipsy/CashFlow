@@ -77,14 +77,14 @@
                     {% if is_maint %}<span class="disabledText">Módulo en mantenimiento.<br> Por favor, vuelva más tarde.</span>{% endif %}
                 </a>
             {% endif %}
-            {% if 4 in session['modules'] %}
+            <!--{% if 4 in session['modules'] %}-->
                 {% set is_maint = MAINTENANCE.BALANCE == 'ON' %}
                 <a href="{{ react_app_url }}" class="card {{ 'disabled' if is_maint else '' }}">
                     <img src="{{ url_for('static', filename='IMG/balance.png') }}" alt="Disponibilidad" class="card-img">
                     <h3>Disponibilidad</h3>
                     {% if is_maint %}<span class="disabledText">Módulo en mantenimiento.<br> Por favor, vuelva más tarde.</span>{% endif %}
                 </a>
-            {% endif %}
+            <!--{% endif %}-->
             <!--
             <a href="{{ url_for('welcome') }}" class="card disabled">
                 <img src="{{ url_for('static', filename='IMG/padlock.png') }}" alt="Gestión de Credenciales" class="card-img">
