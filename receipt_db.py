@@ -1092,58 +1092,82 @@ def get_SalesRepCommission_OLD(receipt_id):
     return salesRepComm
 
 def get_onedriveProofsOfPayments(paymentEntries):
-    headers = get_onedrive_headers()
+    try:
+        headers = get_onedrive_headers()
+    except Exception as e:
+        print(f"Error obteniendo headers de OneDrive: {e}")
+        headers = None
+
     folder_path = "/Recibos de Cobranza/Comprobantes de Pago"
     updated_entries = []
     
     for entry in paymentEntries:
-        if entry[7]:
-            filename = entry[7].split('/')[-1]
-            file_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/root:{folder_path}/{filename}"
+        updated_entry = list(entry)
+        filename_db = entry[7]
 
-            try:
-                response = requests.get(file_url, headers=headers)
-                if response.status_code == 200:
-                    file_data = response.json()
-                    
-                    file_id = file_data['id']
+        # CASO 1: No hay nada en la base de datos
+        if not filename_db:
+            updated_entry[7] = None 
+            updated_entries.append(tuple(updated_entry))
+            continue
 
-                    # Generación de enlace de compartición
-                    share_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/createLink"
-                    share_data = {
-                        "type": "view",
-                        "scope": "anonymous"
-                    }
-                    share_response = requests.post(share_url, headers=headers, json=share_data)
+        # Extraer el nombre real del archivo
+        filename = filename_db.split('/')[-1]
+        
+        # Diccionario por defecto para errores de conexión o archivo no encontrado
+        error_dict = {
+            'url': '#',
+            'name': filename,
+            'error': True,
+            'email_url': None
+        }
 
-                    updated_entry = list(entry)
-                    if share_response.status_code == 200:
-                        shared_link = share_response.json()["link"]["webUrl"]
-                        updated_entry[7] = {
-                            'url': shared_link,
-                            'name': filename,
-                            'error': False,
-                            'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
-                        }
-                    else:
-                        shared_link = file_data.get('webUrl')
-                        updated_entry[7] = {
-                            'url': shared_link,
-                            'name': filename,
-                            'error': True,
-                            'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
-                        }
+        # Si no hay headers o conexión, enviamos el diccionario de error de una vez
+        if not headers:
+            updated_entry[7] = error_dict
+            updated_entries.append(tuple(updated_entry))
+            continue
 
-                    updated_entries.append(tuple(updated_entry))
-                
-                else:
-                    updated_entries.append(entry)
+        file_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/root:{folder_path}/{filename}"
+
+        try:
+            response = requests.get(file_url, headers=headers, timeout=5) # Timeout para no colgar la app
             
-            except Exception as e:
-                updated_entries.append(entry)
+            if response.status_code == 200:
+                file_data = response.json()
+                file_id = file_data['id']
+
+                # Intentar generar el enlace de compartición
+                share_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/createLink"
+                share_data = {"type": "view", "scope": "anonymous"}
+                share_response = requests.post(share_url, headers=headers, json=share_data, timeout=5)
+
+                if share_response.status_code == 200:
+                    updated_entry[7] = {
+                        'url': share_response.json()["link"]["webUrl"],
+                        'name': filename,
+                        'error': False,
+                        'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
+                    }
+                else:
+                    # Si falla el share, usamos el webUrl directo del archivo
+                    updated_entry[7] = {
+                        'url': file_data.get('webUrl'),
+                        'name': filename,
+                        'error': False, # Marcamos como False porque el archivo existe
+                        'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
+                    }
+            else:
+                # El archivo no existe en OneDrive (404) o error de API
+                updated_entry[7] = error_dict
+
+        except Exception as e:
+            print(f"Excepción en petición a OneDrive para {filename}: {e}")
+            updated_entry[7] = error_dict
+        
+        updated_entries.append(tuple(updated_entry))
     
     return updated_entries
-
 
 def get_onedriveStoreLogo(logo_name):
     headers = get_onedrive_headers()
@@ -1264,20 +1288,6 @@ def set_paymentEntryCommission(cursor, receipt_id, paymentEntry_id, DebtAccount_
         ''', (receipt_id, paymentEntry_id, DebtAccount_id, payment_date, amount, days_elapsed, commission_id, bs_commission, usd_commission))
 
 
-"""
-# Guardado de Comprobantes de Pago en el Servidor
-def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
-    saved_file_paths = []
-    for file in proof_of_payments:
-        if file:
-            formatted_date = payment_date.strftime('%Y-%m-%d')
-            new_filename = f"{receipt_id}_{formatted_date}_{index}{os.path.splitext(file.filename)[1]}"
-            file_path = os.path.join('static/ProofsOfPayment', new_filename)
-            file.save(file_path)
-            saved_file_paths.append(file_path)
-    return saved_file_paths
-"""
-
 # Guardado de Comprobantes de Pago en OneDrive
 def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
     saved_file_paths = []
@@ -1296,13 +1306,12 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
                 url = upload_url,
                 headers=headers,
                 data=file_content)
-            
-            if response.status_code == 201:
-                print(f"Archivo {new_filename} subido correctamente.")
+
+            if response.status_code in [200, 201]:
                 saved_file_paths.append(new_filename)
             else:
-                print(f"Error al subir el archivo {new_filename}: {response.status_code}")
-                print(response.json())
+                # LANZAR EXCEPCIÓN: Esto detiene todo y activa el rollback en la ruta
+                raise Exception(f"Error crítico en OneDrive ({response.status_code}): {response.text}")
 
     return saved_file_paths
 

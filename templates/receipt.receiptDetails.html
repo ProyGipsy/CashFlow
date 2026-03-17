@@ -178,19 +178,27 @@
             <label><strong>Comprobante(s):</strong></label><br><br>
             {% if paymentEntries %}
                 {% for paymentEntry in paymentEntries %}
-                    {% if paymentEntry[7] %}
+                    {# Caso 1: El campo en la base de datos está vacío o es None #}
+                    {% if not paymentEntry[7] or paymentEntry[7] == "" %}
+                        <p class="file-info-msg">El comprobante no se ha almacenado en OneDrive. Por favor, solicitar al vendedor.</p>
+                    
+                    {% else %}
                         {% set file_info = paymentEntry[7] %}
+                        
+                        {# Caso 2: El campo tiene datos, pero hubo un error de conexión (marcado desde Python) #}
                         {% if file_info.error %}
-                        <div class="file-error">
-                            Error de conexión, por favor, recargue la página.
+                        <div class="file-error-clickable" onclick="alert('No se ha encontrado el archivo de OneDrive')">
+                            <img class="pdf-icon" src="{{ url_for('static', filename='IMG/warning_icon.png') }}" alt="Error">
+                            <span class="file-link-mock">{{ file_info.name }}</span>
+                            <p><small>(Haga clic para más detalles)</small></p>
                         </div>
-                        {% elif not file_info.error and file_info.name.lower().endswith(('.jpeg', '.jpg', '.png')) %}
-                            <!-- Para imágenes: embed_url o URL directa con thumbnails -->
+
+                        {# Caso 3: Funcionamiento normal #}
+                        {% elif file_info.name.lower().endswith(('.jpeg', '.jpg', '.png')) %}
                             <a href="{{ file_info.url }}" target="_blank">
                                 <img src="{{ file_info.url }}" alt="{{ file_info.name }}" title="Click para ampliar">
                             </a>
-                        {% elif not file_info.error and file_info.name.lower().endswith('.pdf') %}
-                            <!-- Para PDFs: web_url -->
+                        {% elif file_info.name.lower().endswith('.pdf') %}
                             <a class="pdf-link" href="{{ file_info.url }}" target="_blank">
                                 <img class="pdf-icon" src="{{ url_for('static', filename='IMG/pdf_icon.png') }}" alt="PDF">
                                 <span class="pdf-filename">{{ file_info.name }}</span>
@@ -199,7 +207,7 @@
                     {% endif %}
                 {% endfor %}
             {% else %}
-                <p>No hay comprobantes disponibles.</p>
+                <p>No hay registros de pago disponibles.</p>
             {% endif %}
         </div>
         {% endif %}
