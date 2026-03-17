@@ -106,8 +106,6 @@ from receipt_db import (
     set_DebtSettlement,
     get_all_related_receipts,
     set_SyncStatus,
-    get_accountsHistory,
-    get_accountsHistory_admin,
     get_accounts_history_page,
     get_accounts_history_all,
     get_accounts_history_filters,
