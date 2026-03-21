@@ -138,171 +138,6 @@ def get_seller_details(seller_id):
     conn.close()
     return seller
 
-def get_accountsHistory(salesRep_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-                    SET LANGUAGE Spanish
-                    SELECT 
-                        D.AccountID, 
-                        D.N_CTA, 
-                        D.DocumentType,
-                        S.Name AS StoreName,
-                        C.FirstName + ' ' + C.LastName AS CustomerName,
-                        M.Code, 
-                        D.Amount, 
-                        D.AppPaidAmount,
-                        DPR.PaymentReceiptIDs,
-						StatusCalc.PaymentStatus,
-						CASE 
-							WHEN StatusCalc.PaymentStatus IN ('Pagada', 'Usada') 
-							THEN COALESCE(DS.DebtSettlementDate, SRC.CreatedAt) 
-							ELSE NULL 
-						END AS DebtSettlementDate,
-
-						CASE 
-							WHEN StatusCalc.PaymentStatus IN ('Pagada', 'Usada') 
-							THEN COALESCE(DS.CommissionPaymentDate, SRC.CommissionPaymentDate) 
-							ELSE NULL 
-						END AS CommissionPaymentDate
-                    FROM Commission_Receipt.DebtAccount D
-                    JOIN Main.Store S ON D.StoreID = S.ID 
-                    JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd
-                    JOIN Main.Currency M ON D.CurrencyID = M.ID AND D.isRetail = M.isRetail
-                    LEFT JOIN (
-                        SELECT 
-                            DR.DebtAccountID,
-                            STRING_AGG(DR.PaymentReceiptID, ', ') AS PaymentReceiptIDs
-                        FROM Commission_Receipt.DebtPaymentRelation DR
-						JOIN Commission_Receipt.PaymentReceipt PR ON DR.PaymentReceiptID = PR.ReceiptID
-						WHERE PR.IsApproved = 1
-                        GROUP BY DR.DebtAccountID
-                    ) DPR ON D.AccountID = DPR.DebtAccountID
-                    LEFT JOIN (
-                        SELECT 
-                            AccountID,
-                            FORMAT(MAX(CompletionDate), 'yyyy-MM-dd') AS DebtSettlementDate,
-							DATENAME(month, MAX(CompletionDate)) + ' ' + CAST(YEAR(MAX(CompletionDate)) AS VARCHAR) AS CommissionPaymentDate
-                        FROM Commission_Receipt.DebtSettlement
-                        GROUP BY AccountID
-                    ) DS ON D.AccountID = DS.AccountID
-					LEFT JOIN (
-						SELECT
-							AccountID,
-							FORMAT(MAX(SRC.CreatedAt), 'yyyy-MM-dd') AS CreatedAt,
-							DATENAME(month, MAX(SRC.CreatedAt)) + ' ' + CAST(YEAR(MAX(SRC.CreatedAt)) AS VARCHAR) AS CommissionPaymentDate
-						FROM Commission_Receipt.SalesRepCommission SRC
-						JOIN Commission_Receipt.PaymentReceipt PR ON PR.ReceiptID = SRC.ReceiptID
-						WHERE PR.IsApproved = 1
-						GROUP BY AccountID
-					) SRC ON D.AccountID = SRC.AccountID
-					CROSS APPLY (
-						SELECT CASE 
-							WHEN D.DocumentType = 'N/C' THEN
-								CASE 
-									WHEN D.AppPaidAmount = 0 THEN 'Disponible'
-									WHEN D.AppPaidAmount >= D.Amount THEN 'Usada'
-									ELSE 'Parcialmente Usada'
-								END
-							ELSE
-								CASE 
-									WHEN D.AppPaidAmount >= D.Amount THEN 'Pagada'
-									WHEN D.AppPaidAmount > 0 AND D.AppPaidAmount < D.Amount THEN 'Abonada'
-									ELSE 'Pendiente'
-								END
-						END AS PaymentStatus
-					) AS StatusCalc
-                    WHERE GalacCxcStatus NOT IN ('ANU') AND D.SalesRepID = %s
-                    ORDER BY DebtSettlementDate DESC, D.N_CTA;
-                   ''', (salesRep_id,))
-    accounts_history = cursor.fetchall()
-    conn.close()
-    return accounts_history
-
-def get_accountsHistory_admin():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Versión con DebtAccount anterior (sin SyncStatus)
-    cursor.execute('''
-                    SET LANGUAGE Spanish
-                    SELECT 
-                        D.AccountID, 
-                        D.N_CTA, 
-                        D.DocumentType,
-                        S.Name AS StoreName,
-                        C.FirstName + ' ' + C.LastName AS CustomerName,
-                        M.Code, 
-                        D.Amount, 
-                        D.AppPaidAmount,
-                        DPR.PaymentReceiptIDs,
-						StatusCalc.PaymentStatus,
-						CASE 
-							WHEN StatusCalc.PaymentStatus IN ('Pagada', 'Usada') 
-							THEN COALESCE(DS.DebtSettlementDate, SRC.CreatedAt) 
-							ELSE NULL 
-						END AS DebtSettlementDate,
-
-						CASE 
-							WHEN StatusCalc.PaymentStatus IN ('Pagada', 'Usada') 
-							THEN COALESCE(DS.CommissionPaymentDate, SRC.CommissionPaymentDate) 
-							ELSE NULL 
-						END AS CommissionPaymentDate
-                    FROM Commission_Receipt.DebtAccount D
-                    JOIN Main.Store S ON D.StoreID = S.ID 
-                    JOIN Commission_Receipt.Customer C ON D.CustomerID = C.ID AND D.isRembd = C.isRembd
-                    JOIN Main.Currency M ON D.CurrencyID = M.ID AND D.isRetail = M.isRetail
-                    LEFT JOIN (
-                        SELECT 
-                            DR.DebtAccountID,
-                            STRING_AGG(DR.PaymentReceiptID, ', ') AS PaymentReceiptIDs
-                        FROM Commission_Receipt.DebtPaymentRelation DR
-						JOIN Commission_Receipt.PaymentReceipt PR ON DR.PaymentReceiptID = PR.ReceiptID
-						WHERE PR.IsApproved = 1
-                        GROUP BY DR.DebtAccountID
-                    ) DPR ON D.AccountID = DPR.DebtAccountID
-                    LEFT JOIN (
-                        SELECT 
-                            AccountID,
-                            FORMAT(MAX(CompletionDate), 'yyyy-MM-dd') AS DebtSettlementDate,
-							DATENAME(month, MAX(CompletionDate)) + ' ' + CAST(YEAR(MAX(CompletionDate)) AS VARCHAR) AS CommissionPaymentDate
-                        FROM Commission_Receipt.DebtSettlement
-                        GROUP BY AccountID
-                    ) DS ON D.AccountID = DS.AccountID
-					LEFT JOIN (
-						SELECT
-							AccountID,
-							FORMAT(MAX(SRC.CreatedAt), 'yyyy-MM-dd') AS CreatedAt,
-							DATENAME(month, MAX(SRC.CreatedAt)) + ' ' + CAST(YEAR(MAX(SRC.CreatedAt)) AS VARCHAR) AS CommissionPaymentDate
-						FROM Commission_Receipt.SalesRepCommission SRC
-						JOIN Commission_Receipt.PaymentReceipt PR ON PR.ReceiptID = SRC.ReceiptID
-						WHERE PR.IsApproved = 1
-						GROUP BY AccountID
-					) SRC ON D.AccountID = SRC.AccountID
-					CROSS APPLY (
-						SELECT CASE 
-							WHEN D.DocumentType = 'N/C' THEN
-								CASE 
-									WHEN D.AppPaidAmount = 0 THEN 'Disponible'
-									WHEN D.AppPaidAmount >= D.Amount THEN 'Usada'
-									ELSE 'Parcialmente Usada'
-								END
-							ELSE
-								CASE 
-									WHEN D.AppPaidAmount >= D.Amount THEN 'Pagada'
-									WHEN D.AppPaidAmount > 0 AND D.AppPaidAmount < D.Amount THEN 'Abonada'
-									ELSE 'Pendiente'
-								END
-						END AS PaymentStatus
-					) AS StatusCalc
-                    WHERE GalacCxcStatus NOT IN ('ANU')
-                    ORDER BY DebtSettlementDate DESC, D.N_CTA;
-                   ''')
-    accounts_history = cursor.fetchall()
-    conn.close()
-    return accounts_history
-
-
 def _base_accounts_history_sql():
     # Base SELECT portion used by paginated and filtered queries
     return '''
@@ -316,7 +151,16 @@ def _base_accounts_history_sql():
                         M.Code, 
                         D.Amount, 
                         D.AppPaidAmount,
-                        DPR.PaymentReceiptIDs,
+                        CASE 
+							-- 1. Si existen recibos en la relación, se muestran siempre (Prioridad 1)
+							WHEN DPR.PaymentReceiptIDs IS NOT NULL AND DPR.PaymentReceiptIDs <> '' 
+								THEN DPR.PaymentReceiptIDs
+							-- 2. Si no hay recibos y cumple la condición de cuenta antigua (Prioridad 2)
+							WHEN D.GalacCxCStatus = 'CAN' AND D.InvoiceIssueDate < '2026-01-01' 
+								THEN 'Cuenta antigua'
+							-- 3. De lo contrario, queda vacío/null
+							ELSE NULL 
+						END AS PaymentReceiptIDs,
                         StatusCalc.PaymentStatus,
                         CASE 
                             WHEN StatusCalc.PaymentStatus IN ('Pagada', 'Usada') 
@@ -362,6 +206,7 @@ def _base_accounts_history_sql():
                     ) SRC ON D.AccountID = SRC.AccountID
                     CROSS APPLY (
                         SELECT CASE 
+                            WHEN D.GalacCxCStatus = 'CAN' AND D.InvoiceIssueDate < '2026-01-01' THEN 'Pagada'
                             WHEN D.DocumentType = 'N/C' THEN
                                 CASE 
                                     WHEN D.AppPaidAmount = 0 THEN 'Disponible'
@@ -411,7 +256,23 @@ def _build_filters_where_clause(filters):
         params.append('%' + filters['ncta'].strip() + '%')
     if filters.get('status') and filters['status'] != 'ALL':
         # reuse same CASE logic used in SELECT to compute PaymentStatus
-        status_case = "(CASE WHEN D.DocumentType = 'N/C' THEN CASE WHEN D.AppPaidAmount = 0 THEN 'Disponible' WHEN D.AppPaidAmount >= D.Amount THEN 'Usada' ELSE 'Parcialmente Usada' END ELSE CASE WHEN D.AppPaidAmount >= D.Amount THEN 'Pagada' WHEN D.AppPaidAmount > 0 AND D.AppPaidAmount < D.Amount THEN 'Abonada' ELSE 'Pendiente' END END) = %s"
+        status_case = """
+            (CASE 
+                WHEN D.GalacCxCStatus = 'CAN' AND D.InvoiceIssueDate < '2026-01-01' THEN 'Pagada'
+                WHEN D.DocumentType = 'N/C' THEN 
+                    CASE 
+                        WHEN D.AppPaidAmount = 0 THEN 'Disponible' 
+                        WHEN D.AppPaidAmount >= D.Amount THEN 'Usada' 
+                        ELSE 'Parcialmente Usada' 
+                    END 
+                ELSE 
+                    CASE 
+                        WHEN D.AppPaidAmount >= D.Amount THEN 'Pagada' 
+                        WHEN D.AppPaidAmount > 0 AND D.AppPaidAmount < D.Amount THEN 'Abonada' 
+                        ELSE 'Pendiente' 
+                    END 
+            END) = %s
+        """
         where_clauses.append(status_case)
         params.append(filters['status'])
     if filters.get('year') and filters['year'] != 'ALL':
@@ -1091,64 +952,189 @@ def get_SalesRepCommission_OLD(receipt_id):
     conn.close()
     return salesRepComm
 
+# Función de diagnóstico de conexión de OneDrive
+# Descomentar en get_onedriveProofsOfPayments para debugging/testing
+def get_onedrive_diagnostics(headers):
+    if not headers:
+        return
+
+    print("\n" + "="*50)
+    print("DIAGNÓSTICO DE CONEXIÓN Y ESTRUCTURA")
+    print("="*50)
+
+    # 1. Información de la Organización
+    try:
+        org_res = requests.get("https://graph.microsoft.com/v1.0/organization", headers=headers, timeout=5)
+        if org_res.status_code == 200:
+            org = org_res.json()['value'][0]
+            print(f"Conectado a: {org['displayName']} ({org['verifiedDomains'][0]['name']})")
+    except Exception as e: print(f"Error Org: {e}")
+
+    # 2. Verificación de Usuarios e Intento por ID
+    print("\n--- Verificando visibilidad de usuarios ---")
+    target_email = "desarrollo@grupogipsy.com"
+    user_id = None
+
+    try:
+        # Buscamos directamente el detalle del usuario para obtener su ID
+        user_info_res = requests.get(f"https://graph.microsoft.com/v1.0/users/{target_email}", headers=headers, timeout=5)
+        
+        if user_info_res.status_code == 200:
+            user_data = user_info_res.json()
+            user_id = user_data.get('id')
+            print(f"Usuario {target_email} SÍ es visible.")
+            print(f"ID Único de Usuario: {user_id}")
+            
+            # --- INTENTO DE ACCESO AL DRIVE POR ID ---
+            print(f"\n--- Probando acceso al Drive mediante ID ---")
+            drive_url = f"https://graph.microsoft.com/v1.0/users/{user_id}/drive"
+            drive_res = requests.get(drive_url, headers=headers, timeout=5)
+            
+            if drive_res.status_code == 200:
+                print("¡ÉXITO! Se logró conectar al Drive usando el ID.")
+                drive_id = drive_res.json().get('id')
+                print(f"Drive ID: {drive_id}")
+            else:
+                print(f"Error al acceder al Drive incluso con ID: {drive_res.status_code}")
+                print(f"Mensaje: {drive_res.json().get('error', {}).get('message')}")
+        else:
+            print(f"El usuario {target_email} NO aparece en la búsqueda directa (Status: {user_info_res.status_code}).")
+
+    except Exception as e: 
+        print(f"Error en fase de búsqueda: {e}")
+
+    # 3. Exploración de Raíz (Ruta por correo)
+    print(f"\n--- Explorando RAÍZ de: {target_email} (Ruta por Correo) ---")
+    root_url = f"https://graph.microsoft.com/v1.0/users/{target_email}/drive/root/children"
+    
+    try:
+        root_res = requests.get(root_url, headers=headers, timeout=5)
+        if root_res.status_code == 200:
+            items = root_res.json().get('value', [])
+            print(f"Contenido en la raíz: {[i['name'] for i in items]}")
+        else:
+            print(f"Error en Raíz ({root_res.status_code}): Acceso denegado o destino inválido.")
+    except Exception as e: print(f"Error Root: {e}")
+    
+    print("="*50 + "\n")
+
+
 def get_onedriveProofsOfPayments(paymentEntries):
-    headers = get_onedrive_headers()
+    try:
+        headers = get_onedrive_headers()
+    except Exception as e:
+        print(f"Error obteniendo headers de OneDrive: {e}")
+        headers = None
+
+    # Descomentar para debugging/testing
+    #get_onedrive_diagnostics(headers)
+
     folder_path = "/Recibos de Cobranza/Comprobantes de Pago"
+    user_email = "desarrollo@grupogipsy.com"
+
+    # --- BLOQUE DE INSPECCIÓN INICIAL ---
+    # if headers:
+    #     print(f"\n--- Explorando ruta en OneDrive: {folder_path} ---")
+    #     inspect_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/root:{folder_path}:/children"
+        
+    #     try:
+    #         inspect_res = requests.get(inspect_url, headers=headers, timeout=5)
+    #         if inspect_res.status_code == 200:
+    #             items = inspect_res.json().get('value', [])
+                
+    #             # Separar carpetas y archivos para imprimir ordenado
+    #             folders = [i['name'] for i in items if 'folder' in i]
+    #             files = [i['name'] for i in items if 'file' in i]
+
+    #             print(f"Carpetas encontradas ({len(folders)}): {folders if folders else 'Ninguna'}")
+    #             print(f"Archivos encontrados ({len(files)}):")
+    #             for f in files[:10]: # Limitamos a los primeros 10 para no saturar la consola
+    #                 print(f"  - {f}")
+    #             if len(files) > 10: print(f"  ... y {len(files) - 10} archivos más.")
+    #         else:
+    #             print(f"No se pudo listar la ruta. Status: {inspect_res.status_code}")
+    #             print(f"Detalle: {inspect_res.json().get('error', {}).get('message')}")
+    #     except Exception as e:
+    #         print(f"❌ Error durante la inspección: {e}")
+    # print("--------------------------------------------------\n")
+    # --- FIN BLOQUE DE INSPECCIÓN ---
+
     updated_entries = []
     
     for entry in paymentEntries:
-        if entry[7]:
-            filename = entry[7].split('/')[-1]
-            file_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/root:{folder_path}/{filename}"
+        updated_entry = list(entry)
+        filename_db = entry[7]
 
-            try:
-                response = requests.get(file_url, headers=headers)
-                if response.status_code == 200:
-                    file_data = response.json()
-                    
-                    file_id = file_data['id']
+        # CASO 1: No hay nada en la base de datos
+        if not filename_db:
+            updated_entry[7] = None 
+            updated_entries.append(tuple(updated_entry))
+            continue
 
-                    # Generación de enlace de compartición
-                    share_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/createLink"
-                    share_data = {
-                        "type": "view",
-                        "scope": "anonymous"
-                    }
-                    share_response = requests.post(share_url, headers=headers, json=share_data)
+        # Extraer el nombre real del archivo
+        filename = filename_db.split('/')[-1]
+        
+        # Diccionario por defecto para errores de conexión o archivo no encontrado
+        error_dict = {
+            'url': '#',
+            'name': filename,
+            'error': True,
+            'email_url': None
+        }
 
-                    updated_entry = list(entry)
-                    if share_response.status_code == 200:
-                        shared_link = share_response.json()["link"]["webUrl"]
-                        updated_entry[7] = {
-                            'url': shared_link,
-                            'name': filename,
-                            'error': False,
-                            'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
-                        }
-                    else:
-                        shared_link = file_data.get('webUrl')
-                        updated_entry[7] = {
-                            'url': shared_link,
-                            'name': filename,
-                            'error': True,
-                            'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
-                        }
+        # Si no hay headers o conexión, enviamos el diccionario de error de una vez
+        if not headers:
+            updated_entry[7] = error_dict
+            updated_entries.append(tuple(updated_entry))
+            continue
 
-                    updated_entries.append(tuple(updated_entry))
-                
-                else:
-                    updated_entries.append(entry)
+        file_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/root:{folder_path}/{filename}"
+
+        try:
+            response = requests.get(file_url, headers=headers, timeout=5) # Timeout para no colgar la app
             
-            except Exception as e:
-                updated_entries.append(entry)
+            if response.status_code == 200:
+                file_data = response.json()
+                file_id = file_data['id']
+
+                # Intentar generar el enlace de compartición
+                share_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/items/{file_id}/createLink"
+                share_data = {"type": "view", "scope": "anonymous"}
+                share_response = requests.post(share_url, headers=headers, json=share_data, timeout=5)
+
+                if share_response.status_code == 200:
+                    updated_entry[7] = {
+                        'url': share_response.json()["link"]["webUrl"],
+                        'name': filename,
+                        'error': False,
+                        'email_url': f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/items/{file_id}/content"
+                    }
+                else:
+                    # Si falla el share, usamos el webUrl directo del archivo
+                    updated_entry[7] = {
+                        'url': file_data.get('webUrl'),
+                        'name': filename,
+                        'error': False, # Marcamos como False porque el archivo existe
+                        'email_url': f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/items/{file_id}/content"
+                    }
+            else:
+                # El archivo no existe en OneDrive (404) o error de API
+                updated_entry[7] = error_dict
+            
+            print("email_url: " + updated_entry[7]['email_url'])
+
+        except Exception as e:
+            print(f"Excepción en petición a OneDrive para {filename}: {e}")
+            updated_entry[7] = error_dict
+        
+        updated_entries.append(tuple(updated_entry))
     
     return updated_entries
-
 
 def get_onedriveStoreLogo(logo_name):
     headers = get_onedrive_headers()
     folder_path = "/Recibos de Cobranza/Logos Stores"
-    file_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/root:{folder_path}/{logo_name}"
+    file_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/root:{folder_path}/{logo_name}"
 
     try:
         # Verificar si el archivo existe y obtener metadata
@@ -1157,7 +1143,7 @@ def get_onedriveStoreLogo(logo_name):
             file_data = response.json()
             file_id = file_data['id']
             
-            download_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
+            download_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/items/{file_id}/content"
             response = requests.get(download_url, headers=headers, stream=True)
             response.raise_for_status()
             
@@ -1264,20 +1250,6 @@ def set_paymentEntryCommission(cursor, receipt_id, paymentEntry_id, DebtAccount_
         ''', (receipt_id, paymentEntry_id, DebtAccount_id, payment_date, amount, days_elapsed, commission_id, bs_commission, usd_commission))
 
 
-"""
-# Guardado de Comprobantes de Pago en el Servidor
-def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
-    saved_file_paths = []
-    for file in proof_of_payments:
-        if file:
-            formatted_date = payment_date.strftime('%Y-%m-%d')
-            new_filename = f"{receipt_id}_{formatted_date}_{index}{os.path.splitext(file.filename)[1]}"
-            file_path = os.path.join('static/ProofsOfPayment', new_filename)
-            file.save(file_path)
-            saved_file_paths.append(file_path)
-    return saved_file_paths
-"""
-
 # Guardado de Comprobantes de Pago en OneDrive
 def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
     saved_file_paths = []
@@ -1296,13 +1268,12 @@ def save_proofOfPayment(proof_of_payments, receipt_id, payment_date, index):
                 url = upload_url,
                 headers=headers,
                 data=file_content)
-            
-            if response.status_code == 201:
-                print(f"Archivo {new_filename} subido correctamente.")
+
+            if response.status_code in [200, 201]:
                 saved_file_paths.append(new_filename)
             else:
-                print(f"Error al subir el archivo {new_filename}: {response.status_code}")
-                print(response.json())
+                # LANZAR EXCEPCIÓN: Esto detiene todo y activa el rollback en la ruta
+                raise Exception(f"Error crítico en OneDrive ({response.status_code}): {response.text}")
 
     return saved_file_paths
 
