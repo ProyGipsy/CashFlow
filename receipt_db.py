@@ -952,6 +952,73 @@ def get_SalesRepCommission_OLD(receipt_id):
     conn.close()
     return salesRepComm
 
+# Función de diagnóstico de conexión de OneDrive
+# Descomentar en get_onedriveProofsOfPayments para debugging/testing
+def get_onedrive_diagnostics(headers):
+    if not headers:
+        return
+
+    print("\n" + "="*50)
+    print("DIAGNÓSTICO DE CONEXIÓN Y ESTRUCTURA")
+    print("="*50)
+
+    # 1. Información de la Organización
+    try:
+        org_res = requests.get("https://graph.microsoft.com/v1.0/organization", headers=headers, timeout=5)
+        if org_res.status_code == 200:
+            org = org_res.json()['value'][0]
+            print(f"Conectado a: {org['displayName']} ({org['verifiedDomains'][0]['name']})")
+    except Exception as e: print(f"Error Org: {e}")
+
+    # 2. Verificación de Usuarios e Intento por ID
+    print("\n--- Verificando visibilidad de usuarios ---")
+    target_email = "desarrollo@grupogipsy.com"
+    user_id = None
+
+    try:
+        # Buscamos directamente el detalle del usuario para obtener su ID
+        user_info_res = requests.get(f"https://graph.microsoft.com/v1.0/users/{target_email}", headers=headers, timeout=5)
+        
+        if user_info_res.status_code == 200:
+            user_data = user_info_res.json()
+            user_id = user_data.get('id')
+            print(f"Usuario {target_email} SÍ es visible.")
+            print(f"ID Único de Usuario: {user_id}")
+            
+            # --- INTENTO DE ACCESO AL DRIVE POR ID ---
+            print(f"\n--- Probando acceso al Drive mediante ID ---")
+            drive_url = f"https://graph.microsoft.com/v1.0/users/{user_id}/drive"
+            drive_res = requests.get(drive_url, headers=headers, timeout=5)
+            
+            if drive_res.status_code == 200:
+                print("¡ÉXITO! Se logró conectar al Drive usando el ID.")
+                drive_id = drive_res.json().get('id')
+                print(f"Drive ID: {drive_id}")
+            else:
+                print(f"Error al acceder al Drive incluso con ID: {drive_res.status_code}")
+                print(f"Mensaje: {drive_res.json().get('error', {}).get('message')}")
+        else:
+            print(f"El usuario {target_email} NO aparece en la búsqueda directa (Status: {user_info_res.status_code}).")
+
+    except Exception as e: 
+        print(f"Error en fase de búsqueda: {e}")
+
+    # 3. Exploración de Raíz (Ruta por correo)
+    print(f"\n--- Explorando RAÍZ de: {target_email} (Ruta por Correo) ---")
+    root_url = f"https://graph.microsoft.com/v1.0/users/{target_email}/drive/root/children"
+    
+    try:
+        root_res = requests.get(root_url, headers=headers, timeout=5)
+        if root_res.status_code == 200:
+            items = root_res.json().get('value', [])
+            print(f"Contenido en la raíz: {[i['name'] for i in items]}")
+        else:
+            print(f"Error en Raíz ({root_res.status_code}): Acceso denegado o destino inválido.")
+    except Exception as e: print(f"Error Root: {e}")
+    
+    print("="*50 + "\n")
+
+
 def get_onedriveProofsOfPayments(paymentEntries):
     try:
         headers = get_onedrive_headers()
@@ -959,7 +1026,39 @@ def get_onedriveProofsOfPayments(paymentEntries):
         print(f"Error obteniendo headers de OneDrive: {e}")
         headers = None
 
+    # Descomentar para debugging/testing
+    #get_onedrive_diagnostics(headers)
+
     folder_path = "/Recibos de Cobranza/Comprobantes de Pago"
+    user_email = "desarrollo@grupogipsy.com"
+
+    # --- BLOQUE DE INSPECCIÓN INICIAL ---
+    # if headers:
+    #     print(f"\n--- Explorando ruta en OneDrive: {folder_path} ---")
+    #     inspect_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/root:{folder_path}:/children"
+        
+    #     try:
+    #         inspect_res = requests.get(inspect_url, headers=headers, timeout=5)
+    #         if inspect_res.status_code == 200:
+    #             items = inspect_res.json().get('value', [])
+                
+    #             # Separar carpetas y archivos para imprimir ordenado
+    #             folders = [i['name'] for i in items if 'folder' in i]
+    #             files = [i['name'] for i in items if 'file' in i]
+
+    #             print(f"Carpetas encontradas ({len(folders)}): {folders if folders else 'Ninguna'}")
+    #             print(f"Archivos encontrados ({len(files)}):")
+    #             for f in files[:10]: # Limitamos a los primeros 10 para no saturar la consola
+    #                 print(f"  - {f}")
+    #             if len(files) > 10: print(f"  ... y {len(files) - 10} archivos más.")
+    #         else:
+    #             print(f"No se pudo listar la ruta. Status: {inspect_res.status_code}")
+    #             print(f"Detalle: {inspect_res.json().get('error', {}).get('message')}")
+    #     except Exception as e:
+    #         print(f"❌ Error durante la inspección: {e}")
+    # print("--------------------------------------------------\n")
+    # --- FIN BLOQUE DE INSPECCIÓN ---
+
     updated_entries = []
     
     for entry in paymentEntries:
@@ -989,7 +1088,7 @@ def get_onedriveProofsOfPayments(paymentEntries):
             updated_entries.append(tuple(updated_entry))
             continue
 
-        file_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/root:{folder_path}/{filename}"
+        file_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/root:{folder_path}/{filename}"
 
         try:
             response = requests.get(file_url, headers=headers, timeout=5) # Timeout para no colgar la app
@@ -999,7 +1098,7 @@ def get_onedriveProofsOfPayments(paymentEntries):
                 file_id = file_data['id']
 
                 # Intentar generar el enlace de compartición
-                share_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/createLink"
+                share_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/items/{file_id}/createLink"
                 share_data = {"type": "view", "scope": "anonymous"}
                 share_response = requests.post(share_url, headers=headers, json=share_data, timeout=5)
 
@@ -1008,7 +1107,7 @@ def get_onedriveProofsOfPayments(paymentEntries):
                         'url': share_response.json()["link"]["webUrl"],
                         'name': filename,
                         'error': False,
-                        'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
+                        'email_url': f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/items/{file_id}/content"
                     }
                 else:
                     # Si falla el share, usamos el webUrl directo del archivo
@@ -1016,11 +1115,13 @@ def get_onedriveProofsOfPayments(paymentEntries):
                         'url': file_data.get('webUrl'),
                         'name': filename,
                         'error': False, # Marcamos como False porque el archivo existe
-                        'email_url': f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
+                        'email_url': f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/items/{file_id}/content"
                     }
             else:
                 # El archivo no existe en OneDrive (404) o error de API
                 updated_entry[7] = error_dict
+            
+            print("email_url: " + updated_entry[7]['email_url'])
 
         except Exception as e:
             print(f"Excepción en petición a OneDrive para {filename}: {e}")
@@ -1033,7 +1134,7 @@ def get_onedriveProofsOfPayments(paymentEntries):
 def get_onedriveStoreLogo(logo_name):
     headers = get_onedrive_headers()
     folder_path = "/Recibos de Cobranza/Logos Stores"
-    file_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/root:{folder_path}/{logo_name}"
+    file_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/root:{folder_path}/{logo_name}"
 
     try:
         # Verificar si el archivo existe y obtener metadata
@@ -1042,7 +1143,7 @@ def get_onedriveStoreLogo(logo_name):
             file_data = response.json()
             file_id = file_data['id']
             
-            download_url = f"https://graph.microsoft.com/v1.0/users/desarrollo@grupogipsy.com/drive/items/{file_id}/content"
+            download_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/items/{file_id}/content"
             response = requests.get(download_url, headers=headers, stream=True)
             response.raise_for_status()
             
