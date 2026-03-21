@@ -291,8 +291,7 @@ def welcome():
     if user_id:
         token = serializer.dumps({'user_id': user_id}, salt='transfer-auth')
 
-    react_target = f"{react_origin}/documents/?token={token}"
-    return render_template('welcome.html', roles_info=roles_info, react_app_url=react_target)
+    return render_template('welcome.html', roles_info=roles_info, react_app_url_docs=f"{react_origin}/documents/?token={token}", react_app_url_availity=f"{react_origin}/availability/?token={token}")
 
 
 # INICIOS DE SESIÓN INDIVIDUALES (Descartados con el nuevo flujo)
