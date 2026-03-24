@@ -106,8 +106,6 @@ from receipt_db import (
     set_DebtSettlement,
     get_all_related_receipts,
     set_SyncStatus,
-    get_accountsHistory,
-    get_accountsHistory_admin,
     get_accounts_history_page,
     get_accounts_history_all,
     get_accounts_history_filters,
@@ -1103,9 +1101,17 @@ def submit_receipt():
         return redirect(url_for('accountsReceivable'))
     
     except Exception as e:
-        conn.rollback()
-        print(f"Error: {e}")
-        return "Error al procesar la solicitud", 500
+        # ESTA ES LA PARTE QUE DEBES SUSTITUIR:
+        if conn:
+            conn.rollback() # Revierte todo si algo falló (incluyendo el fallo de OneDrive)
+        
+        print(f"Error detectado, transacción revertida: {e}")
+        
+        # Enviamos el error como JSON para que el JS pueda leerlo
+        return jsonify({
+            'error': 'No se pudo registrar la cobranza porque falló el almacenamiento del comprobante de pago.',
+            'details': str(e)
+        }), 500
     
     finally:
         cursor.close()
