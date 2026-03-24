@@ -77,7 +77,7 @@
                     {% if is_maint %}<span class="disabledText">Módulo en mantenimiento.<br> Por favor, vuelva más tarde.</span>{% endif %}
                 </a>
             {% endif %}
-            {% if session['user_id'] == 20 || session['user_id'] == 22 %}
+            {% if session['user_id'] == 20 or session['user_id'] == 22 %}
                 {% set is_maint = MAINTENANCE.BALANCE == 'ON' %}
                 <a href="{{ react_app_url_availity }}" class="card {{ 'disabled' if is_maint else '' }}">
                     <img src="{{ url_for('static', filename='IMG/tesoreria.png') }}" alt="Disponibilidad" class="card-img">
