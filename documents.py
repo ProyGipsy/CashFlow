@@ -15,7 +15,6 @@ from emailScript import (
 )
 
 # Configuración del pool de conexiones
-
 pool = PooledDB(
     creator=pymssql,
     maxconnections = 15,
@@ -126,10 +125,11 @@ def create_doc_type(data):
         cursor.execute(sql_access_control, (data['name'],))
 
         # C. Campos (Fields)
+        # --- MODIFICACIÓN 1: Agregar FieldOrder al INSERT ---
         sql_document_fields = """
-        INSERT INTO Documents.TypeFields (DocumentTypeID, Name, DataType, Length, Precision, isMandatory)
+        INSERT INTO Documents.TypeFields (DocumentTypeID, Name, DataType, Length, Precision, isMandatory, FieldOrder)
         OUTPUT INSERTED.FieldID
-        VALUES (%s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
 
         sql_specific_values = """
@@ -149,8 +149,10 @@ def create_doc_type(data):
             f_len = field.get('length') if field.get('length') else 0
             f_prec = field.get('precision') if field.get('precision') else 0
             is_mandatory = field.get('isRequired', 0)
+            field_order = field.get('fieldOrder', 0) # <--- Capturamos el orden
 
             fields_for_email.append({
+                'orden': field_order, # <--- Agregado para el correo
                 'nombre': field['name'],
                 'tipo_dato': type_translation.get(field['type'], field['type']),
                 'longitud': f_len if f_len > 0 else 'N/A',
@@ -158,13 +160,15 @@ def create_doc_type(data):
                 'obligatorio': 'Sí' if is_mandatory == 1 else 'No'
             })
 
+            # --- MODIFICACIÓN 2: Pasar field_order al execute ---
             cursor.execute(sql_document_fields, (
                 inserted_id, 
                 field['name'], 
                 field['type'], 
                 f_len, 
                 f_prec,
-                is_mandatory
+                is_mandatory,
+                field_order 
             ))
             
             if field['type'] == 'specificValues':
@@ -205,7 +209,7 @@ def create_doc_type(data):
                     email_password=email_password,
                     receiver_emails=[recipient_admin],
                     attachments=None,
-                    bcc=bcc_list # <--- AQUÍ PASAMOS LA COPIA OCULTA
+                    bcc=bcc_list 
                 )
                 print(f"Correo de notificación enviado exitosamente a {recipient_admin} (con copia oculta)")
             
@@ -235,17 +239,19 @@ def get_doc_type_full(data):
         connection = pool.connection()
         cursor = connection.cursor(as_dict=True)
 
-        # Agregamos TF.isMandatory a la consulta
+        # 1. MODIFICACIÓN: Agregamos TF.FieldOrder a la consulta y un ORDER BY al final
         sql = """
         SELECT DT.TypeID AS id, DT.Name AS name, DT.ShortName AS shortName, DT.Description AS description,
                TF.FieldID AS fieldId, TF.Name AS fieldName, TF.DataType AS fieldType, 
                TF.Length AS fieldLength, TF.Precision AS fieldPrecision, 
-               TF.isMandatory, -- <--- NUEVO CAMPO
+               TF.isMandatory, 
+               TF.FieldOrder, -- <--- NUEVO CAMPO
                SV.ValueID AS valueId, SV.Value AS value
         FROM Documents.DocumentType DT
         LEFT JOIN Documents.TypeFields TF ON DT.TypeID = TF.DocumentTypeID
         LEFT JOIN Documents.SpecificValue SV ON TF.FieldID = SV.FieldID
         WHERE DT.TypeID = %s
+        ORDER BY TF.FieldOrder ASC, SV.ValueID ASC -- <--- ORDENAMIENTO POR DEFECTO
         """
 
         cursor.execute(sql, (data['id'],))
@@ -267,7 +273,6 @@ def get_doc_type_full(data):
         for row in rows:
             field_id = row['fieldId']
             
-            # Verificamos que exista un field_id (porque el LEFT JOIN puede traer nulos si no hay campos)
             if field_id and field_id not in fields_map:
                 fields_map[field_id] = {
                     'id': field_id,
@@ -275,7 +280,8 @@ def get_doc_type_full(data):
                     'type': row['fieldType'],
                     'length': row['fieldLength'],
                     'precision': row['fieldPrecision'],
-                    'isRequired': row['isMandatory'], # <--- Mapeamos el valor de la BD (1/0 o True/False)
+                    'isRequired': row['isMandatory'], 
+                    'fieldOrder': row['FieldOrder'], # <--- 2. MODIFICACIÓN: Mapeamos el orden al JSON
                     'specificValues': []
                 }
                 doc_type['fields'].append(fields_map[field_id])
@@ -344,16 +350,16 @@ def edit_doc_type(data):
         """
         cursor.execute(sql_access_control, (data['name'], old_doc_name))
 
-        # 3. DEFINIR SQLs DE CAMPOS (Actualizados con isMandatory)
+        # 3. DEFINIR SQLs DE CAMPOS (Actualizados con FieldOrder)
         sql_update_field = """
             UPDATE Documents.TypeFields
-            SET Name = %s, DataType = %s, Length = %s, Precision = %s, isMandatory = %s
+            SET Name = %s, DataType = %s, Length = %s, Precision = %s, isMandatory = %s, FieldOrder = %s
             WHERE FieldID = %s AND DocumentTypeID = %s
         """
         
         sql_insert_field = """
-            INSERT INTO Documents.TypeFields (DocumentTypeID, Name, DataType, Length, Precision, isMandatory)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO Documents.TypeFields (DocumentTypeID, Name, DataType, Length, Precision, isMandatory, FieldOrder)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """ 
 
         sql_get_new_id = "SELECT SCOPE_IDENTITY() AS new_id"
@@ -365,18 +371,20 @@ def edit_doc_type(data):
         for field in data.get('fields', []):
             field_id = field.get('id')
             
-            # Obtener el valor isRequired (1 o 0)
+            # Obtener los valores booleanos y de orden
             is_mandatory = field.get('isRequired', 0)
+            field_order = field.get('fieldOrder', 0) # <--- MODIFICACIÓN 3: Capturar el nuevo orden
 
             if field_id is None:
-                # --- INSERTAR ---
+                # --- INSERTAR NUEVO CAMPO DURANTE EDICIÓN ---
                 cursor.execute(sql_insert_field, (
                     data['id'], 
                     field['name'], 
                     field['type'], 
                     field.get('length', 0), 
                     field.get('precision', 0),
-                    is_mandatory # <--- Nuevo parámetro
+                    is_mandatory,
+                    field_order
                 ))
 
                 cursor.execute(sql_get_new_id)
@@ -384,14 +392,15 @@ def edit_doc_type(data):
                 current_field_db_id = int(row['new_id'])
             
             else:
-                # --- ACTUALIZAR ---
+                # --- ACTUALIZAR CAMPO EXISTENTE ---
                 current_field_db_id = field_id
                 cursor.execute(sql_update_field, (
                     field['name'], 
                     field['type'], 
                     field.get('length', 0), 
                     field.get('precision', 0), 
-                    is_mandatory, # <--- Nuevo parámetro
+                    is_mandatory, 
+                    field_order, # <--- Pasar el orden
                     field_id, 
                     data['id']
                 ))
@@ -410,7 +419,7 @@ def edit_doc_type(data):
     except Exception as e:
         if connection:
             connection.rollback()
-        print(f"Error en edit_doc_type: {e}")
+        print(f"Error al editar el Tipo de Documento: {e}")
         raise e 
 
     finally:

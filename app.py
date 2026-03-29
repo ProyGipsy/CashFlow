@@ -16,7 +16,6 @@ from werkzeug.utils import secure_filename
 from werkzeug.middleware.proxy_fix import ProxyFix
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
-
 from flask import (
     Flask, 
     redirect, 
@@ -152,6 +151,15 @@ from documents import (
     get_documents_by_type_id,
     )
 
+from availability import (
+    get_banks,
+    get_entities,
+    get_currencies,
+    get_accounts_by_bank,
+    get_transaction_statuses,
+    get_transit_transactions,
+)
+
 app = Flask(__name__)
 app.register_blueprint(reports_bp)
 
@@ -190,7 +198,8 @@ def inject_maintenance_vars():
             'CASHFLOW': os.environ.get('MAINTENANCE_MODE_CASHFLOW', 'OFF'),
             'PAYMENTRECEIPT': os.environ.get('MAINTENANCE_MODE_PAYMENTRECEIPT', 'OFF'),
             'REPORTS': os.environ.get('MAINTENANCE_MODE_REPORTS', 'OFF'),
-            'DOCUMENTS': os.environ.get('MAINTENANCE_MODE_DOCUMENTS', 'OFF')
+            'DOCUMENTS': os.environ.get('MAINTENANCE_MODE_DOCUMENTS', 'OFF'),
+            'BALANCE': os.environ.get('MAINTENANCE_MODE_BALANCE', 'OFF')
         }
     }
 
@@ -288,8 +297,7 @@ def welcome():
     if user_id:
         token = serializer.dumps({'user_id': user_id}, salt='transfer-auth')
 
-    react_target = f"{react_origin}/documents/?token={token}"
-    return render_template('welcome.html', roles_info=roles_info, react_app_url=react_target)
+    return render_template('welcome.html', roles_info=roles_info, react_app_url_docs=f"{react_origin}/documents/?token={token}", react_app_url_availity=f"{react_origin}/availability/?token={token}")
 
 
 # INICIOS DE SESIÓN INDIVIDUALES (Descartados con el nuevo flujo)
@@ -2666,6 +2674,106 @@ def getContacts():
     except Exception as e:
         print(f"Error obteniendo contactos: {e}")
         return jsonify({'error': str(e)}), 500
+
+# Endpoints para el módulo de Disponibilidad
+@app.route('/availability/getTransactionStatuses', methods=['GET'])
+def transactionStatuses():
+    """
+    Endpoint para obtener los estados disponibles para las transacciones.
+    """
+    try:
+        statuses = get_transaction_statuses()
+
+        if not statuses:
+            return jsonify({
+                'error': 'No se encontraron estados de transacción',
+            }), 404
+
+        return jsonify(statuses), 200
+
+    except Exception as e:
+        print(f"Error en endpoint transactionStatuses: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
     
+@app.route('/availability/getBanks', methods=['GET'])
+def getBanks():
+    try:
+        banks = get_banks()
+
+        if not banks:
+            return jsonify({
+                'error': 'No se encontraron bancos',
+            }), 404
+
+        return jsonify(banks), 200
+
+    except Exception as e:
+        print(f"Error en endpoint getBanks: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@app.route('/availability/banks/<int:bank_id>/accounts', methods=['GET'])
+def getBankAccounts(bank_id):
+    try:
+        accounts = get_accounts_by_bank(bank_id)
+
+        if accounts is None:
+            return jsonify({
+                'error': 'No se encontraron cuentas para el banco especificado',
+            }), 404
+
+        return jsonify(accounts), 200
+
+    except Exception as e:
+        print(f"Error en endpoint getBankAccounts: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@app.route('/availability/getEntities', methods=['GET'])
+def getEntities():
+    try:
+        entities = get_entities()
+
+        if not entities:
+            return jsonify({
+                'error': 'No se encontraron entidades',
+            }), 404
+
+        return jsonify(entities), 200
+
+    except Exception as e:
+        print(f"Error en endpoint getEntities: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@app.route('/availability/getCurrencies', methods=['GET'])
+def getCurrencies():
+    try:
+        currencies = get_currencies()
+
+        if not currencies:
+            return jsonify({
+                'error': 'No se encontraron monedas',
+            }), 404
+
+        return jsonify(currencies), 200
+
+    except Exception as e:
+        print(f"Error en endpoint getCurrencies: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@app.route('/availability/getTransitTransactions', methods=['GET'])
+def getTransitTransactions():
+    try:
+        transactions = get_transit_transactions()
+
+        if transactions is None:
+            return jsonify({
+                'error': 'No se encontraron transacciones en tránsito',
+            }), 404
+
+        return jsonify(transactions), 200
+
+    except Exception as e:
+        print(f"Error en endpoint getTransitTransactions: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
 if __name__ == '__main__':
    app.run()
