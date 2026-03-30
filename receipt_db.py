@@ -1425,7 +1425,7 @@ def find_candidate_receipts_by_amount_and_count(cursor, total_amount, relation_c
         SELECT R.ReceiptID
         FROM Commission_Receipt.PaymentReceipt R
         JOIN Commission_Receipt.DebtPaymentRelation P ON R.ReceiptID = P.PaymentReceiptID
-        WHERE R.Amount = %s
+        WHERE R.Amount = %s AND (R.IsReviewed = 0 OR (R.IsReviewed = 1 AND R.IsApproved = 1)) -- Solo buscamos entre los no revisados y los aprobados para evitar falsos positivos
         GROUP BY R.ReceiptID
         HAVING COUNT(*) = %s
     ''', (total_amount, relation_count))
