@@ -256,8 +256,8 @@ def create_doc_type_html(data):
         <div class="container">
             <div class="header">
                 <div class="brand-container">
-                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
-                    <span class="brand-name">Grupo Gipsy</span>
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img" height="40" style="height: 40px; width: auto; display: block; margin-left: auto !important; margin-right: auto !important; margin-bottom: 10px; padding-right: 40px !important; border: 0;">
+                    <span align="center" style = "font-weight: bold; color: #421d83; text-transform: uppercase; text-align: center; margin-left: auto !important; margin-right: auto !important;" class="brand-name">Grupo Gipsy</span>
                 </div>
                 <h2>Gipsy Documentos - Nuevo Tipo de Documento</h2>
             </div>
@@ -350,8 +350,8 @@ def create_new_doc_html(data):
         <div class="container">
             <div class="header">
                 <div class="brand-container">
-                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
-                    <span class="brand-name">Grupo Gipsy</span>
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img" height="40" style="height: 40px; width: auto; display: block; margin-left: auto !important; margin-right: auto !important; margin-bottom: 10px; padding-right: 40px !important; border: 0;">
+                    <span align="center" style = "font-weight: bold; color: #421d83; text-transform: uppercase; text-align: center; margin-left: auto !important; margin-right: auto !important;" class="brand-name">Grupo Gipsy</span>
                 </div>
                 <h2>Gipsy Documentos - Nuevo Documento</h2>
             </div>
@@ -554,8 +554,8 @@ def create_custom_email_html(custom_email_data, document_data_list=None):
                             <td style="padding: 20px 30px;">
                                 <div class="header" style="text-align: left; border-bottom: 2px solid #8b56ed; padding-bottom: 15px; margin-bottom: 20px;">
                                     <div class="brand-container">
-                                        <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
-                                        <span class="brand-name">Grupo Gipsy</span>
+                                        <img src="cid:logo_gipsy" alt="Logo" class="logo-img" height="40" style="height: 40px; width: auto; display: block; margin-left: auto !important; margin-right: auto !important; margin-bottom: 10px; padding-right: 40px !important; border: 0;">
+                                        <span align="center" style = "font-weight: bold; color: #421d83; text-transform: uppercase; text-align: center; margin-left: auto !important; margin-right: auto !important;" class="brand-name">Grupo Gipsy</span>
                                     </div>
                                     <h2 style="color: #421d83; font-size: 24px; margin: 0;">Envío de Documentos</h2>
                                 </div>
@@ -613,8 +613,8 @@ def create_send_notification_html(data):
         <div class="container">
             <div class="header">
                 <div class="brand-container">
-                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img">
-                    <span class="brand-name">Grupo Gipsy</span>
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img" height="40" style="height: 40px; width: auto; display: block; margin-left: auto !important; margin-right: auto !important; margin-bottom: 10px; padding-right: 40px !important; border: 0;">
+                    <span align="center" style = "font-weight: bold; color: #421d83; text-transform: uppercase; text-align: center; margin-left: auto !important; margin-right: auto !important;" class="brand-name">Grupo Gipsy</span>
                 </div>
                 <h2>Gipsy Documentos - Notificación de Envío</h2>
             </div>
