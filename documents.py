@@ -884,7 +884,7 @@ def edit_role(data):
         if cursor: cursor.close()
         if connection: connection.close()
 
-def create_document(data, file_url):
+def create_document(data, file_url, filename):
     connection = None
     cursor = None
 
@@ -983,10 +983,10 @@ def create_document(data, file_url):
         # 5. INSERTAR ANEXO
         if file_url:
             sql_insert_annex = """
-                INSERT INTO Documents.DocumentAnnex (DocumentID, AnnexURL, Date)
-                VALUES (%s, %s, GETDATE())
+                INSERT INTO Documents.DocumentAnnex (DocumentID, AnnexURL, Date, AnnexFileName)
+                VALUES (%s, %s, GETDATE(), %s)
             """
-            cursor.execute(sql_insert_annex, (inserted_id, file_url))
+            cursor.execute(sql_insert_annex, (inserted_id, file_url, filename))
 
         connection.commit()
 
@@ -1039,7 +1039,7 @@ def create_document(data, file_url):
         if cursor: cursor.close()
         if connection: connection.close()
 
-def edit_document(data, new_file_url=None):
+def edit_document(data, new_file_url=None, new_filename=None):
     connection = None
     cursor = None
 
@@ -1125,17 +1125,17 @@ def edit_document(data, new_file_url=None):
         if new_file_url:
             sql_update_annex = """
                 UPDATE Documents.DocumentAnnex
-                SET AnnexURL = %s, Date = GETDATE()
+                SET AnnexURL = %s, Date = GETDATE(), AnnexFileName = %s
                 WHERE DocumentID = %s
             """
-            cursor.execute(sql_update_annex, (new_file_url, data['id']))
+            cursor.execute(sql_update_annex, (new_file_url, new_filename, data['id']))
             
             if cursor.rowcount == 0:
                 sql_insert_annex = """
-                    INSERT INTO Documents.DocumentAnnex (DocumentID, AnnexURL, Date)
-                    VALUES (%s, %s, GETDATE())
+                    INSERT INTO Documents.DocumentAnnex (DocumentID, AnnexURL, Date, AnnexFileName)
+                    VALUES (%s, %s, GETDATE(), %s)
                 """
-                cursor.execute(sql_insert_annex, (data['id'], new_file_url))
+                cursor.execute(sql_insert_annex, (data['id'], new_file_url, new_filename))
 
         connection.commit()
         
@@ -1365,7 +1365,7 @@ def get_document_by_id(data):
                 D.DocumentID, D.TypeID, DT.Name AS TypeName, D.DocumentName,
                 (SELECT STRING_AGG(C.Name, ', ') FROM Documents.DocumentCompanies DC JOIN Documents.Company C ON DC.CompanyID = C.CompanyID WHERE DC.DocumentID = D.DocumentID) AS CompanyName,
                 (SELECT STRING_AGG(CAST(DC.CompanyID AS VARCHAR), ',') FROM Documents.DocumentCompanies DC WHERE DC.DocumentID = D.DocumentID) AS CompanyIDs,
-                DA.AnnexURL
+                DA.AnnexURL, DA.AnnexFileName AS AnnexFilename
             FROM Documents.Document D
             JOIN Documents.DocumentType DT ON D.TypeID = DT.TypeID
             LEFT JOIN Documents.DocumentAnnex DA ON D.DocumentID = DA.DocumentID
