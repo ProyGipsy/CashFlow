@@ -2318,7 +2318,7 @@ def createDoc():
                 # SOLO SI HAY ARCHIVO VALIDO -> SUBIMOS A ONEDRIVE
                 try:
                     result = upload_file_to_onedrive(file)
-                    # filename = result['filename'] # No lo usamos abajo, pero está disponible
+                    filename = result['filename'] # No lo usamos abajo, pero está disponible
                     file_url = result['link']
                 
                 except Exception as e:
@@ -2329,7 +2329,7 @@ def createDoc():
                     }), 500
 
         # 3. LLAMAR A LA LÓGICA DE BASE DE DATOS
-        document_id = create_document(data, file_url)
+        document_id = create_document(data, file_url, filename)
 
         if document_id:
             return jsonify({
@@ -2378,7 +2378,7 @@ def editDoc():
             if file and file.filename != '':
                 try:
                     result = upload_file_to_onedrive(file)
-                    # filename = result['filename']
+                    new_filename = result['filename']
                     new_file_url = result['link'] # <--- CORREGIDO (antes decía ['link'])
                 
                 except Exception as e:
@@ -2390,7 +2390,7 @@ def editDoc():
 
         # 3. LLAMAR A LA LÓGICA DE ACTUALIZACIÓN
         # Si new_file_url es None, la función edit_document debería saber que no debe actualizar ese campo
-        success = edit_document(data, new_file_url)
+        success = edit_document(data, new_file_url, new_filename)
 
         if success:
             response = {'message': 'Documento actualizado exitosamente'}
