@@ -155,9 +155,11 @@ from availability import (
     get_banks,
     get_entities,
     get_currencies,
-    get_accounts_by_bank,
+    update_transaction,
+    create_transaction,
     get_transaction_statuses,
     get_transit_transactions,
+    get_accounts_by_bank_and_entity,
 )
 
 app = Flask(__name__)
@@ -2713,8 +2715,10 @@ def getBanks():
 
 @app.route('/availability/banks/<int:bank_id>/accounts', methods=['GET'])
 def getBankAccounts(bank_id):
+
+    entity_id = request.args.get('entity_id')
     try:
-        accounts = get_accounts_by_bank(bank_id)
+        accounts = get_accounts_by_bank_and_entity(bank_id, entity_id)
 
         if accounts is None:
             return jsonify({
@@ -2774,6 +2778,63 @@ def getTransitTransactions():
     except Exception as e:
         print(f"Error en endpoint getTransitTransactions: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
+
+@app.route('/availability/transactions', methods=['POST'])
+def createTransaction():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': 'No se recibieron datos para la creación de la transacción'}), 400
+
+    try:
+        # Aquí le pasamos la data mapeada desde React
+        transaction_id = create_transaction(data)
+
+        if transaction_id:
+            return jsonify({
+                'message': 'Transacción creada exitosamente',
+                'new_id': transaction_id # <--- Clave para que React asigne el ID correcto
+            }), 201
+        else:
+            return jsonify({
+                'error': 'No se pudo crear la transacción'
+            }), 500
+        
+    except Exception as e:
+        print(f"Error en endpoint createTransaction: {e}")
+        return jsonify({
+            'error': 'Error del servidor al crear la transacción',
+            'details': str(e)
+        }), 500
+    
+    
+@app.route('/availability/transactions/<int:transaction_id>', methods=['PUT'])
+def updateTransaction(transaction_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': 'No se recibieron datos para la actualización de la transacción'}), 400
+
+    try:
+        print(data)
+        success = update_transaction(transaction_id, data)
+        print(f"Resultado de update_transaction: {success}")
+        
+        if success:
+            return jsonify({
+                'message': 'Transacción actualizada exitosamente'
+            }), 200
+        else:
+            return jsonify({
+                'error': 'No se pudo actualizar la transacción'
+            }), 404
+
+    except Exception as e:
+        print(f"Error en endpoint updateTransaction: {e}")
+        return jsonify({
+            'error': 'Error del servidor al actualizar la transacción',
+            'details': str(e)
+        }), 500
 
 if __name__ == '__main__':
    app.run()

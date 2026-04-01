@@ -81,7 +81,7 @@ def get_banks():
         if connection:
             connection.close()
 
-def get_accounts_by_bank(bank_id):
+def get_accounts_by_bank_and_entity(bank_id, entity_id):
     """
     Obtiene las cuentas asociadas a un banco específico.
     """
@@ -95,11 +95,11 @@ def get_accounts_by_bank(bank_id):
         sql = """
         SELECT AccountID, AccountNumber, AccountName, CurrencyID
         FROM AccountBalance.Account
-        WHERE BankID = %s AND IsActive = 1
+        WHERE BankID = %s AND EntityID = %s AND IsActive = 1
         ORDER BY AccountName ASC
         """
 
-        cursor.execute(sql, (bank_id,))
+        cursor.execute(sql, (bank_id, entity_id))
         accounts = cursor.fetchall()
 
         #print(f"Cuentas obtenidas para el banco {bank_id}: {accounts}")
@@ -229,3 +229,129 @@ def get_transit_transactions():
             cursor.close()
         if connection:
             connection.close()
+
+def create_transaction(data):
+    """
+    Crea una nueva transacción en tránsito.
+    """
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor()
+
+        status_id = data.get('TransitStatusID', 1)
+        
+        from datetime import datetime
+        executed_at = datetime.now() if status_id == 2 else None
+        cancelled_at = datetime.now() if status_id == 3 else None
+
+        sql = """
+            SET NOCOUNT ON;
+            
+            INSERT INTO AccountBalance.TransitTransaction 
+            (TransactionTime, EntityID, AccountID, Reference, Concept, Amount, TransitStatusID, ExecutedAt, CancelledAt, CreatedAt, UpdatedAt)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, GETDATE(), GETDATE());
+            
+            SELECT SCOPE_IDENTITY();
+        """
+
+        cursor.execute(sql, (
+            data['DateTrx'],
+            data['EntityID'],
+            data['AccountID'],
+            data.get('ReferenceDoc', ''),
+            data['Concept'],
+            data['Amount'],
+            status_id,
+            executed_at,
+            cancelled_at
+        ))
+
+        # 1. PRIMERO leemos el resultado del SELECT SCOPE_IDENTITY()
+        row = cursor.fetchone()
+        
+        if not row or row[0] is None:
+            raise Exception("El INSERT fue exitoso pero SCOPE_IDENTITY devolvió nulo.")
+            
+        new_id = int(row[0])
+        
+        # 2. DESPUÉS hacemos el commit para guardar los cambios en BD
+        connection.commit()
+        
+        return new_id
+
+    except Exception as e:
+        print(f"Error al crear la transacción: {e}")
+        # Hacemos rollback en caso de que algo falle
+        if connection:
+            connection.rollback()
+        return False
+
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+def update_transaction(transaction_id, data):
+    """
+    Actualiza una transacción en tránsito existente.
+    """
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor()
+        
+        status_id = data['TransitStatusID']
+
+        # Usamos CASE WHEN en SQL para proteger las fechas de ejecución/anulación previas
+        sql = """
+            UPDATE [AccountBalance].[TransitTransaction]
+            SET TransactionTime = %s, 
+                EntityID = %s, 
+                AccountID = %s, 
+                Reference = %s, 
+                Concept = %s, 
+                Amount = %s, 
+                TransitStatusID = %s,
+                ExecutedAt = CASE 
+                                WHEN %s = 2 THEN COALESCE(ExecutedAt, GETDATE()) 
+                                WHEN %s = 1 THEN NULL 
+                                ELSE ExecutedAt 
+                             END,
+                CancelledAt = CASE 
+                                WHEN %s = 3 THEN COALESCE(CancelledAt, GETDATE()) 
+                                WHEN %s = 1 THEN NULL 
+                                ELSE CancelledAt 
+                              END,
+                UpdatedAt = GETDATE()
+            WHERE TransitTransactionID = %s
+        """
+        
+        cursor.execute(sql, (
+            data['DateTrx'],
+            data['EntityID'],
+            data['AccountID'],
+            data.get('ReferenceDoc', ''),
+            data['Concept'],
+            data['Amount'],
+            status_id,
+            # Parámetros repetidos para evaluar el CASE de ExecutedAt
+            status_id, status_id, 
+            # Parámetros repetidos para evaluar el CASE de CancelledAt
+            status_id, status_id, 
+            transaction_id
+        ))
+
+        connection.commit()
+        return cursor.rowcount > 0  
+
+    except Exception as e:
+        print(f"Error al actualizar la transacción: {e}")
+        return False
+
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
