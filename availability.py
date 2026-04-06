@@ -348,6 +348,12 @@ def update_transaction(transaction_id, data):
         connection.commit()
         return cursor.rowcount > 0  
 
+    except pymssql.Error as db_err:
+        print(f"Error de BD/Driver al actualizar la transacción {transaction_id}: {db_err}")
+        if connection:
+            connection.rollback()
+        return False
+    
     except Exception as e:
         print(f"Error al actualizar la transacción: {e}")
         return False
