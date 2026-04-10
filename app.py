@@ -157,6 +157,7 @@ from availability import (
     get_currencies,
     update_transaction,
     create_transaction,
+    get_banks_by_entity,
     get_transaction_statuses,
     get_transit_transactions,
     get_accounts_by_bank_and_entity,
@@ -2833,6 +2834,22 @@ def updateTransaction(transaction_id):
         print(f"Error en endpoint updateTransaction: {e}")
         return jsonify({
             'error': 'Error del servidor al actualizar la transacción',
+            'details': str(e)
+        }), 500
+
+@app.route('/availability/entities/<int:entity_id>/banks', methods=['GET'])
+def get_entity_banks(entity_id):
+    """
+    Retorna los bancos asociados a una entidad para llenar la cascada del frontend.
+    """
+    try:
+        banks = get_banks_by_entity(entity_id)
+        return jsonify(banks), 200
+
+    except Exception as e:
+        print(f"Error en endpoint get_entity_banks: {e}")
+        return jsonify({
+            'error': 'Error interno del servidor al obtener los bancos',
             'details': str(e)
         }), 500
 

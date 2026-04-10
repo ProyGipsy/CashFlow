@@ -361,3 +361,38 @@ def update_transaction(transaction_id, data):
     finally:
         if cursor: cursor.close()
         if connection: connection.close()
+
+
+def get_banks_by_entity(entity_id):
+    """
+    Obtiene los bancos únicos que tienen cuentas activas asociadas a una entidad específica.
+    """
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT DISTINCT B.BankID, B.BankName
+        FROM AccountBalance.Bank B
+        INNER JOIN AccountBalance.Account A ON B.BankID = A.BankID
+        WHERE A.EntityID = %s AND A.IsActive = 1
+        ORDER BY B.BankName ASC
+        """
+
+        cursor.execute(sql, (entity_id,))
+        banks = cursor.fetchall()
+
+        return banks
+
+    except Exception as e:
+        print(f"Error al obtener los bancos por entidad: {e}")
+        return []
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
