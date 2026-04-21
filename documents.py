@@ -1718,3 +1718,43 @@ def get_contacts_by_user_db(user_id):
     finally:
         if cursor: cursor.close()
         if connection: connection.close()
+
+def get_contacts_agenda():
+    connection = None
+    cursor = None
+    agenda = []
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+            SELECT ContactID, Alias, Emails 
+            FROM Documents.Contacts
+            ORDER BY Alias ASC
+        """
+        
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+
+        for row in rows:
+            raw_emails = row['Emails']
+            emails_array = []
+            
+            if raw_emails:
+                emails_array = [e.strip() for e in raw_emails.split(',') if e.strip()]
+
+            agenda.append({
+                'id': row['ContactID'],
+                'alias': row['Alias'],
+                'emails': emails_array
+            })
+
+        return agenda
+
+    except Exception as e:
+        print(f"Error en get_contact_agenda: {e}")
+        raise e 
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
