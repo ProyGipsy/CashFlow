@@ -145,6 +145,7 @@ from documents import (
     get_doc_type_full,
     get_document_by_id,
     get_docs_companies,
+    get_contacts_agenda,
     get_suggested_emails,
     get_contacts_by_user_db,
     get_all_documents_lists,    
@@ -2676,6 +2677,16 @@ def getContacts():
 
     except Exception as e:
         print(f"Error obteniendo contactos: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/documents/getContactsAgenda', methods=['GET'])
+def getContactsAgenda():
+    try:
+        agenda = get_contacts_agenda()
+        return jsonify(agenda), 200
+    
+    except Exception as e:
+        print(f"Error obteniendo agenda: {e}")
         return jsonify({'error': str(e)}), 500
 
 # Endpoints para el módulo de Disponibilidad
