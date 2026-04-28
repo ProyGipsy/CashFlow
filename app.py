@@ -203,7 +203,8 @@ def inject_maintenance_vars():
             'PAYMENTRECEIPT': os.environ.get('MAINTENANCE_MODE_PAYMENTRECEIPT', 'OFF'),
             'REPORTS': os.environ.get('MAINTENANCE_MODE_REPORTS', 'OFF'),
             'DOCUMENTS': os.environ.get('MAINTENANCE_MODE_DOCUMENTS', 'OFF'),
-            'BALANCE': os.environ.get('MAINTENANCE_MODE_BALANCE', 'OFF')
+            'BALANCE': os.environ.get('MAINTENANCE_MODE_BALANCE', 'OFF'),
+            'PURCHASES': os.environ.get('MAINTENANCE_MODE_PURCHASES', 'OFF')
         }
     }
 
@@ -301,7 +302,7 @@ def welcome():
     if user_id:
         token = serializer.dumps({'user_id': user_id}, salt='transfer-auth')
 
-    return render_template('welcome.html', roles_info=roles_info, react_app_url_docs=f"{react_origin}/documents/?token={token}", react_app_url_availity=f"{react_origin}/availability/?token={token}")
+    return render_template('welcome.html', roles_info=roles_info, react_app_url_docs=f"{react_origin}/documents/?token={token}", react_app_url_availity=f"{react_origin}/availability/?token={token}", react_app_url_purchases=f"{react_origin}/purchases/?token={token}")
 
 
 # INICIOS DE SESIÓN INDIVIDUALES (Descartados con el nuevo flujo)
