@@ -399,6 +399,7 @@ def generate_document_content_html(doc_data):
     COLOR_DARK_LILA = "#421d83"
     COLOR_PRIMARY_LILA = "#8b56ed"
     COLOR_PRIMARY_RED = "#DD030E"
+    COLOR_BACKGROUND_YELLOW = "#FCEA46"
     COLOR_TEXT_DARK = "#333"
     COLOR_BG_DETAIL = "#f9f9f9"
     COLOR_BORDER = "#e0e0e0"
@@ -426,7 +427,16 @@ def generate_document_content_html(doc_data):
             
             # Creamos el botón/enlace HTML
             attachment_display = f"""
-            <a href="{annex_url}" target="_blank" style="color: {COLOR_PRIMARY_RED}; font-size: 15px; text-decoration: none; font-weight: bold;">
+            <a href="{annex_url}" target="_blank" 
+                style="
+                    color: {COLOR_PRIMARY_RED};
+                    background-color: {COLOR_BACKGROUND_YELLOW};
+                    padding: 2px 4px;
+                    font-size: 15px;
+                    text-decoration: none;
+                    font-weight: bold;
+                    border-radius: 3px;
+                ">
                 📄 Click aquí para Ver/Descargar el archivo
             </a>
             """
