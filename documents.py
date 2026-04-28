@@ -1,10 +1,14 @@
 import os
 import json
+import shutil
 import pymssql
+import requests
+import tempfile
 
 from datetime import datetime
 from collections import Counter
 from dbutils.pooled_db import PooledDB
+
 from emailScript import (
     send_email,
     create_doc_type_html,
@@ -1380,7 +1384,7 @@ def get_document_by_id(data):
         sql_values = """
             SELECT 
                 TF.Name AS FieldName, 
-                TF.DataType, -- <--- Necesitamos esto
+                TF.DataType,
                 FV.Value
             FROM Documents.FieldValue FV
             JOIN Documents.TypeFields TF ON FV.FieldID = TF.FieldID
@@ -1414,85 +1418,150 @@ def get_document_by_id(data):
             'CompanyID': company_ids_list[0] if company_ids_list else None, 
             'CompanyName': doc_header['CompanyName'],
             'AnnexURL': doc_header['AnnexURL'],
-            'fieldsData': fields_data_dict # Ahora lleva booleanos reales
+            'fieldsData': fields_data_dict
         }
 
     except Exception as e:
         print(f"Error: {e}")
         raise e 
+    
     finally:
         if cursor: cursor.close()
         if connection: connection.close()
         
+def download_onedrive_file(public_url, temp_dir, file_name):
+    """
+    Descarga el archivo real desde un enlace de OneDrive/SharePoint
+    y lo guarda en un directorio temporal.
+    """
+    # 1. Forzar el parámetro de descarga
+    if "?" in public_url:
+        download_url = public_url.replace("?web=1", "").replace("&web=1", "") + "&download=1"
+    else:
+        download_url = public_url + "?download=1"
+
+    # 2. Hacerle creer a Microsoft que somos Chrome en Windows (Evita bloqueos anti-bots)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+    }
+
+    print(f"Intentando descargar: {download_url}")
+    
+    # 3. Descargar siguiendo redirecciones
+    response = requests.get(download_url, headers=headers, allow_redirects=True, timeout=30)
+    response.raise_for_status()
+
+    # 4. Validar que no nos hayan devuelto una página web
+    if "text/html" in response.headers.get("Content-Type", ""):
+        raise Exception("El enlace de OneDrive está protegido, requiere inicio de sesión o bloqueó la descarga automatizada.")
+
+    # 5. Guardar en el servidor temporalmente
+    file_path = os.path.join(temp_dir, file_name)
+    with open(file_path, "wb") as f:
+        f.write(response.content)
+        
+    return file_path
+
 def send_documents(user_id, email_data, full_documents_data):
+    print("DEBUG: --- INICIANDO send_documents ---")
+    print(f"DEBUG: user_id: {user_id}")
+    print(f"DEBUG: Cantidad de documentos a procesar: {len(full_documents_data)}")
+
     sender_email = os.environ.get('MAIL_USERNAME_DOCUMENTS')
     email_password = os.environ.get('MAIL_PASSWORD_DOCUMENTS')
 
     if not sender_email or not email_password:
-        raise Exception("Credenciales de correo no configuradas en el servidor.")
+        raise Exception("Credenciales de correo no configuradas.")
 
     connection = None
     cursor = None
+    
+    # Crear un directorio temporal en el servidor
+    temp_dir = tempfile.mkdtemp()
+    print(f"DEBUG: Directorio temporal creado en: {temp_dir}")
+    
+    attachments_list = [] # Aquí guardaremos las rutas físicas [str]
 
     try:
-        # --- 1. PREPARACIÓN Y LIMPIEZA DE DATOS ---
-        # Destinatarios
+        # --- 1. PREPARACIÓN DE CORREO ---
         recipients_list = email_data.get('recipients', [])
-        if not isinstance(recipients_list, list):
-            recipients_list = [recipients_list]
+        if not isinstance(recipients_list, list): recipients_list = [recipients_list]
         
-        recipients_str = ", ".join([str(r) for r in recipients_list])
-
-        # Asunto
         subject_client = str(email_data.get('subject', 'Envío de Documentos'))
-
-        # Cuerpo (Body)
         raw_body = email_data.get('body', '')
-        if isinstance(raw_body, dict):
-            body_text = json.dumps(raw_body)
-        else:
-            body_text = str(raw_body)
-
-        # Generar HTML
+        body_text = json.dumps(raw_body) if isinstance(raw_body, dict) else str(raw_body)
+        
         html_body_client = create_custom_email_html(email_data, full_documents_data)
+        print("DEBUG: HTML del correo generado exitosamente.")
 
-        # --- 2. ENVÍO DE CORREO A DESTINATARIOS (CLIENTES) ---
+        # --- 2. DESCARGAR ADJUNTOS DE ONEDRIVE ---
+        print("DEBUG: --- INICIANDO BUCLE DE DESCARGA DE ADJUNTOS ---")
+        for index, doc in enumerate(full_documents_data):
+            print(doc)
+            url = doc.get('AnnexURL')
+            doc_name = doc.get('DocumentName', 'Documento_Adjunto.pdf')
+
+            if not doc_name.lower().endswith('.pdf'):
+                doc_name += '.pdf'
+                
+            print(f"DEBUG: Doc #{index + 1} | Nombre esperado: {doc_name} | URL: {url}")
+            
+            if url:
+                try:
+                    # Usamos nuestra nueva función para bajar el archivo físicamente
+                    print(f"DEBUG: Llamando a download_onedrive_file para {doc_name}...")
+                    file_path = download_onedrive_file(url, temp_dir, doc_name)
+                    print(f"DEBUG: download_onedrive_file retornó la ruta: {file_path}")
+                    
+                    # Verificación vital: ¿El archivo existe y cuánto pesa?
+                    if os.path.exists(file_path):
+                        file_size = os.path.getsize(file_path)
+                        print(f"DEBUG: CONFIRMADO - El archivo existe en disco. Tamaño: {file_size} bytes.")
+                        if file_size < 5000: # Un PDF real raramente pesa menos de 5KB
+                            print("DEBUG ALERTA: El tamaño del archivo es muy pequeño. Podría ser un error HTML en lugar del PDF real.")
+                    else:
+                        print(f"DEBUG ALERTA FATAL: El archivo NO se encuentra en la ruta {file_path} después de la descarga.")
+
+                    attachments_list.append(file_path)
+                    print(f"✔ Archivo listo para enviar y agregado a la lista: {file_path}")
+                except Exception as e:
+                    print(f"❌ DEBUG EXCEPCIÓN AL DESCARGAR {doc_name}: {type(e).__name__} - {str(e)}")
+            else:
+                print(f"DEBUG: El documento {doc_name} no tiene URL válida.")
+
+        # --- 3. ENVÍO DEL CORREO AL CLIENTE ---
+        print("DEBUG: --- PREPARANDO ENVÍO send_email ---")
+        final_attachments = attachments_list if attachments_list else None
+        print(f"DEBUG: Variable final_attachments que se pasará a send_email: {final_attachments}")
+        print(f"DEBUG: Tipo de final_attachments: {type(final_attachments)}")
+        
         send_email(
             subject=subject_client,
             body_html=html_body_client,
             sender_email=sender_email,
             email_password=email_password,
             receiver_emails=recipients_list,
-            attachments=None
+            attachments=final_attachments # Pasamos la lista de strings (ej: ['/tmp/xyz/doc.pdf'])
         )
+        print(f"--> Correo enviado exitosamente a: {recipients_list}")
 
-        print(f'--> Correo enviado exitosamente a: {recipients_list}')
-
-        # --- 3. GUARDADO EN BASE DE DATOS (LOG) ---
+        # --- 4. LOG EN BASE DE DATOS Y NOTIFICACIÓN ---
         try:
+            print("DEBUG: Guardando Log en base de datos...")
             connection = pool.connection()
             cursor = connection.cursor()
-
-            send_email_sql = """
-                INSERT INTO Documents.Delivery (userId, Recipient, DeliveryDate, Subject, Body)
-                VALUES (%s, %s, GETDATE(), %s, %s)
-            """
-            
-            cursor.execute(send_email_sql, (user_id, recipients_str, subject_client, body_text))
+            sql = "INSERT INTO Documents.Delivery (userId, Recipient, DeliveryDate, Subject, Body) VALUES (%s, %s, GETDATE(), %s, %s)"
+            cursor.execute(sql, (user_id, ", ".join(map(str, recipients_list)), subject_client, body_text))
             connection.commit()
-            
-            print("--> Registro de envío guardado en Documents.Delivery")
-
-        except Exception as db_error:
-            print(f"⚠ ALERTA: El correo se envió, pero falló el guardado en BD: {db_error}")
-            if connection: connection.rollback()
+            print("DEBUG: Log guardado exitosamente.")
         
-        finally:
-            if cursor: cursor.close()
-            if connection: connection.close()
+        except Exception as db_e:
+            print(f"⚠ Error en BD: {db_e}")
+            if connection: connection.rollback()
 
         # --- 4. NOTIFICACIÓN A ADMINISTRACIÓN ---
         try:
+            print("DEBUG: Preparando notificación a administración...")
             # A. Destinatario Principal (Visible en "Para")
             admin_recipients = [os.environ.get('MAIL_TEST_DOCUMENTS') or sender_email]
 
@@ -1525,12 +1594,24 @@ def send_documents(user_id, email_data, full_documents_data):
 
         except Exception as admin_e:
             print(f"Error menor enviando notificación a admin: {admin_e}")
-        
+
         return True
 
     except Exception as e:
-        print(f"Error fatal enviando documentos: {e}")
+        print(f"💥 DEBUG ERROR FATAL EN send_documents: {type(e).__name__} - {str(e)}")
         raise e
+
+    finally:
+        print("DEBUG: --- INICIANDO BLOQUE FINALLY (LIMPIEZA) ---")
+        if cursor: cursor.close()
+        if connection: connection.close()
+        
+        # --- 5. LIMPIEZA DEL DISCO DURO ---
+        # Borra la carpeta temporal y los PDF descargados sin importar si hubo error o éxito
+        print(f"DEBUG: Eliminando directorio temporal: {temp_dir}")
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        print("✔ Servidor limpio: Archivos temporales eliminados.")
+        print("DEBUG: --- FIN DE send_documents ---")
 
 def get_suggested_emails(user_id):
     connection = None
