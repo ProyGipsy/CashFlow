@@ -192,7 +192,7 @@ def create_doc_type(data):
             recipient_admin = os.environ.get("MAIL_RECIPIENT_TEST")
 
             # --- DEFINIR LA COPIA OCULTA (BCC) ---
-            bcc_list = ['bibliotecagipsy@outlook.com']
+            bcc_list = [os.environ.get("MAIL_TEST_DOCUMENTS_GIPSYCORP")]
 
             if sender_email and email_password and recipient_admin:
                 
@@ -999,7 +999,10 @@ def create_document(data, file_url, filename):
             sender_email = os.environ.get("MAIL_USERNAME_DOCUMENTS")
             email_password = os.environ.get("MAIL_PASSWORD_DOCUMENTS")
             recipient_admin = os.environ.get("MAIL_TEST_DOCUMENTS")
-            bcc_list = ['bibliotecagipsy@outlook.com'] 
+            bcc_list = [os.environ.get("MAIL_TEST_DOCUMENTS_GIPSYCORP")] 
+
+            if data['docTypeId'] == 49:
+                bcc_list.append(os.environ.get("MAIL_TEST_DOCUMENTS_OUTLOOK_PAGOS"))
 
             if sender_email and email_password and recipient_admin:
                 
@@ -1463,9 +1466,9 @@ def download_onedrive_file(public_url, temp_dir, file_name):
     return file_path
 
 def send_documents(user_id, email_data, full_documents_data):
-    print("DEBUG: --- INICIANDO send_documents ---")
-    print(f"DEBUG: user_id: {user_id}")
-    print(f"DEBUG: Cantidad de documentos a procesar: {len(full_documents_data)}")
+    #print("DEBUG: --- INICIANDO send_documents ---")
+    #print(f"DEBUG: user_id: {user_id}")
+    #print(f"DEBUG: Cantidad de documentos a procesar: {len(full_documents_data)}")
 
     sender_email = os.environ.get('MAIL_USERNAME_DOCUMENTS')
     email_password = os.environ.get('MAIL_PASSWORD_DOCUMENTS')
@@ -1478,7 +1481,7 @@ def send_documents(user_id, email_data, full_documents_data):
     
     # Crear un directorio temporal en el servidor
     temp_dir = tempfile.mkdtemp()
-    print(f"DEBUG: Directorio temporal creado en: {temp_dir}")
+    #print(f"DEBUG: Directorio temporal creado en: {temp_dir}")
     
     attachments_list = [] # Aquí guardaremos las rutas físicas [str]
 
@@ -1492,10 +1495,10 @@ def send_documents(user_id, email_data, full_documents_data):
         body_text = json.dumps(raw_body) if isinstance(raw_body, dict) else str(raw_body)
         
         html_body_client = create_custom_email_html(email_data, full_documents_data)
-        print("DEBUG: HTML del correo generado exitosamente.")
+        #print("DEBUG: HTML del correo generado exitosamente.")
 
         # --- 2. DESCARGAR ADJUNTOS DE ONEDRIVE ---
-        print("DEBUG: --- INICIANDO BUCLE DE DESCARGA DE ADJUNTOS ---")
+        #print("DEBUG: --- INICIANDO BUCLE DE DESCARGA DE ADJUNTOS ---")
         for index, doc in enumerate(full_documents_data):
             print(doc)
             url = doc.get('AnnexURL')
@@ -1504,21 +1507,22 @@ def send_documents(user_id, email_data, full_documents_data):
             if not doc_name.lower().endswith('.pdf'):
                 doc_name += '.pdf'
                 
-            print(f"DEBUG: Doc #{index + 1} | Nombre esperado: {doc_name} | URL: {url}")
+            #print(f"DEBUG: Doc #{index + 1} | Nombre esperado: {doc_name} | URL: {url}")
             
             if url:
                 try:
                     # Usamos nuestra nueva función para bajar el archivo físicamente
-                    print(f"DEBUG: Llamando a download_onedrive_file para {doc_name}...")
+                    #print(f"DEBUG: Llamando a download_onedrive_file para {doc_name}...")
                     file_path = download_onedrive_file(url, temp_dir, doc_name)
-                    print(f"DEBUG: download_onedrive_file retornó la ruta: {file_path}")
+                    #print(f"DEBUG: download_onedrive_file retornó la ruta: {file_path}")
                     
                     # Verificación vital: ¿El archivo existe y cuánto pesa?
                     if os.path.exists(file_path):
                         file_size = os.path.getsize(file_path)
-                        print(f"DEBUG: CONFIRMADO - El archivo existe en disco. Tamaño: {file_size} bytes.")
+                        #print(f"DEBUG: CONFIRMADO - El archivo existe en disco. Tamaño: {file_size} bytes.")
                         if file_size < 5000: # Un PDF real raramente pesa menos de 5KB
                             print("DEBUG ALERTA: El tamaño del archivo es muy pequeño. Podría ser un error HTML en lugar del PDF real.")
+                            pass
                     else:
                         print(f"DEBUG ALERTA FATAL: El archivo NO se encuentra en la ruta {file_path} después de la descarga.")
 
@@ -1532,8 +1536,8 @@ def send_documents(user_id, email_data, full_documents_data):
         # --- 3. ENVÍO DEL CORREO AL CLIENTE ---
         print("DEBUG: --- PREPARANDO ENVÍO send_email ---")
         final_attachments = attachments_list if attachments_list else None
-        print(f"DEBUG: Variable final_attachments que se pasará a send_email: {final_attachments}")
-        print(f"DEBUG: Tipo de final_attachments: {type(final_attachments)}")
+        #print(f"DEBUG: Variable final_attachments que se pasará a send_email: {final_attachments}")
+        #print(f"DEBUG: Tipo de final_attachments: {type(final_attachments)}")
         
         send_email(
             subject=subject_client,
@@ -1566,7 +1570,14 @@ def send_documents(user_id, email_data, full_documents_data):
             admin_recipients = [os.environ.get('MAIL_TEST_DOCUMENTS') or sender_email]
 
             # B. Destinatario Oculto (BCC)
-            bcc_list = ['bibliotecagipsy@outlook.com']
+            bcc_set = set([os.environ.get("MAIL_TEST_DOCUMENTS_GIPSYCORP")])
+
+            for doc in full_documents_data:
+                doc_type_id = doc.get('TypeID')
+                if doc_type_id == 49:
+                    bcc_set.add(os.environ.get("MAIL_TEST_DOCUMENTS_OUTLOOK_PAGOS"))
+
+            bcc_list = list(bcc_set)
 
             if admin_recipients:
                 notification_context = {
@@ -1602,16 +1613,17 @@ def send_documents(user_id, email_data, full_documents_data):
         raise e
 
     finally:
-        print("DEBUG: --- INICIANDO BLOQUE FINALLY (LIMPIEZA) ---")
+        #print("DEBUG: --- INICIANDO BLOQUE FINALLY (LIMPIEZA) ---")
         if cursor: cursor.close()
         if connection: connection.close()
         
         # --- 5. LIMPIEZA DEL DISCO DURO ---
         # Borra la carpeta temporal y los PDF descargados sin importar si hubo error o éxito
-        print(f"DEBUG: Eliminando directorio temporal: {temp_dir}")
+        #print(f"DEBUG: Eliminando directorio temporal: {temp_dir}")
         shutil.rmtree(temp_dir, ignore_errors=True)
-        print("✔ Servidor limpio: Archivos temporales eliminados.")
-        print("DEBUG: --- FIN DE send_documents ---")
+        
+        #print("✔ Servidor limpio: Archivos temporales eliminados.")
+        #print("DEBUG: --- FIN DE send_documents ---")
 
 def get_suggested_emails(user_id):
     connection = None
