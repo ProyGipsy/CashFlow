@@ -164,6 +164,14 @@ from availability import (
     get_accounts_by_bank_and_entity,
 )
 
+from purchases import (
+    get_purchases_list,
+    add_beneficiary,
+    update_beneficiary,
+    get_beneficiaries_list,
+
+)
+
 app = Flask(__name__)
 app.register_blueprint(reports_bp)
 
@@ -2850,7 +2858,7 @@ def updateTransaction(transaction_id):
         }), 500
 
 @app.route('/availability/entities/<int:entity_id>/banks', methods=['GET'])
-def get_entity_banks(entity_id):
+def getEntityBanks(entity_id):
     """
     Retorna los bancos asociados a una entidad para llenar la cascada del frontend.
     """
@@ -2862,6 +2870,85 @@ def get_entity_banks(entity_id):
         print(f"Error en endpoint get_entity_banks: {e}")
         return jsonify({
             'error': 'Error interno del servidor al obtener los bancos',
+            'details': str(e)
+        }), 500
+
+@app.route('/purchases/getPurchases', methods=['GET'])
+def getPurchases():
+    try:
+        purchases = get_purchases_list()
+        return jsonify(purchases), 200 
+
+    except Exception as e:
+        print(f"Error en endpoint getPurchases: {e}")
+        return jsonify({
+            'error': 'Error interno del servidor al obtener las compras',
+            'details': str(e)
+        }), 500
+
+@app.route('/purchases/getBeneficiaries', methods=['GET'])
+def getBeneficiaries():
+    try:
+        beneficiaries = get_beneficiaries_list()
+        return jsonify(beneficiaries), 200
+
+    except Exception as e:
+        print(f"Error en endpoint get_beneficiaries: {e}")
+        return jsonify({
+            'error': 'Error interno del servidor al obtener los beneficiarios',
+            'details': str(e)
+        }), 500
+
+@app.route('/purchases/addBeneficiaries', methods=['POST'])
+def addBeneficiary():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': 'No se recibieron datos para la creación del beneficiario'}), 400
+
+    try:
+        beneficiary_id = add_beneficiary(data)
+
+        if beneficiary_id:
+            return jsonify({
+                'message': 'Beneficiario creado exitosamente',
+                'new_id': beneficiary_id
+            }), 201
+        else:
+            return jsonify({
+                'error': 'No se pudo crear el beneficiario'
+            }), 500
+
+    except Exception as e:
+        print(f"Error en endpoint add_beneficiary: {e}")
+        return jsonify({
+            'error': 'Error del servidor al crear el beneficiario',
+            'details': str(e)
+        }), 500
+
+@app.route('/purchases/updateBeneficiaries/<int:beneficiary_id>', methods=['PUT'])
+def updateBeneficiary(beneficiary_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': 'No se recibieron datos para la actualización del beneficiario'}), 400
+
+    try:
+        success = update_beneficiary(beneficiary_id, data)
+
+        if success:
+            return jsonify({
+                'message': 'Beneficiario actualizado exitosamente'
+            }), 200
+        else:
+            return jsonify({
+                'error': 'No se pudo actualizar el beneficiario'
+            }), 404
+
+    except Exception as e:
+        print(f"Error en endpoint update_beneficiary: {e}")
+        return jsonify({
+            'error': 'Error del servidor al actualizar el beneficiario',
             'details': str(e)
         }), 500
 
