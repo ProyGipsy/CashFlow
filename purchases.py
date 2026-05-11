@@ -22,6 +22,94 @@ pool = PooledDB(
     database = os.environ.get('DB_NAME')
 )
 
+def add_purchase(data):
+    connection = None
+    cursor = None
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor()
+
+        # Completamos a 20 dígitos si es necesario por reglas de la BD
+        account_padded = str(data['account']).zfill(20)
+
+        # ELIMINADO: BolivarsAmount de la lista de columnas y un %s de los valores
+        sql = """
+            INSERT INTO Exchange.CurrencyPurchase 
+            (PurchaseDate, EntityID, BankID, AccountNumber, DollarsPurchased, ExchangeRate, Observations, CreatedAt, UpdatedAt)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, GETDATE(), GETDATE());
+
+            SELECT SCOPE_IDENTITY();
+        """
+        
+        # ELIMINADO: data['bolivares'] de la tupla de ejecución
+        cursor.execute(sql, (
+            data['date'], 
+            data['entityId'], 
+            data['bankId'], 
+            account_padded, 
+            data['dollarsBought'], 
+            data['exchangeRate'], 
+            data['observations']
+        ))
+        
+        result = cursor.fetchone()
+        new_id = result[0] if result else None
+        connection.commit()
+        return new_id
+
+    except Exception as e:
+        if connection: connection.rollback()
+        raise e
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+
+def update_purchase(purchase_id, data):
+    connection = None
+    cursor = None
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor()
+        
+        account_padded = str(data['account']).zfill(20)
+
+        # ELIMINADO: BolivarsAmount = %s del bloque SET
+        sql = """
+            UPDATE Exchange.CurrencyPurchase
+            SET PurchaseDate = %s,
+                EntityID = %s,
+                BankID = %s,
+                AccountNumber = %s,
+                DollarsPurchased = %s,
+                ExchangeRate = %s,
+                Observations = %s,
+                UpdatedAt = GETDATE()
+            WHERE CurrencyPurchaseID = %s
+        """
+        
+        # ELIMINADO: data['bolivares'] de la tupla de ejecución
+        cursor.execute(sql, (
+            data['date'], 
+            data['entityId'], 
+            data['bankId'], 
+            account_padded, 
+            data['dollarsBought'], 
+            data['exchangeRate'], 
+            data['observations'], 
+            purchase_id
+        ))
+        
+        connection.commit()
+        return cursor.rowcount > 0
+
+    except Exception as e:
+        if connection: connection.rollback()
+        raise e
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
 def get_purchases_list():
     connection = None
     cursor = None

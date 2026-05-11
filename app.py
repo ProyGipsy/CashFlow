@@ -165,6 +165,8 @@ from availability import (
 )
 
 from purchases import (
+    add_purchase,
+    update_purchase,
     get_purchases_list,
     add_beneficiary,
     update_beneficiary,
@@ -2886,6 +2888,27 @@ def getPurchases():
             'details': str(e)
         }), 500
 
+@app.route('/purchases/addPurchase', methods=['POST'])
+def addPurchaseEndpoint():
+    data = request.get_json()
+    try:
+        new_id = add_purchase(data)
+        return jsonify({'message': 'Compra registrada', 'new_id': new_id}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/purchases/updatePurchase/<int:purchase_id>', methods=['PUT'])
+def updatePurchaseEndpoint(purchase_id):
+    data = request.get_json()
+    try:
+        success = update_purchase(purchase_id, data)
+        if success:
+            return jsonify({'message': 'Compra actualizada'}), 200
+        else:
+            return jsonify({'error': 'Compra no encontrada'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
 @app.route('/purchases/getBeneficiaries', methods=['GET'])
 def getBeneficiaries():
     try:
