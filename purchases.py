@@ -159,6 +159,12 @@ def get_purchases_list():
         if cursor: cursor.close()
         if connection: connection.close()
 
+def get_purchase_settlements_list(): pass
+
+def add_purchase_settlement(data): pass
+
+def update_purchase_settlement(settlement_id, data): pass
+
 def get_beneficiaries_list():
     connection = None
     cursor = None
