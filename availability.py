@@ -212,7 +212,7 @@ def get_transit_transactions():
             INNER JOIN AccountBalance.Entity E ON T.EntityID = E.EntityID
             INNER JOIN AccountBalance.TransitStatus S ON T.TransitStatusID = S.TransitStatusID
         ORDER BY 
-            T.TransactionTime DESC
+            T.TransitTransactionID DESC
         """
         cursor.execute(sql)
         

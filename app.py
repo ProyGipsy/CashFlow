@@ -171,7 +171,9 @@ from purchases import (
     add_beneficiary,
     update_beneficiary,
     get_beneficiaries_list,
-
+    add_purchase_settlement,
+    update_purchase_settlement,
+    get_purchase_settlements_list,
 )
 
 app = Flask(__name__)
@@ -181,7 +183,7 @@ app.register_blueprint(reports_bp)
 react_origin = os.environ.get('VITE_FRONT_API_URL_PROD', 'http://localhost:5173')
 CORS(app, resources={r"/*": {"origins": react_origin}}, supports_credentials=True)
 
-# Configuración de cookies para el Cross-site de Documentos (React)
+# Configuración de cookies para el Cross-site de React
 app.config["SESSION_COOKIE_SAMESITE"] = 'None'
 app.config["SESSION_COOKIE_SECURE"] = True
 
@@ -2889,7 +2891,7 @@ def getPurchases():
         }), 500
 
 @app.route('/purchases/addPurchase', methods=['POST'])
-def addPurchaseEndpoint():
+def addPurchase():
     data = request.get_json()
     try:
         new_id = add_purchase(data)
@@ -2898,7 +2900,7 @@ def addPurchaseEndpoint():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/purchases/updatePurchase/<int:purchase_id>', methods=['PUT'])
-def updatePurchaseEndpoint(purchase_id):
+def updatePurchase(purchase_id):
     data = request.get_json()
     try:
         success = update_purchase(purchase_id, data)
@@ -2909,6 +2911,45 @@ def updatePurchaseEndpoint(purchase_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
+@app.route('/purchases/getPurchaseSettlements', methods=['GET'])
+def getPurchaseSettlements():
+    try:
+        settlements = get_purchase_settlements_list()
+        return jsonify(settlements), 200
+    
+    except Exception as e:
+        return jsonify({
+            'error': 'Error interno del servidor al obtener las recepciones de compra.',
+            'details': str(e)
+        }), 500
+
+@app.route('/purchases/addPurchaseSettlement', methods=['POST'])
+def addPurchaseSettlement():
+    data = request.get_json()
+    try:
+        new_id = add_purchase_settlement(data)
+        return jsonify({'message': 'Recepción de compra registrada', 'new_id': new_id}), 201
+    except Exception as e:
+        return jsonify({
+            'error': 'Error interno del servidor al registrar la recepción de compra.',
+            'details': str(e)
+        }), 500
+    
+@app.route('/purchases/updatePurchaseSettlement/<int:settlement_id>', methods=['PUT'])
+def updatePurchaseSettlement(settlement_id):
+    data = request.get_json()
+    try:
+        success = update_purchase_settlement(settlement_id, data)
+        if success:
+            return jsonify({'message': 'Recepción de compra actualizada'}), 200
+        else:
+            return jsonify({'error': 'Recepción de compra no encontrada'}), 404
+    except Exception as e:
+        return jsonify({
+            'error': 'Error interno del servidor al actualizar la recepción de compra.',
+            'details': str(e)
+        }), 500
+    
 @app.route('/purchases/getBeneficiaries', methods=['GET'])
 def getBeneficiaries():
     try:
@@ -2918,7 +2959,7 @@ def getBeneficiaries():
     except Exception as e:
         print(f"Error en endpoint get_beneficiaries: {e}")
         return jsonify({
-            'error': 'Error interno del servidor al obtener los beneficiarios',
+            'error': 'Error interno del servidor al obtener los beneficiarios.',
             'details': str(e)
         }), 500
 
