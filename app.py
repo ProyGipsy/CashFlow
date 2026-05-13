@@ -2725,7 +2725,7 @@ def transactionStatuses():
 @app.route('/availability/getBanks', methods=['GET'])
 def getBanks():
     try:
-        banks = get_banks()
+        banks = get_banks(mode="all")
 
         if not banks:
             return jsonify({
@@ -2950,6 +2950,28 @@ def updatePurchaseSettlement(settlement_id):
             'details': str(e)
         }), 500
     
+@app.route('/getBanksNational', methods=['GET'])
+def getBanksNational():
+    try:
+        banks = get_banks(mode="national")
+        return jsonify(banks), 200
+    except Exception as e:
+        return jsonify({
+            'error': 'Error interno del servidor al obtener los bancos nacionales',
+            'details': str(e)
+        }), 500
+
+@app.route('/getBanksInternational', methods=['GET'])
+def getBanksInternational():
+    try:
+        banks = get_banks(mode="international")
+        return jsonify(banks), 200
+    except Exception as e:
+        return jsonify({
+            'error': 'Error interno del servidor al obtener los bancos internacionales',
+            'details': str(e)
+        }), 500
+
 @app.route('/purchases/getBeneficiaries', methods=['GET'])
 def getBeneficiaries():
     try:

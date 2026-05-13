@@ -50,7 +50,7 @@ def get_transaction_statuses():
         if connection:
             connection.close()
 
-def get_banks():
+def get_banks(mode="all"):
     """
     Obtiene la lista de bancos disponibles.
     """
@@ -61,10 +61,28 @@ def get_banks():
         connection = pool.connection()
         cursor = connection.cursor(as_dict=True)
 
-        sql = """
-        SELECT BankID, BankName
-        FROM AccountBalance.Bank
-        """
+        if mode == "all":
+            sql = """
+            SELECT BankID, BankName
+            FROM AccountBalance.Bank
+            ORDER BY BankID
+            """
+        elif mode == "national":
+            sql = """
+            SELECT DISTINCT B.BankID, B.BankName
+            FROM AccountBalance.Bank B
+            JOIN AccountBalance.Account A ON B.BankID = A.BankID
+            WHERE A.CurrencyID = 1
+            ORDER BY B.BankID
+            """
+        elif mode == "international":
+            sql = """
+            SELECT DISTINCT B.BankID, B.BankName
+            FROM AccountBalance.Bank B
+            JOIN AccountBalance.Account A ON B.BankID = A.BankID
+            WHERE A.CurrencyID = 2
+            ORDER BY B.BankID
+            """
 
         cursor.execute(sql)
         banks = cursor.fetchall()

@@ -181,7 +181,10 @@ def get_beneficiaries_list():
                 BK.BankName AS bank,          -- Este es el nombre para la tabla
                 B.BankID AS bankId,           -- Este es el ID para la lógica
                 B.AccountNumber AS account,
-                B.Observations AS observations
+                B.Observations AS observations,
+                B.FiscalIdentifier as documentPrefix,
+                B.IdentificationNumber as documentNumber,
+                B.Email as email
             FROM Exchange.Beneficiary B
             LEFT JOIN AccountBalance.Bank BK ON B.BankID = BK.BankID
             ORDER BY B.BeneficiaryID DESC
@@ -212,12 +215,12 @@ def add_beneficiary(data):
         cursor = connection.cursor()
 
         sql = """
-            INSERT INTO Exchange.Beneficiary (BeneficiaryName, BankID, AccountNumber, Observations, isActive, CreatedAt, UpdatedAt)
-            VALUES (%s, %s, %s, %s, 1, GETDATE(), GETDATE());
+            INSERT INTO Exchange.Beneficiary (BeneficiaryName, BankID, AccountNumber, Observations, isActive, CreatedAt, UpdatedAt, FiscalIdentifier, IdentificationNumber, Email)
+            VALUES (%s, %s, %s, %s, 1, GETDATE(), GETDATE(), %s, %s, %s);
 
             SELECT SCOPE_IDENTITY();
         """
-        cursor.execute(sql, (data['name'], data['bankId'], data['account'], data['observations']))
+        cursor.execute(sql, (data['name'], data['bankId'], data['account'], data['observations'], data['documentPrefix'], data['documentNumber'], data['email']))
         new_id = cursor.fetchone()[0]
         
         connection.commit()
@@ -251,10 +254,13 @@ def update_beneficiary(beneficiary_id, data):
                 BankID = %s,
                 AccountNumber = %s,
                 Observations = %s,
-                UpdatedAt = GETDATE()
+                UpdatedAt = GETDATE(),
+                FiscalIdentifier = %s,
+                IdentificationNumber = %s,
+                Email = %s
             WHERE BeneficiaryID = %s
         """
-        cursor.execute(sql, (data['name'], data['bankId'], data['account'], data['observations'], beneficiary_id))
+        cursor.execute(sql, (data['name'], data['bankId'], data['account'], data['observations'], data['documentPrefix'], data['documentNumber'], data['email'], beneficiary_id))
         connection.commit()
 
         if cursor.rowcount > 0:
