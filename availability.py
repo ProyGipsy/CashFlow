@@ -99,7 +99,7 @@ def get_banks(mode="all"):
         if connection:
             connection.close()
 
-def get_accounts_by_bank_and_entity(bank_id, entity_id):
+def get_accounts_by_bank_and_entity(bank_id, entity_id, currency_id=None):
     """
     Obtiene las cuentas asociadas a un banco específico.
     """
@@ -110,14 +110,22 @@ def get_accounts_by_bank_and_entity(bank_id, entity_id):
         connection = pool.connection()
         cursor = connection.cursor(as_dict=True)
 
-        sql = """
-        SELECT AccountID, AccountNumber, AccountName, CurrencyID
-        FROM AccountBalance.Account
-        WHERE BankID = %s AND EntityID = %s AND IsActive = 1
-        ORDER BY AccountName ASC
-        """
+        if currency_id:
+            sql = """
+            SELECT AccountID, AccountNumber, AccountName, CurrencyID
+            FROM AccountBalance.Account
+            WHERE BankID = %s AND EntityID = %s AND CurrencyID = %s AND IsActive = 1
+            ORDER BY AccountName ASC    
+            """
+        else:
+            sql = """
+            SELECT AccountID, AccountNumber, AccountName, CurrencyID
+            FROM AccountBalance.Account
+            WHERE BankID = %s AND EntityID = %s AND IsActive = 1
+            ORDER BY AccountName ASC
+            """
 
-        cursor.execute(sql, (bank_id, entity_id))
+        cursor.execute(sql, (bank_id, entity_id, currency_id) if currency_id else (bank_id, entity_id))
         accounts = cursor.fetchall()
 
         #print(f"Cuentas obtenidas para el banco {bank_id}: {accounts}")

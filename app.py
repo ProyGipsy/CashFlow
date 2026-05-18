@@ -166,14 +166,15 @@ from availability import (
 
 from purchases import (
     add_purchase,
+    get_reception_history,
     update_purchase,
     get_purchases_list,
     add_beneficiary,
     update_beneficiary,
     get_beneficiaries_list,
-    add_purchase_settlement,
-    update_purchase_settlement,
-    get_purchase_settlements_list,
+    get_entities_list,
+    get_banks_by_entity_and_currency,
+    validate_purchase,
 )
 
 app = Flask(__name__)
@@ -253,7 +254,7 @@ def login():
     return render_template('indexLogin.html')
 
 @app.route('/documents/getUser', methods=['GET'])
-def get_current_user():
+def getCurrentUser():
     auth_header = request.headers.get('Authorization')
     user_id = None
 
@@ -2911,44 +2912,14 @@ def updatePurchase(purchase_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
-@app.route('/purchases/getPurchaseSettlements', methods=['GET'])
-def getPurchaseSettlements():
+@app.route('/purchases/getSettlements', methods=['GET'])
+def get_settlements_route():
     try:
-        settlements = get_purchase_settlements_list()
+        settlements = get_reception_history()
         return jsonify(settlements), 200
-    
     except Exception as e:
-        return jsonify({
-            'error': 'Error interno del servidor al obtener las recepciones de compra.',
-            'details': str(e)
-        }), 500
-
-@app.route('/purchases/addPurchaseSettlement', methods=['POST'])
-def addPurchaseSettlement():
-    data = request.get_json()
-    try:
-        new_id = add_purchase_settlement(data)
-        return jsonify({'message': 'Recepción de compra registrada', 'new_id': new_id}), 201
-    except Exception as e:
-        return jsonify({
-            'error': 'Error interno del servidor al registrar la recepción de compra.',
-            'details': str(e)
-        }), 500
-    
-@app.route('/purchases/updatePurchaseSettlement/<int:settlement_id>', methods=['PUT'])
-def updatePurchaseSettlement(settlement_id):
-    data = request.get_json()
-    try:
-        success = update_purchase_settlement(settlement_id, data)
-        if success:
-            return jsonify({'message': 'Recepción de compra actualizada'}), 200
-        else:
-            return jsonify({'error': 'Recepción de compra no encontrada'}), 404
-    except Exception as e:
-        return jsonify({
-            'error': 'Error interno del servidor al actualizar la recepción de compra.',
-            'details': str(e)
-        }), 500
+        print(f"Error obteniendo historial de liquidaciones: {e}")
+        return jsonify({'error': str(e)}), 500
     
 @app.route('/getBanksNational', methods=['GET'])
 def getBanksNational():
@@ -3037,6 +3008,103 @@ def updateBeneficiary(beneficiary_id):
             'error': 'Error del servidor al actualizar el beneficiario',
             'details': str(e)
         }), 500
+
+@app.route('/purchases/getNationalEntities', methods=['GET'])
+def getNationalEntities():
+    try:
+        entities = get_entities_list(currency_mode=1)
+        return jsonify(entities), 200
+    except Exception as e:
+        return jsonify({
+            'error': 'Error interno del servidor al obtener las entidades nacionales',
+            'details': str(e)
+        }), 500
+
+@app.route('/purchases/getInternationalEntities', methods=['GET'])
+def getInternationalEntities():
+    try:
+        entities = get_entities_list(currency_mode=2)
+        return jsonify(entities), 200
+    except Exception as e:
+        return jsonify({
+            'error': 'Error interno del servidor al obtener las entidades internacionales',
+            'details': str(e)
+        }), 500
+    
+@app.route('/purchases/getBanksByNationalEntity/<int:entity_id>', methods=['GET'])
+def getBanksByEntityAndCurrencyEndpoint(entity_id):
+    try:
+        # Extraemos el currency_id de la URL. Si no se envía, por defecto buscará 1.
+        currency_id = request.args.get('currency_id', default=1, type=int)
+        
+        banks = get_banks_by_entity_and_currency(entity_id, currency_id)
+        return jsonify(banks), 200
+
+    except Exception as e:
+        print(f"Error obteniendo bancos para la entidad {entity_id}: {e}")
+        return jsonify({'error': 'Error interno del servidor'}), 500
+    
+@app.route('/purchases/getOriginAccounts/<int:bank_id>', methods=['GET'])
+def getOriginAccounts(bank_id):
+
+    entity_id = request.args.get('entity_id')
+    try:
+        accounts = get_accounts_by_bank_and_entity(bank_id, entity_id, currency_id=1)
+
+        if accounts is None:
+            return jsonify({
+                'error': 'No se encontraron cuentas para el banco especificado',
+            }), 404
+
+        return jsonify(accounts), 200
+
+    except Exception as e:
+        print(f"Error en endpoint getOriginAccounts: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+    
+@app.route('/purchases/getBanksByInternationalEntity/<int:entity_id>', methods=['GET'])
+def getBanksByInternationalEntityEndpoint(entity_id):
+    try:
+        # Extraemos el currency_id de la URL. Si no se envía, por defecto buscará 2.
+        currency_id = request.args.get('currency_id', default=2, type=int)
+        
+        banks = get_banks_by_entity_and_currency(entity_id, currency_id)
+        return jsonify(banks), 200
+
+    except Exception as e:
+        print(f"Error obteniendo bancos para la entidad internacional {entity_id}: {e}")
+        return jsonify({'error': 'Error interno del servidor'}), 500
+    
+@app.route('/purchases/getDestinationAccounts/<int:bank_id>', methods=['GET'])
+def getDestinationAccounts(bank_id):
+    entity_id = request.args.get('entity_id')
+    try:
+        accounts = get_accounts_by_bank_and_entity(bank_id, entity_id, currency_id=2)
+
+        if accounts is None:
+            return jsonify({
+                'error': 'No se encontraron cuentas para el banco especificado',
+            }), 404
+
+        return jsonify(accounts), 200
+
+    except Exception as e:
+        print(f"Error en endpoint getDestinationAccounts: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@app.route('/purchases/validatePurchase/<int:purchase_id>', methods=['POST'])
+def validate_purchase_route(purchase_id):
+    try:
+        data = request.json
+        # Asumiendo que obtienes el user_id del token JWT en tu aplicación
+        # Si usas flask_jwt_extended, esto sería: user_id = get_jwt_identity()
+        user_id = data.get('validatedBy', 'Sistema') 
+        
+        validate_purchase(purchase_id, data, user_id)
+        return jsonify({"message": "Compra validada exitosamente"}), 201
+    except Exception as e:
+        print(f"Error en validación: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
    app.run()
