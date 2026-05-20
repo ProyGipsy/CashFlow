@@ -668,7 +668,6 @@ def create_send_notification_html(data):
     return html_content
 
 # --- TEMPLATES PARA EL MÓDULO DE COMPRA DE DIVISAS ---
-
 def create_registered_purchase_html(data, purchase_id):
     """Genera el HTML para una nueva compra registrada usando el estilo base de Gipsy."""
     html_content = f"""
