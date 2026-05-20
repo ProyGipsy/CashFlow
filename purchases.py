@@ -82,7 +82,7 @@ def add_purchase(data):
                 B.BankName,
                 A.AccountNumber
             FROM [Exchange].[Beneficiary] BEN
-            INNER JOIN [AccountBalance].[Banks] B ON B.BankID = %s
+            INNER JOIN [AccountBalance].[Bank] B ON B.BankID = %s
             INNER JOIN [AccountBalance].[Account] A ON A.AccountID = %s
             WHERE BEN.BeneficiaryID = %s
         """
