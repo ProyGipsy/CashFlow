@@ -9,6 +9,11 @@ from datetime import datetime
 from collections import Counter
 from dbutils.pooled_db import PooledDB
 
+from emailScript import  (
+    send_purchase_registration_email,
+    send_purchase_validation_email,
+)
+
 # Configuración del pool de conexiones
 pool = PooledDB(
     creator=pymssql,
@@ -68,7 +73,57 @@ def add_purchase(data):
         
         result = cursor.fetchone()
         new_id = result[0] if result else None
+        
+        # 2. OBTENER INFORMACIÓN RELACIONAL Y TEXTOS LIMPIOS PARA EL CORREO
+        sql_info = """
+            SELECT 
+                BEN.BeneficiaryName,
+                BEN.Email,
+                B.BankName,
+                A.AccountNumber
+            FROM [Exchange].[Beneficiary] BEN
+            INNER JOIN [AccountBalance].[Banks] B ON B.BankID = %s
+            INNER JOIN [AccountBalance].[Account] A ON A.AccountID = %s
+            WHERE BEN.BeneficiaryID = %s
+        """
+        cursor.execute(sql_info, (data['destBankId'], data['destAccountId'], data['beneficiaryId']))
+        info_result = cursor.fetchone()
+
+        # Confirmamos la transacción en la Base de Datos (Los datos ya están guardados)
         connection.commit()
+
+        # 3. CONSTRUCCIÓN DE PAYLOAD Y ENVIAR NOTIFICACIÓN AL PROVEEDOR
+        if info_result and new_id:
+            provider_name, provider_email, dest_bank_name, dest_account_num = info_result
+            
+            if provider_email:
+                bolivares = float(data['dollarsBought']) * float(data['exchangeRate'])
+                
+                # Estructuramos el payload formateando los números de manera atractiva
+                email_payload = {
+                    "provider_name": provider_name,
+                    "purchase_date": data['date'],
+                    "dollars_bought": f"{float(data['dollarsBought']):,.2f}",
+                    "exchange_rate": f"{float(data['exchangeRate']):,.2f}",
+                    "bolivares_amount": f"{bolivares:,.2f}",
+                    "dest_bank": dest_bank_name,
+                    "dest_account": dest_account_num,
+                    "observations": data.get('observations', 'Ninguna.')
+                }
+                
+                # Disparamos el envío del correo de registro de forma segura
+                try:
+                    send_purchase_registration_email(
+                        provider_email=provider_email,
+                        email_data=email_payload,
+                        purchase_id=int(new_id)
+                    )
+                except Exception as mail_err:
+                    # Si falla el servidor de correo, capturamos el error para no frustrar la operación web
+                    print(f"Advertencia: Compra #{new_id} registrada, pero falló el envío del correo: {mail_err}")
+            else:
+                print(f"Aviso: El proveedor '{provider_name}' no tiene una dirección de correo configurada.")
+
         return new_id
 
     except Exception as e:
@@ -77,7 +132,6 @@ def add_purchase(data):
     finally:
         if cursor: cursor.close()
         if connection: connection.close()
-
 
 def update_purchase(purchase_id, data):
     connection = None
@@ -230,6 +284,7 @@ def get_reception_history():
                 E.EntityName AS receivingCompany,
                 S.ReceivingBank AS receivingBank,
                 S.ReceivingAccountNumber AS account,
+                P.DollarsPurchased AS amountExpected,
                 S.ReceivedAmountUSD AS amountReceived,
                 S.SettlementStatus AS status,
                 S.ReferenceNumber AS referenceNumber,
@@ -435,14 +490,14 @@ def validate_purchase(purchase_id, data, user_id):
         connection = pool.connection()
         cursor = connection.cursor()
 
-        # 1. CONTROL DE SEGURIDAD: Evita doble validación en simultáneo
+        # 1. CONTROL DE SEGURIDAD (Doble validación)
         check_sql = "SELECT COUNT(1) FROM [Exchange].[CurrencyPurchaseSettlement] WHERE [CurrencyPurchaseID] = %s"
         cursor.execute(check_sql, (purchase_id,))
-
         if cursor.fetchone()[0] > 0:
             raise Exception("Esta compra ya ha sido validada previamente.")
 
-        sql = """
+        # 2. INSERTANDO EN LA TABLA DE LIQUIDACIONES
+        sql_insert = """
             INSERT INTO [Exchange].[CurrencyPurchaseSettlement]
             (
                 [CurrencyPurchaseID], [ReceptionDate], [ReceivedAmountUSD],
@@ -452,21 +507,56 @@ def validate_purchase(purchase_id, data, user_id):
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, GETDATE(), %s, %s, GETDATE(), GETDATE())
         """
-        
-        cursor.execute(sql, (
-            purchase_id,
-            data['receptionDate'],
-            data['receivedAmountUSD'],
-            data['receivedExchangeRate'],
-            data['referenceNumber'],
-            data['receivingBank'],       
-            data['receivingAccount'],    
-            user_id,                     
-            data['settlementStatus'],    
-            data['observations']
+        cursor.execute(sql_insert, (
+            purchase_id, data['receptionDate'], data['receivedAmountUSD'],
+            data['receivedExchangeRate'], data['referenceNumber'], data['receivingBank'],       
+            data['receivingAccount'], user_id, data['settlementStatus'], data['observations']
         ))
         
+        # 3. OBTENER INFORMACIÓN DEL PROVEEDOR Y EL MONTO ESPERADO DE LA COMPRA
+        sql_provider_info = """
+            SELECT 
+                BEN.BeneficiaryName,
+                BEN.Email,
+                P.DollarsPurchased
+            FROM [Exchange].[CurrencyPurchase] P
+            INNER JOIN [Exchange].[Beneficiary] BEN ON P.BeneficiaryID = BEN.BeneficiaryID
+            WHERE P.CurrencyPurchaseID = %s
+        """
+        cursor.execute(sql_provider_info, (purchase_id,))
+        provider_result = cursor.fetchone()
+
+        # Confirmamos la transacción en Base de Datos
         connection.commit()
+
+        # 4. CONSTRUCCIÓN DE PAYLOAD Y ENVIAR NOTIFICACIÓN
+        if provider_result:
+            provider_name, provider_email, dollars_purchased = provider_result
+            
+            if provider_email:
+                # Preparamos los datos con el formateo contable
+                email_payload = {
+                    "provider_name": provider_name,
+                    "reception_date": data['receptionDate'],
+                    "status": data['settlementStatus'],
+                    "expected_amount": f"{float(dollars_purchased):,.2f}",
+                    "received_amount": f"{float(data['receivedAmountUSD']):,.2f}",
+                    "receiving_bank": data['receivingBank'],
+                    "reference_number": data['referenceNumber'],
+                    "observations": data.get('observations', 'Ninguna.')
+                }
+                
+                try:
+                    send_purchase_validation_email(
+                        provider_email=provider_email,
+                        email_data=email_payload,
+                        purchase_id=purchase_id
+                    )
+                except Exception as mail_err:
+                    print(f"Advertencia: Compra liquidada pero falló el envío de correo: {mail_err}")
+            else:
+                print(f"Aviso: El proveedor '{provider_name}' no posee un correo electrónico registrado.")
+
         return True
 
     except Exception as e:

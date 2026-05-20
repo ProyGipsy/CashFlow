@@ -422,3 +422,219 @@ def get_banks_by_entity(entity_id):
             cursor.close()
         if connection:
             connection.close()
+
+def get_national_info_by_bank():
+    """
+    Obtiene información agregada para el reporte de disponibilidad nacional.
+    """
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        """
+        Disponibilidad real agrupada por banco en bolivares
+        """
+        sql = """
+        SELECT 
+            B.BankName AS banco,
+            ISNULL(SUM(A.LedgerBalance), 0) AS saldo,
+            ISNULL(SUM(A.TransitAmount), 0) AS transito,
+            ISNULL(SUM(A.AvailableBalance), 0) AS disponible
+        FROM AccountBalance.Account A
+        JOIN AccountBalance.Bank B ON A.BankID = B.BankID
+        WHERE A.CurrencyID = 1
+        GROUP BY B.BankName
+        ORDER BY B.BankName;
+        """
+
+        cursor.execute(sql)
+        national_data = cursor.fetchall()
+        return national_data
+    
+    except pymssql.Error as db_err:
+        print(f"Error de BD/Driver al obtener la información nacional: {db_err}")
+        return []
+    
+    except Exception as e:
+        print(f"Error al obtener la información nacional: {e}")
+        return []
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def get_national_info_by_entity():
+    """
+    Obtiene información agregada para el reporte de disponibilidad nacional agrupada por entidad.
+    """
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT 
+            E.EntityName AS empresa,
+            ISNULL(SUM(A.LedgerBalance), 0) AS saldo,
+            ISNULL(SUM(A.TransitAmount), 0) AS transito,
+            ISNULL(SUM(A.AvailableBalance), 0) AS disponible
+        FROM AccountBalance.Account A
+        JOIN AccountBalance.Entity E ON A.EntityID = E.EntityID
+        WHERE A.CurrencyID = 1
+        GROUP BY E.EntityName
+        ORDER BY E.EntityName;
+        """
+
+        cursor.execute(sql)
+        national_data = cursor.fetchall()
+        return national_data
+    
+    except pymssql.Error as db_err:
+        print(f"Error de BD/Driver al obtener la información nacional por entidad: {db_err}")
+        return []
+    
+    except Exception as e:
+        print(f"Error al obtener la información nacional por entidad: {e}")
+        return []
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def get_custody_info_by_bank():
+    """
+    Obtiene información de custodia agrupada por banco.
+    """
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT 
+            B.BankName AS banco,
+            ISNULL(SUM(A.LedgerBalance), 0) AS saldo,
+            ISNULL(SUM(A.TransitAmount), 0) AS transito,
+            ISNULL(SUM(A.AvailableBalance), 0) AS disponible
+        FROM AccountBalance.Account A
+        INNER JOIN AccountBalance.Bank B ON A.BankID = B.BankID
+        WHERE A.CurrencyID = 2 
+            AND A.BankID IN (
+                SELECT DISTINCT BankID 
+                FROM AccountBalance.Account 
+                WHERE CurrencyID = 1
+            )
+        GROUP BY B.BankName
+        ORDER BY B.BankName;
+        """
+
+        cursor.execute(sql)
+        custody_data = cursor.fetchall()
+        return custody_data
+
+    except pymssql.Error as db_err:
+        print(f"Error de BD/Driver al obtener la información de custodia: {db_err}")
+        return []
+
+    except Exception as e:
+        print(f"Error al obtener la información de custodia: {e}")
+        return []
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def get_custody_info_by_entity():
+    """
+    Obtiene información de custodia agrupada por entidad.
+    """
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        SELECT 
+            E.EntityName AS empresa,
+            ISNULL(SUM(A.LedgerBalance), 0) AS saldo,
+            ISNULL(SUM(A.TransitAmount), 0) AS transito,
+            ISNULL(SUM(A.AvailableBalance), 0) AS disponible
+        FROM AccountBalance.Account A
+        INNER JOIN AccountBalance.Entity E ON A.EntityID = E.EntityID
+        WHERE A.CurrencyID = 2 
+            AND A.BankID IN (
+                SELECT DISTINCT BankID 
+                FROM AccountBalance.Account 
+                WHERE CurrencyID = 1
+            )
+        GROUP BY E.EntityName
+        ORDER BY E.EntityName;
+        """
+
+        cursor.execute(sql)
+        custody_data = cursor.fetchall()
+        return custody_data
+
+    except pymssql.Error as db_err:
+        print(f"Error de BD/Driver al obtener la información de custodia por entidad: {db_err}")
+        return []
+
+    except Exception as e:
+        print(f"Error al obtener la información de custodia por entidad: {e}")
+        return []
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def get_usa_info_by_bank():
+    """
+    Obtiene información agregada para el reporte de disponibilidad en USA agrupada por banco.
+    """
+    connection = None
+    cursor = None
+
+    try:
+        connection = pool.connection()
+        cursor = connection.cursor(as_dict=True)
+
+        sql = """
+        """
+
+        cursor.execute(sql)
+        custody_data = cursor.fetchall()
+        return custody_data
+
+    except pymssql.Error as db_err:
+        print(f"Error de BD/Driver al obtener la información de cuenta USA por banco: {db_err}")
+        return []
+
+    except Exception as e:
+        print(f"Error al obtener la información de cuenta USA por banco: {e}")
+        return []
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def get_usa_info_by_entity():
+    pass

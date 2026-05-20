@@ -154,8 +154,12 @@ from documents import (
 
 from availability import (
     get_banks,
+    get_custody_info_by_bank,
+    get_custody_info_by_entity,
     get_entities,
     get_currencies,
+    get_national_info_by_bank,
+    get_national_info_by_entity,
     update_transaction,
     create_transaction,
     get_banks_by_entity,
@@ -2878,6 +2882,54 @@ def getEntityBanks(entity_id):
             'details': str(e)
         }), 500
 
+@app.route('/availability/reports/getNationalInfoByBank', methods=['GET'])
+def getNationalInfoByBank():
+    try:
+        info = get_national_info_by_bank()
+        return jsonify(info), 200
+    except Exception as e:
+        print(f"Error en endpoint getNationalInfoByBank: {e}")
+        return jsonify({
+            'error': 'Error interno del servidor al obtener la información nacional',
+            'details': str(e)
+        }), 500
+
+@app.route('/availability/reports/getNationalInfoByEntity', methods=['GET'])
+def getNationalInfoByEntity():
+    try:
+        info = get_national_info_by_entity()
+        return jsonify(info), 200
+    except Exception as e:
+        print(f"Error en endpoint getNationalInfoByEntity: {e}")
+        return jsonify({
+            'error': 'Error interno del servidor al obtener la información nacional',
+            'details': str(e)
+        }), 500
+
+@app.route('/availability/reports/getCustodyInfoByBank', methods=['GET'])
+def getCustodyInfoByBank():
+    try:
+        info = get_custody_info_by_bank()
+        return jsonify(info), 200
+    except Exception as e:
+        print(f"Error en endpoint getCustodyInfoByBank: {e}")
+        return jsonify({
+            'error': 'Error interno del servidor al obtener la información de custodia',
+            'details': str(e)
+        }), 500
+
+@app.route('/availability/reports/getCustodyInfoByEntity', methods=['GET'])
+def getCustodyInfoByEntity():
+    try:
+        info = get_custody_info_by_entity()
+        return jsonify(info), 200
+    except Exception as e:
+        print(f"Error en endpoint getCustodyInfoByEntity: {e}")
+        return jsonify({
+            'error': 'Error interno del servidor al obtener la información de custodia',
+            'details': str(e)
+        }), 500
+    
 @app.route('/purchases/getPurchases', methods=['GET'])
 def getPurchases():
     try:
