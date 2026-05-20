@@ -667,9 +667,149 @@ def create_send_notification_html(data):
     """
     return html_content
 
+# --- TEMPLATES PARA EL MÓDULO DE COMPRA DE DIVISAS ---
+def create_registered_purchase_html(data, purchase_id):
+    """Genera el HTML para una nueva compra registrada usando el estilo base de Gipsy."""
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8"/>
+        <style>{get_base_email_style()}</style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <div class="brand-container">
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img" height="40" style="height: 40px; width: auto; display: block; margin-left: auto !important; margin-right: auto !important; margin-bottom: 10px; padding-right: 40px !important; border: 0;">
+                    <span align="center" style="font-weight: bold; color: #421d83; text-transform: uppercase; text-align: center; margin-left: auto !important; margin-right: auto !important;" class="brand-name">Grupo Gipsy</span>
+                </div>
+                <h2>Notificación de Nueva Operación</h2>
+            </div>
+            <div class="body-content">
+                <p><strong>Hola, {data.get("provider_name", "Proveedor")}.</strong></p>
+                <p>Le notificamos que se ha registrado exitosamente una nueva operación de compra de divisas (Orden #{purchase_id}). A continuación, los detalles acordados:</p>
+                
+                <table class="data-table">
+                    <tr>
+                        <th>Fecha de Operación</th>
+                        <td>{data.get("purchase_date", "")}</td>
+                    </tr>
+                    <tr>
+                        <th>Monto Acordado</th>
+                        <td style="color: #2e7d32; font-weight: bold;">${data.get("dollars_bought", "0.00")} USD</td>
+                    </tr>
+                    <tr>
+                        <th>Tasa de Cambio</th>
+                        <td>Bs. {data.get("exchange_rate", "0.00")}</td>
+                    </tr>
+                    <tr>
+                        <th>Contravalor total</th>
+                        <td style="font-weight: bold;">Bs. {data.get("bolivares_amount", "0.00")}</td>
+                    </tr>
+                    <tr>
+                        <th>Banco Destino</th>
+                        <td>{data.get("dest_bank", "")}</td>
+                    </tr>
+                    <tr>
+                        <th>Cuenta Destino</th>
+                        <td>{data.get("dest_account", "")}</td>
+                    </tr>
+                </table>
+                <p class="message-body"><strong>Observaciones:</strong> {data.get("observations", "N/A")}</p>
+                <p>Quedamos a la espera del procesamiento correspondiente a las coordenadas bancarias indicadas.</p>
+            </div>
+            <div class="footer">
+                <p>Este es un correo automático generado por el sistema de tesorería, por favor no responda.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
+
+def create_validated_purchase_html(data, purchase_id):
+    """Genera el HTML para la liquidación validada usando el estilo base de Gipsy."""
+    status = data.get("status", "Completada")
+    status_color = "#2e7d32" if status == "Completada" else "#d84315" if status == "Parcial" else "#d32f2f"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8"/>
+        <style>{get_base_email_style()}</style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <div class="brand-container">
+                    <img src="cid:logo_gipsy" alt="Logo" class="logo-img" height="40" style="height: 40px; width: auto; display: block; margin-left: auto !important; margin-right: auto !important; margin-bottom: 10px; padding-right: 40px !important; border: 0;">
+                    <span align="center" style="font-weight: bold; color: #421d83; text-transform: uppercase; text-align: center; margin-left: auto !important; margin-right: auto !important;" class="brand-name">Grupo Gipsy</span>
+                </div>
+                <h2>Confirmación de Liquidación Exitosa</h2>
+            </div>
+            <div class="body-content">
+                <p><strong>Hola, {data.get("provider_name", "Proveedor")}.</strong></p>
+                <p>Le informamos que hemos validado la recepción de los fondos de la operación #{purchase_id}. A continuación, el detalle de la liquidación:</p>
+                
+                <table class="data-table">
+                    <tr>
+                        <th>Fecha de Recepción</th>
+                        <td>{data.get("reception_date", "")}</td>
+                    </tr>
+                    <tr>
+                        <th>Estatus final</th>
+                        <td><span style="color: white; background-color: {status_color}; padding: 3px 8px; border-radius: 10px; font-weight: bold; font-size: 0.85em;">{status}</span></td>
+                    </tr>
+                    <tr>
+                        <th>Monto Esperado</th>
+                        <td style="color: #757575; font-weight: bold;">${data.get("expected_amount", "0.00")} USD</td>
+                    </tr>
+                    <tr>
+                        <th>Monto Recibido</th>
+                        <td style="color: #2e7d32; font-weight: bold;">${data.get("received_amount", "0.00")} USD</td>
+                    </tr>
+                    <tr>
+                        <th>Banco Receptor</th>
+                        <td>{data.get("receiving_bank", "")}</td>
+                    </tr>
+                    <tr>
+                        <th>Número de Referencia</th>
+                        <td style="font-family: monospace; font-weight: bold;">{data.get("reference_number", "N/A")}</td>
+                    </tr>
+                </table>
+                <p class="message-body"><strong>Comentarios adicionales:</strong><br>{data.get("observations", "Ninguno.")}</p>
+                <p>Agradecemos su valiosa gestión y confianza.</p>
+            </div>
+            <div class="footer">
+                <p>Este es un correo automático generado por el sistema de tesorería, por favor no responda.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
+
+def send_purchase_registration_email(provider_email, email_data, purchase_id):
+    """Lee credenciales del entorno y envía la notificación de nueva compra."""
+    sender = os.environ.get("MAIL_USERNAME_DOCUMENTS")
+    password = os.environ.get("MAIL_PASSWORD_DOCUMENTS")
+    subject = f"Gipsy Compras - Nuevo Registro de Compra de Divisas #{purchase_id}"
+    body_html = create_registered_purchase_html(email_data, purchase_id)
+    
+    return send_email(subject, body_html, sender, password, [provider_email])
+
+def send_purchase_validation_email(provider_email, email_data, purchase_id):
+    """Lee credenciales del entorno y envía la confirmación de validación."""
+    sender = os.environ.get("MAIL_USERNAME_DOCUMENTS")
+    password = os.environ.get("MAIL_PASSWORD_DOCUMENTS")
+    subject = f"Gipsy Compras - Operación de Compra de Divisas #{purchase_id} Validada"
+    body_html = create_validated_purchase_html(email_data, purchase_id)
+    
+    return send_email(subject, body_html, sender, password, [provider_email])
 
 # --- MAIN - EJECUCIÓN DE PRUEBA ---
-
 if __name__ == "__main__":
     print("Script de prueba de envío de correos de Gipsy Documentos")
     
