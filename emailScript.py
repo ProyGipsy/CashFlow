@@ -684,7 +684,7 @@ def create_registered_purchase_html(data, purchase_id):
                     <img src="cid:logo_gipsy" alt="Logo" class="logo-img" height="40" style="height: 40px; width: auto; display: block; margin-left: auto !important; margin-right: auto !important; margin-bottom: 10px; padding-right: 40px !important; border: 0;">
                     <span align="center" style="font-weight: bold; color: #421d83; text-transform: uppercase; text-align: center; margin-left: auto !important; margin-right: auto !important;" class="brand-name">Grupo Gipsy</span>
                 </div>
-                <h2>Notificación de Nueva Operación</h2>
+                <h2>Notificación de Nueva Compra</h2>
             </div>
             <div class="body-content">
                 <p><strong>Hola, {data.get("provider_name", "Proveedor")}.</strong></p>
@@ -747,7 +747,7 @@ def create_validated_purchase_html(data, purchase_id):
                     <img src="cid:logo_gipsy" alt="Logo" class="logo-img" height="40" style="height: 40px; width: auto; display: block; margin-left: auto !important; margin-right: auto !important; margin-bottom: 10px; padding-right: 40px !important; border: 0;">
                     <span align="center" style="font-weight: bold; color: #421d83; text-transform: uppercase; text-align: center; margin-left: auto !important; margin-right: auto !important;" class="brand-name">Grupo Gipsy</span>
                 </div>
-                <h2>Confirmación de Liquidación Exitosa</h2>
+                <h2>Notificación de Validación de Compra</h2>
             </div>
             <div class="body-content">
                 <p><strong>Hola, {data.get("provider_name", "Proveedor")}.</strong></p>
